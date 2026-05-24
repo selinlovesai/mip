@@ -11,6 +11,7 @@ import { useState } from "react";
 import { Check } from "@untitledui/icons";
 import { useTheme } from "@/providers/theme-provider";
 import { cx } from "@/utils/cx";
+import { COLOR_TOKEN_GROUPS } from "@/mip/design-tokens";
 import { ACCENTS, getSavedAccent, saveAccent } from "../../shell/appearance";
 
 type Section = "theme" | "colors" | "typography" | "shadows" | "spacing";
@@ -24,14 +25,7 @@ const SECTIONS: Array<{ id: Section; label: string }> = [
 ];
 
 // --- token catalogs (names map to emitted CSS custom properties) ---
-const COLOR_GROUPS: Array<{ group: string; tokens: string[] }> = [
-    { group: "Brand", tokens: ["brand-50", "brand-100", "brand-200", "brand-300", "brand-400", "brand-500", "brand-600", "brand-700", "brand-800", "brand-900", "brand-950"].map((t) => `--color-${t}`) },
-    { group: "Text", tokens: ["text-primary", "text-secondary", "text-tertiary", "text-quaternary", "text-placeholder", "text-brand-secondary", "text-error-primary", "text-success-primary", "text-warning-primary"].map((t) => `--color-${t}`) },
-    { group: "Background", tokens: ["bg-primary", "bg-secondary", "bg-tertiary", "bg-quaternary", "bg-active", "bg-brand-solid", "bg-brand-primary", "bg-error-solid", "bg-success-solid", "bg-warning-solid"].map((t) => `--color-${t}`) },
-    { group: "Border", tokens: ["border-primary", "border-secondary", "border-tertiary", "border-brand", "border-error"].map((t) => `--color-${t}`) },
-    { group: "Foreground", tokens: ["fg-brand-primary", "fg-brand-secondary", "fg-error-primary", "fg-success-primary", "fg-warning-primary"].map((t) => `--color-${t}`) },
-    { group: "Utility", tokens: ["utility-brand-500", "utility-blue-500", "utility-indigo-500", "utility-purple-500", "utility-pink-500", "utility-orange-500", "utility-green-500", "utility-red-500", "utility-yellow-500", "utility-neutral-500"].map((t) => `--color-${t}`) },
-];
+const COLOR_GROUPS = COLOR_TOKEN_GROUPS;
 
 const FONT_TOKENS = ["--font-body", "--font-display", "--font-mono"];
 const DISPLAY_SCALE = ["--text-display-2xl", "--text-display-xl", "--text-display-lg", "--text-display-md", "--text-display-sm", "--text-display-xs"];

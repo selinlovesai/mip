@@ -1,8 +1,11 @@
 /**
- * Widget editor — an Untitled UI slide-out drawer for editing a widget's title,
- * settings (as JSON), and a small **Design** section (border + background color)
- * that writes to `widget.style`. Persists via the store's `updateWidget`. The
- * edit button (shown in edit mode by WidgetChrome) is the drawer trigger.
+ * Widget editor — an Untitled UI slide-out drawer with two tabs:
+ *   · Settings — title + settings JSON
+ *   · Design   — border + background color, each pickable from a native swatch,
+ *                a free-text field (transparent / var() / rgb()), OR the shared
+ *                design-token palette (same colors as Settings → Appearance).
+ * Persists via the store's `updateWidget` (settings + widget.style). The edit
+ * button (shown in edit mode by WidgetChrome) is the drawer trigger.
  */
 
 import { useState } from "react";
@@ -12,27 +15,31 @@ import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { Input } from "@/components/base/input/input";
 import { TextArea } from "@/components/base/textarea/textarea";
 import { SlideoutMenu } from "@/components/application/slideout-menus/slideout-menu";
+import { COLOR_TOKEN_GROUPS } from "@/mip/design-tokens";
 import { useDashboard } from "@/mip/store";
 import type { MipWidget } from "@/mip/schema";
+import { cx } from "@/utils/cx";
 import { DEFAULT_BACKGROUND_COLOR, DEFAULT_BORDER_COLOR } from "./widget-chrome";
 
+type EditorTab = "settings" | "design";
+
 /**
- * A color control supporting any CSS color OR "transparent" / CSS vars. A native
- * color swatch sets hex values; the text field accepts `transparent`,
- * `var(--…)`, rgb(), etc.; a quick button resets to transparent.
+ * A full-width color control. Supports any CSS color or `transparent` / `var()`
+ * via the swatch + text field, plus one-click selection from the design-token
+ * palette (writes `var(--color-…)`).
  */
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-    // A native <input type=color> only understands #rrggbb; fall back to black
-    // for the swatch when the value is transparent / a var() / a keyword.
-    const swatch = /^#[0-9a-fA-F]{6}$/.test(value) ? value : "#000000";
+    const isHex = /^#[0-9a-fA-F]{6}$/.test(value);
     return (
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-2">
             <span className="text-sm font-medium text-secondary">{label}</span>
             <div className="flex items-center gap-2">
+                {/* live preview of the current value (works for var()/keywords too) */}
+                <span className="size-9 shrink-0 rounded-md ring-1 ring-inset ring-secondary" style={{ background: value || "transparent" }} aria-hidden />
                 <input
                     type="color"
-                    aria-label={`${label} swatch`}
-                    value={swatch}
+                    aria-label={`${label} hex picker`}
+                    value={isHex ? value : "#000000"}
                     onChange={(e) => onChange(e.target.value)}
                     className="size-9 shrink-0 cursor-pointer rounded-md border border-secondary bg-primary p-0.5"
                 />
@@ -41,12 +48,38 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
                     Clear
                 </Button>
             </div>
+            {/* token palette — same colors as Settings → Appearance */}
+            <div className="flex flex-col gap-2 rounded-lg bg-secondary p-2 ring-1 ring-secondary">
+                {COLOR_TOKEN_GROUPS.map((g) => (
+                    <div key={g.group} className="flex flex-col gap-1">
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-quaternary">{g.group}</span>
+                        <div className="flex flex-wrap gap-1.5">
+                            {g.tokens.map((token) => {
+                                const cssVar = `var(${token})`;
+                                const selected = value === cssVar;
+                                return (
+                                    <button
+                                        key={token}
+                                        type="button"
+                                        title={token.replace(/^--color-/, "")}
+                                        aria-label={token}
+                                        onClick={() => onChange(cssVar)}
+                                        className={cx("size-6 rounded-md ring-1 ring-inset ring-black/10 transition", selected ? "outline outline-2 outline-offset-1 outline-brand" : "hover:scale-110")}
+                                        style={{ backgroundColor: cssVar }}
+                                    />
+                                );
+                            })}
+                        </div>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }
 
 function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }) {
     const { updateWidget } = useDashboard();
+    const [tab, setTab] = useState<EditorTab>("settings");
     const [title, setTitle] = useState(widget.title ?? "");
     const [settingsText, setSettingsText] = useState(JSON.stringify(widget.settings ?? {}, null, 2));
     const [borderColor, setBorderColor] = useState(widget.style?.borderColor ?? DEFAULT_BORDER_COLOR);
@@ -59,6 +92,7 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
             settings = settingsText.trim() ? JSON.parse(settingsText) : {};
         } catch (err) {
             setError(err instanceof Error ? err.message : "Invalid JSON");
+            setTab("settings");
             return;
         }
         updateWidget(widget.id, {
@@ -69,6 +103,11 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
         close();
     };
 
+    const TABS: Array<{ id: EditorTab; label: string }> = [
+        { id: "settings", label: "Settings" },
+        { id: "design", label: "Design" },
+    ];
+
     return (
         <>
             <SlideoutMenu.Header onClose={close}>
@@ -78,28 +117,41 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
                 </p>
             </SlideoutMenu.Header>
             <SlideoutMenu.Content className="flex flex-col gap-4">
-                <Input label="Title" value={title} onChange={setTitle} placeholder="Widget title" />
-                <TextArea
-                    label="Settings (JSON)"
-                    hint="The widget's data/configuration. Must be valid JSON."
-                    value={settingsText}
-                    onChange={(next) => {
-                        setSettingsText(next);
-                        setError(null);
-                    }}
-                    rows={12}
-                    textAreaClassName="font-mono text-xs"
-                />
-                {error ? <p className="text-sm text-utility-error-500">{error}</p> : null}
+                {/* tabs */}
+                <div className="flex gap-1 border-b border-secondary">
+                    {TABS.map((t) => (
+                        <button
+                            key={t.id}
+                            onClick={() => setTab(t.id)}
+                            className={cx("-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors", tab === t.id ? "border-brand text-brand-secondary" : "border-transparent text-tertiary hover:text-secondary")}
+                        >
+                            {t.label}
+                        </button>
+                    ))}
+                </div>
 
-                {/* Design — border + background color (first slice of the Design tab) */}
-                <div className="flex flex-col gap-3 border-t border-secondary pt-4">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-quaternary">Design</span>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {tab === "settings" ? (
+                    <div className="flex flex-col gap-4">
+                        <Input label="Title" value={title} onChange={setTitle} placeholder="Widget title" />
+                        <TextArea
+                            label="Settings (JSON)"
+                            hint="The widget's data/configuration. Must be valid JSON."
+                            value={settingsText}
+                            onChange={(next) => {
+                                setSettingsText(next);
+                                setError(null);
+                            }}
+                            rows={14}
+                            textAreaClassName="font-mono text-xs"
+                        />
+                        {error ? <p className="text-sm text-utility-error-500">{error}</p> : null}
+                    </div>
+                ) : (
+                    <div className="flex flex-col gap-6">
                         <ColorField label="Border" value={borderColor} onChange={setBorderColor} />
                         <ColorField label="Background" value={backgroundColor} onChange={setBackgroundColor} />
                     </div>
-                </div>
+                )}
             </SlideoutMenu.Content>
             <SlideoutMenu.Footer>
                 <div className="flex justify-end gap-2">
