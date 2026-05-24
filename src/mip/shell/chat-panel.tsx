@@ -326,7 +326,15 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                         className="flex-1"
                         textAreaClassName="max-h-20 resize-none rounded-none border-0 shadow-none ring-0 text-xs leading-4 focus:ring-0"
                     />
-                    <Button size="sm" color="primary" iconLeading={Send01} className="rounded-none" isDisabled={!draft.trim() || thinking} onClick={() => void sendText(draft)} aria-label="Send" />
+                    <button
+                        type="button"
+                        aria-label="Send"
+                        disabled={!draft.trim() || thinking}
+                        onClick={() => void sendText(draft)}
+                        className="flex items-center px-3 text-tertiary transition-colors hover:text-secondary disabled:opacity-40"
+                    >
+                        <Send01 className="size-4" />
+                    </button>
                 </div>
                 {assistantSettingsPopover}
             </div>
