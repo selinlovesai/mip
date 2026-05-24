@@ -4,13 +4,13 @@
  * assistant. Icon controls use the Untitled UI ButtonUtility component.
  */
 
-import { Lock01, LockUnlocked01, Moon01, PlusCircle, Settings01, Stars01, Sun } from "@untitledui/icons";
+import { ChevronRight, Lock01, LockUnlocked01, Moon01, PlusCircle, Settings01, Stars01, Sun } from "@untitledui/icons";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { useTheme } from "@/providers/theme-provider";
 import { useDashboard } from "@/mip/store";
 import { cx } from "@/utils/cx";
 
-export function Topbar({ onAddWidget, onToggleChat, chatOpen, onOpenSettings, settingsOpen }: { onAddWidget: () => void; onToggleChat: () => void; chatOpen: boolean; onOpenSettings: () => void; settingsOpen: boolean }) {
+export function Topbar({ onAddWidget, onToggleChat, chatOpen, onOpenSettings, settingsOpen, sidebarCollapsed, onExpandSidebar }: { onAddWidget: () => void; onToggleChat: () => void; chatOpen: boolean; onOpenSettings: () => void; settingsOpen: boolean; sidebarCollapsed: boolean; onExpandSidebar: () => void }) {
     const { activePage, editMode, setEditMode } = useDashboard();
     const { theme, setTheme } = useTheme();
     const isDark = theme === "dark" || (theme === "system" && typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches);
@@ -19,9 +19,12 @@ export function Topbar({ onAddWidget, onToggleChat, chatOpen, onOpenSettings, se
 
     return (
         <header className="flex items-center justify-between gap-4 border-b border-secondary bg-primary px-6 py-3.5">
-            <div className="flex flex-col leading-tight">
-                <span className="text-xs text-tertiary">Page</span>
-                <h1 className="text-lg font-semibold text-primary">{activePage.title}</h1>
+            <div className="flex items-center gap-2.5">
+                {sidebarCollapsed ? <ButtonUtility color="tertiary" size="sm" icon={ChevronRight} tooltip="Open sidebar" onClick={onExpandSidebar} /> : null}
+                <div className="flex flex-col leading-tight">
+                    <span className="text-xs text-tertiary">Page</span>
+                    <h1 className="text-lg font-semibold text-primary">{activePage.title}</h1>
+                </div>
             </div>
             <div className="flex items-center gap-1.5">
                 <ButtonUtility

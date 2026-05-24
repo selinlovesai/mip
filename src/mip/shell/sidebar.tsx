@@ -10,7 +10,7 @@
  */
 
 import { useState } from "react";
-import { ChevronLeft, Copy01, DotsVertical, Grid01, Plus, Trash01 } from "@untitledui/icons";
+import { ChevronLeft, ChevronRight, Copy01, DotsVertical, Grid01, LogOut01, Plus, Settings01, Trash01, User01 } from "@untitledui/icons";
 import { Avatar } from "@/components/base/avatar/avatar";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { Dropdown } from "@/components/base/dropdown/dropdown";
@@ -18,7 +18,7 @@ import { Input } from "@/components/base/input/input";
 import { NavItemBase } from "@/components/application/app-navigation/base-components/nav-item";
 import { useDashboard } from "@/mip/store";
 
-export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+export function Sidebar({ onToggle, onOpenSettings }: { onToggle: () => void; onOpenSettings: () => void }) {
     const { state, activePage, setActivePage, addPage, renamePage, deletePage, duplicatePage } = useDashboard();
     const [adding, setAdding] = useState(false);
     const [draft, setDraft] = useState("");
@@ -48,28 +48,8 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
 
     const canDelete = state.pages.length > 1;
 
-    if (collapsed) {
-        return (
-            <aside className="flex w-16 shrink-0 flex-col items-center gap-4 border-r border-secondary bg-primary py-4">
-                <button onClick={onToggle} className="flex size-9 items-center justify-center rounded-lg bg-brand-solid font-bold text-white" aria-label="Expand sidebar">
-                    M
-                </button>
-                {state.pages.map((page) => (
-                    <ButtonUtility
-                        key={page.id}
-                        color={page.id === activePage.id ? "secondary" : "tertiary"}
-                        icon={Grid01}
-                        tooltip={page.title}
-                        tooltipPlacement="right"
-                        onClick={() => setActivePage(page.id)}
-                    />
-                ))}
-            </aside>
-        );
-    }
-
     return (
-        <aside className="flex w-64 shrink-0 flex-col border-r border-secondary bg-primary">
+        <aside className="flex h-full w-64 shrink-0 flex-col border-r border-secondary bg-primary">
             <div className="flex items-center justify-between gap-2 px-4 py-4">
                 <div className="flex items-center gap-2.5">
                     <Avatar size="md" rounded={false} initials="M" className="bg-brand-solid text-white" />
@@ -149,12 +129,28 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
                 </ul>
             </nav>
 
-            <div className="flex items-center gap-2.5 border-t border-secondary px-4 py-3">
-                <Avatar size="md" initials="SA" />
-                <span className="flex flex-col leading-tight">
-                    <span className="text-sm font-semibold text-primary">Super Admin</span>
-                    <span className="text-xs text-tertiary">superadmin</span>
-                </span>
+            <div className="border-t border-secondary p-2">
+                <Dropdown.Root>
+                    <button
+                        type="button"
+                        aria-label="Open account menu"
+                        className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left hover:bg-secondary"
+                    >
+                        <Avatar size="md" initials="SA" />
+                        <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                            <span className="truncate text-sm font-semibold text-primary">Super Admin</span>
+                            <span className="truncate text-xs text-tertiary">superadmin</span>
+                        </span>
+                        <ChevronRight className="size-4 shrink-0 text-tertiary" />
+                    </button>
+                    <Dropdown.Popover placement="top end">
+                        <Dropdown.Menu>
+                            <Dropdown.Item icon={User01} label="Profile" onAction={onOpenSettings} />
+                            <Dropdown.Item icon={Settings01} label="Settings" onAction={onOpenSettings} />
+                            <Dropdown.Item icon={LogOut01} label="Sign out" onAction={() => window.location.reload()} />
+                        </Dropdown.Menu>
+                    </Dropdown.Popover>
+                </Dropdown.Root>
             </div>
         </aside>
     );

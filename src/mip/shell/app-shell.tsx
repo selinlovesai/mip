@@ -34,7 +34,9 @@ export const AppShell = () => {
             <SettingsProvider>
                 <DashboardProvider>
                     <div className="flex h-dvh overflow-hidden bg-secondary">
-                        <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((v) => !v)} />
+                        <div className={`shrink-0 overflow-hidden transition-[width] duration-200 ease-in-out ${sidebarCollapsed ? "w-0" : "w-64"}`}>
+                            <Sidebar onToggle={() => setSidebarCollapsed(true)} onOpenSettings={() => setSettingsOpen(true)} />
+                        </div>
                         <div className="flex min-w-0 flex-1 flex-col">
                             <Topbar
                                 onAddWidget={() => setPickerOpen(true)}
@@ -42,6 +44,8 @@ export const AppShell = () => {
                                 chatOpen={chatOpen}
                                 onOpenSettings={() => setSettingsOpen(true)}
                                 settingsOpen={settingsOpen}
+                                sidebarCollapsed={sidebarCollapsed}
+                                onExpandSidebar={() => setSidebarCollapsed(false)}
                             />
                             <main className="min-h-0 flex-1 overflow-hidden">
                                 {settingsOpen ? (
