@@ -44,6 +44,7 @@ interface StoreValue {
     setActivePage: (id: string) => void;
     addPage: (title: string) => void;
     addWidget: (widget: MipWidget) => void;
+    updateWidget: (widgetId: string, patch: Partial<MipWidget>) => void;
     removeWidget: (widgetId: string) => void;
     applyLayout: (layout: Layout) => void;
 }
@@ -88,6 +89,12 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         [updateActivePage],
     );
 
+    const updateWidget = useCallback(
+        (widgetId: string, patch: Partial<MipWidget>) =>
+            updateActivePage((page) => ({ ...page, widgets: page.widgets.map((w) => (w.id === widgetId ? { ...w, ...patch } : w)) })),
+        [updateActivePage],
+    );
+
     const removeWidget = useCallback(
         (widgetId: string) => updateActivePage((page) => ({ ...page, widgets: page.widgets.filter((w) => w.id !== widgetId) })),
         [updateActivePage],
@@ -110,8 +117,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     );
 
     const value = useMemo<StoreValue>(
-        () => ({ state, activePage, editMode, setEditMode, setActivePage, addPage, addWidget, removeWidget, applyLayout }),
-        [state, activePage, editMode, setActivePage, addPage, addWidget, removeWidget, applyLayout],
+        () => ({ state, activePage, editMode, setEditMode, setActivePage, addPage, addWidget, updateWidget, removeWidget, applyLayout }),
+        [state, activePage, editMode, setActivePage, addPage, addWidget, updateWidget, removeWidget, applyLayout],
     );
 
     return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>;
