@@ -16,12 +16,14 @@ import { Badge } from "@/components/base/badges/badges";
 import { Button } from "@/components/base/buttons/button";
 import { CloseButton } from "@/components/base/buttons/close-button";
 import { Input } from "@/components/base/input/input";
+import { useSettings } from "@/mip/settings/settings-store";
 import { useDashboard } from "@/mip/store";
 import { cx } from "@/utils/cx";
 import { TEMPLATES, TEMPLATE_CATEGORIES, cloneTemplateWidgets, type DashboardTemplate } from "./templates-catalog";
 
 export function TemplatesModal({ open, onClose, onOpenConnections }: { open: boolean; onClose: () => void; onOpenConnections?: () => void }) {
     const { importTemplate } = useDashboard();
+    const { ensureConnection } = useSettings();
     const [query, setQuery] = useState("");
     const [category, setCategory] = useState<(typeof TEMPLATE_CATEGORIES)[number]>("All");
     const [selected, setSelected] = useState<DashboardTemplate | null>(null);
@@ -43,6 +45,7 @@ export function TemplatesModal({ open, onClose, onOpenConnections }: { open: boo
     };
 
     const doImport = (template: DashboardTemplate) => {
+        for (const conn of template.connectionsSeed ?? []) ensureConnection(conn);
         importTemplate(template.name, cloneTemplateWidgets(template));
         close();
     };

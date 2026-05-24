@@ -9,6 +9,7 @@
  */
 
 import type { MipWidget } from "@/mip/schema";
+import type { Connection } from "@/mip/settings/settings-store";
 
 export type TemplateCategory = "Analytics" | "Finance" | "Management" | "General" | "Business" | "Marketing";
 
@@ -21,6 +22,8 @@ export interface DashboardTemplate {
     /** Connectors this template uses; [] means no keys needed. */
     connectors: string[];
     needsKeys: boolean;
+    /** Connections the template needs; ensured (added if missing) on import. */
+    connectionsSeed?: Connection[];
     widgets: MipWidget[];
 }
 
@@ -52,10 +55,37 @@ export const TEMPLATES: DashboardTemplate[] = [
         icon: "🪙",
         connectors: ["Binance", "CoinGecko"],
         needsKeys: false,
+        connectionsSeed: [
+            { id: "binance", name: "Binance", type: "rest", baseUrl: "https://api.binance.com" },
+            { id: "coingecko", name: "CoinGecko", type: "rest", baseUrl: "https://api.coingecko.com" },
+        ],
         widgets: [
-            { id: "c-btc", type: "kpi", title: "BTC / USD", layout: L(0, 0, 4, 1), settings: { value: 67400, valueFormat: "currency", delta: 2.1, deltaLabel: "24h" } },
-            { id: "c-eth", type: "kpi", title: "ETH / USD", layout: L(4, 0, 4, 1), settings: { value: 3520, valueFormat: "currency", delta: -0.8, deltaLabel: "24h" } },
-            { id: "c-cap", type: "kpi", title: "Market cap", layout: L(8, 0, 4, 1), settings: { value: 2380000000000, valueFormat: "currency", delta: 1.4, deltaLabel: "24h" } },
+            // Live: Binance 24h ticker — lastPrice + priceChangePercent.
+            {
+                id: "c-btc",
+                type: "kpi",
+                title: "BTC / USD",
+                layout: L(0, 0, 4, 1),
+                settings: { valueFormat: "currency", deltaLabel: "24h" },
+                data: { sourceId: "binance", request: { method: "GET", path: "/api/v3/ticker/24hr", params: { symbol: "BTCUSDT" } }, map: { value: "$.lastPrice", delta: "$.priceChangePercent" } },
+            },
+            {
+                id: "c-eth",
+                type: "kpi",
+                title: "ETH / USD",
+                layout: L(4, 0, 4, 1),
+                settings: { valueFormat: "currency", deltaLabel: "24h" },
+                data: { sourceId: "binance", request: { method: "GET", path: "/api/v3/ticker/24hr", params: { symbol: "ETHUSDT" } }, map: { value: "$.lastPrice", delta: "$.priceChangePercent" } },
+            },
+            // Live: CoinGecko global market cap.
+            {
+                id: "c-cap",
+                type: "kpi",
+                title: "Market cap",
+                layout: L(8, 0, 4, 1),
+                settings: { valueFormat: "currency", deltaLabel: "24h" },
+                data: { sourceId: "coingecko", request: { method: "GET", path: "/api/v3/global" }, map: { value: "$.data.total_market_cap.usd", delta: "$.data.market_cap_change_percentage_24h_usd" } },
+            },
             { id: "c-chart", type: "lineChart", title: "BTC price (7d)", layout: L(0, 1, 12, 3), settings: { valueFormat: "currency", points: [{ label: "D1", value: 64200 }, { label: "D2", value: 65100 }, { label: "D3", value: 63800 }, { label: "D4", value: 66200 }, { label: "D5", value: 66900 }, { label: "D6", value: 67100 }, { label: "D7", value: 67400 }] } },
         ],
     },

@@ -81,7 +81,12 @@ interface SettingsState {
 const STORAGE_KEY = "mip-settings-v1";
 
 const DEFAULT_STATE: SettingsState = {
-    connections: [{ id: "mock", name: "Sample data", type: "mock" }],
+    connections: [
+        { id: "mock", name: "Sample data", type: "mock" },
+        // Keyless public APIs — power the Crypto template's live widgets.
+        { id: "binance", name: "Binance", type: "rest", baseUrl: "https://api.binance.com" },
+        { id: "coingecko", name: "CoinGecko", type: "rest", baseUrl: "https://api.coingecko.com" },
+    ],
     apps: [],
     assistant: {},
     profile: { name: "Super Admin", email: "superadmin@protocol.dev" },
@@ -104,6 +109,8 @@ interface SettingsValue {
     connectApp: (appId: string, method: AuthMethod) => void;
     disconnectApp: (appId: string) => void;
     addConnection: (conn: Omit<Connection, "id">) => string;
+    /** Add a connection with a fixed id if one with that id doesn't already exist. */
+    ensureConnection: (conn: Connection) => void;
     updateConnection: (id: string, patch: Partial<Connection>) => void;
     removeConnection: (id: string) => void;
     getConnection: (id: string) => Connection | undefined;
@@ -144,6 +151,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         return id;
     }, []);
 
+    const ensureConnection = useCallback((conn: Connection) => {
+        setState((s) => (s.connections.some((c) => c.id === conn.id) ? s : { ...s, connections: [...s.connections, conn] }));
+    }, []);
+
     const updateConnection = useCallback((id: string, patch: Partial<Connection>) => {
         setState((s) => ({ ...s, connections: s.connections.map((c) => (c.id === id ? { ...c, ...patch } : c)) }));
     }, []);
@@ -165,8 +176,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const value = useMemo<SettingsValue>(
-        () => ({ connections: state.connections, apps: state.apps, isAppConnected, connectApp, disconnectApp, addConnection, updateConnection, removeConnection, getConnection, aiConnections, assistant: state.assistant, setAssistant, profile: state.profile, setProfile }),
-        [state, isAppConnected, connectApp, disconnectApp, addConnection, updateConnection, removeConnection, getConnection, aiConnections, setAssistant, setProfile],
+        () => ({ connections: state.connections, apps: state.apps, isAppConnected, connectApp, disconnectApp, addConnection, ensureConnection, updateConnection, removeConnection, getConnection, aiConnections, assistant: state.assistant, setAssistant, profile: state.profile, setProfile }),
+        [state, isAppConnected, connectApp, disconnectApp, addConnection, ensureConnection, updateConnection, removeConnection, getConnection, aiConnections, setAssistant, setProfile],
     );
 
     return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

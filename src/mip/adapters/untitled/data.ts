@@ -22,10 +22,26 @@ export interface ChartPoint {
     value: number;
 }
 
-function readByPath(source: unknown, path: string | undefined): unknown {
+/**
+ * Read a value from a payload by JSONPath-lite: supports `$`, leading `$.`,
+ * dotted keys, and array indices (`a.b[0].c` or `a.0.c`). Returns the source
+ * itself for `$` / empty path. Used to resolve widget data `map` expressions.
+ */
+export function readJsonPath(source: unknown, path?: string): unknown {
     if (!path) return source;
-    return path.split(".").reduce<unknown>((acc, key) => {
-        if (acc && typeof acc === "object" && key in (acc as Row)) return (acc as Row)[key];
+    let p = path.trim();
+    if (p === "$") return source;
+    if (p.startsWith("$")) p = p.slice(1);
+    if (p.startsWith(".")) p = p.slice(1);
+    if (!p) return source;
+    const segments = p.replace(/\[(\w+)\]/g, ".$1").split(".").filter(Boolean);
+    return segments.reduce<unknown>((acc, key) => {
+        if (acc == null) return undefined;
+        if (Array.isArray(acc)) {
+            const i = Number(key);
+            return Number.isInteger(i) ? acc[i] : undefined;
+        }
+        if (typeof acc === "object") return (acc as Row)[key];
         return undefined;
     }, source);
 }
@@ -37,7 +53,7 @@ function asRows(value: unknown): Row[] {
 /** Resolve a widget's collection of records from fetched data or authored settings. */
 export function resolveRows(widget: MipWidget, dataState: WidgetDataState, mapKey?: string): Row[] {
     if (dataState.status === "success" && dataState.data != null) {
-        const mapped = readByPath(dataState.data, mapKey ? widget.data?.map?.[mapKey] : undefined);
+        const mapped = readJsonPath(dataState.data, mapKey ? widget.data?.map?.[mapKey] : undefined);
         const rows = asRows(mapped ?? dataState.data);
         if (rows.length) return rows;
     }

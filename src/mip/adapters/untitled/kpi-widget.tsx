@@ -10,21 +10,27 @@
 import { TrendDown01, TrendUp01 } from "@untitledui/icons";
 import { BadgeWithIcon } from "@/components/base/badges/badges";
 import type { WidgetRenderProps } from "@/mip/adapter/types";
+import { readJsonPath } from "./data";
 import { formatNumber, formatValue } from "./format";
 import { WidgetCard } from "./widget-card";
 
 export function KpiWidget({ widget, dataState }: WidgetRenderProps) {
     const settings = widget.settings ?? {};
 
-    // Prefer fetched data when the source resolved; otherwise use authored settings.
-    const fetched = dataState.status === "success" && dataState.data != null ? (dataState.data as Record<string, unknown>) : undefined;
-    const rawValue = fetched?.value ?? settings.value;
+    // Prefer fetched data when the source resolved; otherwise use authored
+    // settings. When a data `map` is present, resolve value/delta via JSONPath
+    // (e.g. value: "$.lastPrice"); otherwise read top-level keys.
+    const fetched = dataState.status === "success" && dataState.data != null ? dataState.data : undefined;
+    const map = widget.data?.map;
+    const mapped = (key: string): unknown =>
+        fetched == null ? undefined : map?.[key] != null ? readJsonPath(fetched, map[key]) : (fetched as Record<string, unknown>)[key];
+    const rawValue = mapped("value") ?? settings.value;
     const valueFormat = typeof settings.valueFormat === "string" ? settings.valueFormat : undefined;
     const unit = typeof settings.unit === "string" ? settings.unit : "";
 
     const displayValue = formatValue(rawValue, valueFormat);
 
-    const rawDelta = fetched?.delta ?? settings.delta;
+    const rawDelta = mapped("delta") ?? settings.delta;
     const deltaNum = typeof rawDelta === "number" ? rawDelta : Number(rawDelta);
     const hasDelta = rawDelta != null && rawDelta !== "" && Number.isFinite(deltaNum);
     const deltaIsUp = hasDelta && deltaNum > 0;

@@ -12,6 +12,7 @@ import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { WidgetView } from "@/mip/adapter/registry";
 import type { MipWidget } from "@/mip/schema";
 import { cx } from "@/utils/cx";
+import { useWidgetData } from "./use-widget-data";
 import { WidgetEditorButton } from "./widget-editor";
 
 /** Design-tab defaults — match the widget card's normal look (white surface,
@@ -26,6 +27,7 @@ export function widgetCardStyle(widget: MipWidget): CSSProperties {
 }
 
 export function WidgetChrome({ widget, editMode, onDelete }: { widget: MipWidget; editMode: boolean; onDelete: (id: string) => void }) {
+    const dataState = useWidgetData(widget);
     return (
         <div className={cx("group relative h-full", editMode && "rounded-xl ring-1 ring-transparent transition-shadow hover:ring-brand")}>
             {editMode ? (
@@ -44,7 +46,7 @@ export function WidgetChrome({ widget, editMode, onDelete }: { widget: MipWidget
                 className="h-full overflow-hidden rounded-xl [&>section]:!rounded-none [&>section]:!bg-transparent [&>section]:!ring-0"
                 style={widgetCardStyle(widget)}
             >
-                <WidgetView widget={widget} />
+                <WidgetView widget={widget} dataState={dataState} />
             </div>
         </div>
     );
