@@ -137,6 +137,12 @@ export interface MipWidgetStyle {
     /** Raw CSS color overrides (Design tab) — any CSS color or "transparent". */
     borderColor?: string;
     backgroundColor?: string;
+    /**
+     * Per-widget color scheme (Design tab → "Text & Border"). "light"/"dark"
+     * remap text / sub-text / border (and surface) tokens to that mode's own
+     * shades for this widget only; undefined follows the app theme.
+     */
+    colorScheme?: "light" | "dark";
 }
 
 export interface MipPermissions {

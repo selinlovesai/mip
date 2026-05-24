@@ -13,13 +13,20 @@ import { ChevronRight, Edit03 } from "@untitledui/icons";
 import { Button } from "@/components/base/buttons/button";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { Input } from "@/components/base/input/input";
+import { Select } from "@/components/base/select/select";
 import { TextArea } from "@/components/base/textarea/textarea";
 import { SlideoutMenu } from "@/components/application/slideout-menus/slideout-menu";
 import { COLOR_TOKEN_GROUPS } from "@/mip/design-tokens";
 import { useDashboard } from "@/mip/store";
 import type { MipWidget } from "@/mip/schema";
 import { cx } from "@/utils/cx";
-import { DEFAULT_BACKGROUND_COLOR, DEFAULT_BORDER_COLOR } from "./widget-chrome";
+import { DEFAULT_BACKGROUND_COLOR } from "./widget-chrome";
+
+const COLOR_SCHEMES = [
+    { id: "default", label: "Default (follow theme)" },
+    { id: "light", label: "Light" },
+    { id: "dark", label: "Dark" },
+];
 
 type EditorTab = "settings" | "design";
 
@@ -96,7 +103,7 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
     const [tab, setTab] = useState<EditorTab>("settings");
     const [title, setTitle] = useState(widget.title ?? "");
     const [settingsText, setSettingsText] = useState(JSON.stringify(widget.settings ?? {}, null, 2));
-    const [borderColor, setBorderColor] = useState(widget.style?.borderColor ?? DEFAULT_BORDER_COLOR);
+    const [scheme, setScheme] = useState<string>(widget.style?.colorScheme ?? "default");
     const [backgroundColor, setBackgroundColor] = useState(widget.style?.backgroundColor ?? DEFAULT_BACKGROUND_COLOR);
     const [error, setError] = useState<string | null>(null);
 
@@ -112,7 +119,7 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
         updateWidget(widget.id, {
             title: title.trim() || undefined,
             settings,
-            style: { ...widget.style, borderColor, backgroundColor },
+            style: { ...widget.style, backgroundColor, colorScheme: scheme === "default" ? undefined : (scheme as "light" | "dark") },
         });
         close();
     };
@@ -162,7 +169,13 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
                     </div>
                 ) : (
                     <div className="flex flex-col gap-6">
-                        <ColorField label="Border" value={borderColor} onChange={setBorderColor} />
+                        <div className="flex flex-col gap-1.5">
+                            <span className="text-sm font-medium text-secondary">Text &amp; Border</span>
+                            <Select aria-label="Text and border color scheme" selectedKey={scheme} items={COLOR_SCHEMES} onSelectionChange={(k) => setScheme(String(k))}>
+                                {(item) => <Select.Item id={item.id}>{item.label}</Select.Item>}
+                            </Select>
+                            <span className="text-xs text-tertiary">Light or Dark adjusts text, sub-text and border to their own shades.</span>
+                        </div>
                         <ColorField label="Background" value={backgroundColor} onChange={setBackgroundColor} />
                     </div>
                 )}
