@@ -18,6 +18,7 @@ import { Checkbox } from "@/components/base/checkbox/checkbox";
 import { Input } from "@/components/base/input/input";
 import { Select } from "@/components/base/select/select";
 import { TextArea } from "@/components/base/textarea/textarea";
+import { dbAvailable, dbGet } from "@/mip/api";
 import { useDashboard, type DashboardPage, type PageAccessLevel, type PageVariable } from "@/mip/store";
 import { cx } from "@/utils/cx";
 
@@ -57,15 +58,17 @@ const ROLES: Array<{ id: string; label: string; locked?: boolean; defaultAccess:
 const cardCls = "flex flex-col gap-4 rounded-xl bg-secondary p-4 ring-1 ring-secondary";
 
 export function DashboardSettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-    const { activePage, updatePageSettings } = useDashboard();
+    const { activePage, updatePageSettings, renamePageId, isPageIdAvailable } = useDashboard();
     const [tab, setTab] = useState<TabId>("general");
     const [draft, setDraft] = useState<DashboardPage>(activePage);
+    const [idError, setIdError] = useState<string | null>(null);
 
     // Re-sync the draft whenever the modal (re)opens or the active page changes.
     useEffect(() => {
         if (open) {
             setDraft(activePage);
             setTab("general");
+            setIdError(null);
         }
     }, [open, activePage]);
 
@@ -87,8 +90,31 @@ export function DashboardSettingsModal({ open, onClose }: { open: boolean; onClo
         setDraft((d) => ({ ...d, variables: (d.variables ?? []).map((v) => (v.id === id ? { ...v, ...patch } : v)) }));
     const removeVariable = (id: string) => setDraft((d) => ({ ...d, variables: (d.variables ?? []).filter((v) => v.id !== id) }));
 
-    const save = () => {
-        updatePageSettings(activePage.id, {
+    const save = async () => {
+        const nextId = draft.id.trim();
+        // Page ID validation: non-empty, unique vs. other pages, and (when the
+        // DB is reachable) not already taken by a different dashboard row.
+        if (nextId !== activePage.id) {
+            if (!isPageIdAvailable(nextId, activePage.id)) {
+                setIdError("That Page ID is already used by another page.");
+                setTab("general");
+                return;
+            }
+            if (await dbAvailable()) {
+                const existing = await dbGet("dashboards", nextId);
+                if (existing) {
+                    setIdError("That Page ID already exists in the database.");
+                    setTab("general");
+                    return;
+                }
+            }
+            if (!renamePageId(activePage.id, nextId)) {
+                setIdError("Couldn't change the Page ID — it may already be in use.");
+                setTab("general");
+                return;
+            }
+        }
+        updatePageSettings(nextId, {
             title: draft.title.trim() || activePage.title,
             description: draft.description,
             layoutMode: draft.layoutMode ?? "dashboard",
@@ -134,7 +160,16 @@ export function DashboardSettingsModal({ open, onClose }: { open: boolean; onClo
                                     <div className="flex flex-col gap-4">
                                         <h3 className="text-sm font-semibold text-primary">Page Settings</h3>
                                         <Input label="Title" value={draft.title} onChange={(v) => setDraftField("title", v)} placeholder="Page title" />
-                                        <Input label="Page ID" value={draft.id} isDisabled hint="The stable identifier for this page (read-only)." onChange={() => {}} />
+                                        <Input
+                                            label="Page ID"
+                                            value={draft.id}
+                                            onChange={(v) => {
+                                                setDraftField("id", v);
+                                                setIdError(null);
+                                            }}
+                                            isInvalid={!!idError}
+                                            hint={idError ?? "Unique identifier for this page (used in URLs and the DB)."}
+                                        />
                                         <TextArea
                                             label="Description"
                                             value={draft.description ?? ""}
@@ -243,7 +278,7 @@ export function DashboardSettingsModal({ open, onClose }: { open: boolean; onClo
                             <Button color="secondary" size="md" onClick={onClose}>
                                 Cancel
                             </Button>
-                            <Button color="primary" size="md" onClick={save}>
+                            <Button color="primary" size="md" onClick={() => void save()}>
                                 Save Settings
                             </Button>
                         </div>

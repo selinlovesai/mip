@@ -51,7 +51,7 @@ export function TemplatesModal({ open, onClose, onOpenConnections }: { open: boo
         <ModalOverlay isOpen={open} onOpenChange={(isOpen) => !isOpen && close()} isDismissable>
             <Modal className="max-w-3xl">
                 <Dialog>
-                    <div className="flex max-h-[80vh] w-full flex-col overflow-hidden rounded-xl bg-primary shadow-xl ring-1 ring-secondary">
+                    <div className="flex h-[600px] max-h-[85vh] w-full flex-col overflow-hidden rounded-xl bg-primary shadow-xl ring-1 ring-secondary">
                         {selected ? (
                             /* ---- Import-confirm view ---- */
                             <>
@@ -116,7 +116,7 @@ export function TemplatesModal({ open, onClose, onOpenConnections }: { open: boo
                                                 onClick={() => setCategory(c)}
                                                 className={cx(
                                                     "rounded-full px-3 py-1 text-xs font-medium ring-1 transition-colors",
-                                                    category === c ? "bg-brand-50 text-brand-secondary ring-brand" : "bg-primary text-tertiary ring-secondary hover:bg-secondary",
+                                                    category === c ? "bg-transparent text-brand-secondary ring-brand" : "bg-primary text-tertiary ring-secondary hover:bg-secondary",
                                                 )}
                                             >
                                                 {c}

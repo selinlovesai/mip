@@ -298,7 +298,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
     // ---- COMPACT mode ----
     if (mode === "compact") {
         return (
-            <div className="fixed top-20 right-4 z-50 flex w-[360px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl bg-primary shadow-xl ring-1 ring-secondary">
+            <div className="fixed right-0 top-0 z-50 flex w-[360px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-l-xl rounded-br-xl border-b border-l border-secondary bg-primary shadow-xl">
                 <div className="flex items-center justify-between gap-2 border-b border-secondary px-3 py-2">
                     <div className="flex min-w-0 items-center gap-2">
                         <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-brand-solid">
@@ -336,7 +336,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
     // ---- FLOATING CHAT mode ----
     if (mode === "chat") {
         return (
-            <div className="fixed top-20 right-4 bottom-4 z-50 flex w-[420px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl bg-primary shadow-xl ring-1 ring-secondary">
+            <div className="fixed right-0 top-0 bottom-4 z-50 flex w-[420px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-l-2xl rounded-br-2xl border-b border-l border-secondary bg-primary shadow-xl">
                 {header}
                 {messageList}
                 {footer}

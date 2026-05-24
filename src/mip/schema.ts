@@ -134,6 +134,9 @@ export interface MipWidgetStyle {
     density?: DensityValue;
     variant?: ButtonVariant;
     size?: SizeValue;
+    /** Raw CSS color overrides (Design tab) — any CSS color or "transparent". */
+    borderColor?: string;
+    backgroundColor?: string;
 }
 
 export interface MipPermissions {

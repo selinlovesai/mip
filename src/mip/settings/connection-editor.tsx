@@ -108,6 +108,7 @@ export function ConnectionEditor({ id, onClose }: { id: string; onClose: () => v
     const [expandedEndpoint, setExpandedEndpoint] = useState<string | null>(null);
     const [selectedEndpointId, setSelectedEndpointId] = useState<string | null>(stored?.endpoints?.[0]?.id ?? null);
     const [collectionJson, setCollectionJson] = useState("");
+    const [importMsg, setImportMsg] = useState<string | null>(null);
     const [test, setTest] = useState<TestState | null>(null);
     const [showPreview, setShowPreview] = useState(false);
 
@@ -140,9 +141,18 @@ export function ConnectionEditor({ id, onClose }: { id: string; onClose: () => v
         setSelectedEndpointId(ep.id);
     };
     const discoverEndpoints = () => {
-        const ep: ConnectionEndpoint = { id: uid("ep"), label: "Health", method: "GET", path: "/health", mapPath: "$" };
-        patch({ endpoints: [...endpoints, ep] });
-        setSelectedEndpointId(ep.id);
+        // Probe a few common REST conventions, but never duplicate an endpoint
+        // that already exists (same METHOD + path).
+        const candidates: ConnectionEndpoint[] = [
+            { id: uid("ep"), label: "Health", method: "GET", path: "/health", mapPath: "$" },
+            { id: uid("ep"), label: "Status", method: "GET", path: "/status", mapPath: "$" },
+            { id: uid("ep"), label: "Root", method: "GET", path: "/", mapPath: "$" },
+        ];
+        const existing = new Set(endpoints.map((e) => `${e.method.toUpperCase()} ${e.path}`));
+        const fresh = candidates.filter((c) => !existing.has(`${c.method.toUpperCase()} ${c.path}`));
+        if (fresh.length === 0) return; // nothing new to add
+        patch({ endpoints: [...endpoints, ...fresh] });
+        setSelectedEndpointId(fresh[0]!.id);
     };
     const removeEndpoint = (epId: string) => {
         patch({ endpoints: endpoints.filter((e) => e.id !== epId) });
@@ -151,37 +161,63 @@ export function ConnectionEditor({ id, onClose }: { id: string; onClose: () => v
     };
 
     // --- Postman import ---
-    const importCollection = () => {
-        try {
-            const parsed = JSON.parse(collectionJson) as { item?: unknown[] };
-            const items = Array.isArray(parsed.item) ? parsed.item : [];
-            const imported: ConnectionEndpoint[] = [];
-            for (const raw of items) {
-                const it = raw as {
-                    name?: string;
-                    request?: { method?: string; url?: { raw?: string; path?: string[] } | string; body?: { raw?: string } };
-                };
-                const req = it.request;
-                if (!req) continue;
-                let path = "/";
-                if (typeof req.url === "string") path = req.url;
-                else if (req.url?.path) path = `/${req.url.path.join("/")}`;
-                else if (req.url?.raw) path = req.url.raw;
-                imported.push({
-                    id: uid("ep"),
-                    label: it.name ?? "Imported",
-                    method: (req.method ?? "GET").toUpperCase(),
-                    path,
-                    body: req.body?.raw,
-                });
+    type PostmanItem = {
+        name?: string;
+        item?: PostmanItem[]; // folders nest their requests here
+        request?:
+            | string
+            | { method?: string; url?: { raw?: string; path?: string[] } | string; body?: { raw?: string } };
+    };
+
+    /** Walk a Postman collection tree (folders nest under `item[]`) → endpoints. */
+    const flattenPostman = (items: PostmanItem[]): ConnectionEndpoint[] => {
+        const out: ConnectionEndpoint[] = [];
+        for (const it of items) {
+            if (Array.isArray(it.item)) {
+                out.push(...flattenPostman(it.item)); // folder → recurse
+                continue;
             }
-            if (imported.length) {
-                patch({ endpoints: [...endpoints, ...imported] });
-                setCollectionJson("");
+            const req = it.request;
+            if (!req) continue;
+            if (typeof req === "string") {
+                out.push({ id: uid("ep"), label: it.name ?? "Imported", method: "GET", path: req });
+                continue;
             }
-        } catch {
-            /* ignore parse errors (best-effort) */
+            let path = "/";
+            if (typeof req.url === "string") path = req.url;
+            else if (req.url?.path) path = `/${req.url.path.join("/")}`;
+            else if (req.url?.raw) path = req.url.raw;
+            out.push({
+                id: uid("ep"),
+                label: it.name ?? "Imported",
+                method: (req.method ?? "GET").toUpperCase(),
+                path,
+                body: typeof req === "object" ? req.body?.raw : undefined,
+            });
         }
+        return out;
+    };
+
+    const importCollection = () => {
+        let parsed: { item?: PostmanItem[]; baseUrl?: string };
+        try {
+            parsed = JSON.parse(collectionJson);
+        } catch {
+            setImportMsg("Invalid JSON — paste a Postman v2 collection export.");
+            return;
+        }
+        const items = Array.isArray(parsed.item) ? parsed.item : [];
+        const imported = flattenPostman(items);
+        if (imported.length === 0) {
+            setImportMsg("No requests found in that collection.");
+            return;
+        }
+        // De-dupe against what's already there (METHOD + path).
+        const existing = new Set(endpoints.map((e) => `${e.method.toUpperCase()} ${e.path}`));
+        const fresh = imported.filter((e) => !existing.has(`${e.method.toUpperCase()} ${e.path}`));
+        patch({ endpoints: [...endpoints, ...fresh] });
+        setCollectionJson("");
+        setImportMsg(`Imported ${fresh.length} endpoint${fresh.length === 1 ? "" : "s"}${imported.length - fresh.length ? ` (${imported.length - fresh.length} already present)` : ""}.`);
     };
 
     // --- Actions ---
@@ -452,14 +488,18 @@ export function ConnectionEditor({ id, onClose }: { id: string; onClose: () => v
                 <TextArea
                     label="Collection JSON"
                     value={collectionJson}
-                    onChange={setCollectionJson}
+                    onChange={(v) => {
+                        setCollectionJson(v);
+                        setImportMsg(null);
+                    }}
                     rows={5}
                     placeholder={'{ "item": [ { "name": "List", "request": { "method": "GET", "url": { "path": ["v1","items"] } } } ] }'}
                 />
-                <div>
+                <div className="flex items-center gap-3">
                     <Button color="secondary" size="sm" isDisabled={!collectionJson.trim()} onClick={importCollection}>
                         Import collection
                     </Button>
+                    {importMsg ? <span className="text-sm text-tertiary">{importMsg}</span> : null}
                 </div>
             </div>
 

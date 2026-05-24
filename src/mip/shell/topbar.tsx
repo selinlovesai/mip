@@ -15,7 +15,8 @@ export function Topbar({ onAddWidget, onToggleChat, chatOpen, onOpenDashboardSet
     const { theme, setTheme } = useTheme();
     const isDark = theme === "dark" || (theme === "system" && typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches);
 
-    const activeClass = "bg-brand-50 text-brand-secondary ring-1 ring-brand hover:bg-brand-50 hover:text-brand-secondary";
+    // Active toggle look: transparent fill + brand ring/text (reads in light AND dark).
+    const activeClass = "bg-transparent text-brand-secondary ring-1 ring-brand hover:text-brand-secondary";
 
     return (
         <header className="flex items-center justify-between gap-4 border-b border-secondary bg-primary px-6 py-3.5">

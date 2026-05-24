@@ -1,14 +1,33 @@
-/** Profile settings tab — basic account fields (client-only demo). */
+/** Profile settings tab — account fields persisted to the settings store. */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Avatar } from "@/components/base/avatar/avatar";
 import { Button } from "@/components/base/buttons/button";
 import { Input } from "@/components/base/input/input";
+import { useSettings } from "../settings-store";
+
+function initialsOf(name: string): string {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "U";
+    return (parts[0]![0]! + (parts[1]?.[0] ?? "")).toUpperCase();
+}
 
 export function ProfileTab() {
-    const [name, setName] = useState("Super Admin");
-    const [email, setEmail] = useState("superadmin@protocol.dev");
+    const { profile, setProfile } = useSettings();
+    const [name, setName] = useState(profile.name);
+    const [email, setEmail] = useState(profile.email);
     const [saved, setSaved] = useState(false);
+
+    // Keep local fields in sync if the store changes elsewhere.
+    useEffect(() => {
+        setName(profile.name);
+        setEmail(profile.email);
+    }, [profile.name, profile.email]);
+
+    const save = () => {
+        setProfile({ name: name.trim() || "User", email: email.trim() });
+        setSaved(true);
+    };
 
     return (
         <div className="flex flex-col gap-8">
@@ -18,10 +37,10 @@ export function ProfileTab() {
             </header>
 
             <div className="flex items-center gap-4">
-                <Avatar size="xl" initials="SA" />
+                <Avatar size="xl" initials={initialsOf(name)} />
                 <div>
                     <p className="text-sm font-semibold text-primary">{name}</p>
-                    <p className="text-sm text-tertiary">superadmin · Super Admin</p>
+                    <p className="text-sm text-tertiary">{email}</p>
                 </div>
             </div>
 
@@ -31,10 +50,10 @@ export function ProfileTab() {
             </div>
 
             <div className="flex items-center gap-3">
-                <Button color="primary" size="md" onClick={() => setSaved(true)}>
+                <Button color="primary" size="md" onClick={save}>
                     Save changes
                 </Button>
-                {saved ? <span className="text-sm text-utility-green-500">Saved ✓</span> : null}
+                {saved ? <span className="text-sm text-utility-success-500">Saved ✓</span> : null}
             </div>
         </div>
     );

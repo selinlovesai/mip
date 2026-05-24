@@ -1,10 +1,10 @@
 /**
  * Client for the FastAPI backend (server/). Base URL from VITE_MIP_API or
- * http://localhost:8787. Used by the assistant (chat) and the Connections
+ * http://localhost:8799. Used by the assistant (chat) and the Connections
  * editor (endpoint test).
  */
 
-const BASE = (import.meta.env.VITE_MIP_API as string | undefined)?.replace(/\/$/, "") ?? "http://localhost:8787";
+const BASE = (import.meta.env.VITE_MIP_API as string | undefined)?.replace(/\/$/, "") ?? "http://localhost:8799";
 
 export interface ChatResult {
     ok: boolean;

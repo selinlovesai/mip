@@ -66,10 +66,16 @@ export interface AssistantConfig {
     callableConnectionIds?: string[];
 }
 
+export interface UserProfile {
+    name: string;
+    email: string;
+}
+
 interface SettingsState {
     connections: Connection[];
     apps: AppConnection[];
     assistant: AssistantConfig;
+    profile: UserProfile;
 }
 
 const STORAGE_KEY = "mip-settings-v1";
@@ -78,6 +84,7 @@ const DEFAULT_STATE: SettingsState = {
     connections: [{ id: "mock", name: "Sample data", type: "mock" }],
     apps: [],
     assistant: {},
+    profile: { name: "Super Admin", email: "superadmin@protocol.dev" },
 };
 
 function load(): SettingsState {
@@ -104,6 +111,8 @@ interface SettingsValue {
     aiConnections: Connection[];
     assistant: AssistantConfig;
     setAssistant: (patch: Partial<AssistantConfig>) => void;
+    profile: UserProfile;
+    setProfile: (patch: Partial<UserProfile>) => void;
 }
 
 const SettingsContext = createContext<SettingsValue | null>(null);
@@ -151,9 +160,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, assistant: { ...s.assistant, ...patch } }));
     }, []);
 
+    const setProfile = useCallback((patch: Partial<UserProfile>) => {
+        setState((s) => ({ ...s, profile: { ...s.profile, ...patch } }));
+    }, []);
+
     const value = useMemo<SettingsValue>(
-        () => ({ connections: state.connections, apps: state.apps, isAppConnected, connectApp, disconnectApp, addConnection, updateConnection, removeConnection, getConnection, aiConnections, assistant: state.assistant, setAssistant }),
-        [state, isAppConnected, connectApp, disconnectApp, addConnection, updateConnection, removeConnection, getConnection, aiConnections, setAssistant],
+        () => ({ connections: state.connections, apps: state.apps, isAppConnected, connectApp, disconnectApp, addConnection, updateConnection, removeConnection, getConnection, aiConnections, assistant: state.assistant, setAssistant, profile: state.profile, setProfile }),
+        [state, isAppConnected, connectApp, disconnectApp, addConnection, updateConnection, removeConnection, getConnection, aiConnections, setAssistant, setProfile],
     );
 
     return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

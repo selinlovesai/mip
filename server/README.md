@@ -42,9 +42,12 @@ pip install -r requirements.txt
 createdb mip_tailwind
 export DATABASE_URL="postgresql+asyncpg://localhost/mip_tailwind"
 
-uvicorn main:app --reload --port 8787
+uvicorn main:app --reload --port 8799
 ```
+
+> **Port:** mip-tailwind uses **8799** (the original mip data-proxy owns 8787, so
+> both stacks can run side by side).
 
 `DATABASE_URL` defaults to `postgresql+asyncpg://localhost/mip_tailwind`; a plain
 `postgres://…` URL is auto-rewritten to the asyncpg driver. The frontend calls
-`http://localhost:8787` by default (override with `VITE_MIP_API`).
+`http://localhost:8799` by default (override with `VITE_MIP_API`).

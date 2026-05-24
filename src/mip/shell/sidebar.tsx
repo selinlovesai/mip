@@ -10,16 +10,26 @@
  */
 
 import { useState } from "react";
+import { Button as AriaButton } from "react-aria-components";
 import { ChevronLeft, ChevronRight, Copy01, DotsVertical, Grid01, LogOut01, Plus, Settings01, Trash01, User01 } from "@untitledui/icons";
 import { Avatar } from "@/components/base/avatar/avatar";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { Dropdown } from "@/components/base/dropdown/dropdown";
 import { Input } from "@/components/base/input/input";
 import { NavItemBase } from "@/components/application/app-navigation/base-components/nav-item";
+import { useSettings } from "@/mip/settings/settings-store";
+import type { SettingsTabId } from "@/mip/settings/settings-surface";
 import { useDashboard } from "@/mip/store";
 
-export function Sidebar({ onToggle, onOpenSettings }: { onToggle: () => void; onOpenSettings: () => void }) {
+function initialsOf(name: string): string {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "U";
+    return (parts[0]![0]! + (parts[1]?.[0] ?? "")).toUpperCase();
+}
+
+export function Sidebar({ onToggle, onOpenSettings }: { onToggle: () => void; onOpenSettings: (tab?: SettingsTabId) => void }) {
     const { state, activePage, setActivePage, addPage, renamePage, deletePage, duplicatePage } = useDashboard();
+    const { profile } = useSettings();
     const [adding, setAdding] = useState(false);
     const [draft, setDraft] = useState("");
     const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -131,22 +141,21 @@ export function Sidebar({ onToggle, onOpenSettings }: { onToggle: () => void; on
 
             <div className="border-t border-secondary p-2">
                 <Dropdown.Root>
-                    <button
-                        type="button"
+                    <AriaButton
                         aria-label="Open account menu"
-                        className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left hover:bg-secondary"
+                        className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left outline-focus-ring hover:bg-secondary"
                     >
-                        <Avatar size="md" initials="SA" />
+                        <Avatar size="md" initials={initialsOf(profile.name)} />
                         <span className="flex min-w-0 flex-1 flex-col leading-tight">
-                            <span className="truncate text-sm font-semibold text-primary">Super Admin</span>
-                            <span className="truncate text-xs text-tertiary">superadmin</span>
+                            <span className="truncate text-sm font-semibold text-primary">{profile.name}</span>
+                            <span className="truncate text-xs text-tertiary">{profile.email}</span>
                         </span>
                         <ChevronRight className="size-4 shrink-0 text-tertiary" />
-                    </button>
+                    </AriaButton>
                     <Dropdown.Popover placement="top end">
                         <Dropdown.Menu>
-                            <Dropdown.Item icon={User01} label="Profile" onAction={onOpenSettings} />
-                            <Dropdown.Item icon={Settings01} label="Settings" onAction={onOpenSettings} />
+                            <Dropdown.Item icon={User01} label="Profile" onAction={() => onOpenSettings("profile")} />
+                            <Dropdown.Item icon={Settings01} label="Settings" onAction={() => onOpenSettings()} />
                             <Dropdown.Item icon={LogOut01} label="Sign out" onAction={() => window.location.reload()} />
                         </Dropdown.Menu>
                     </Dropdown.Popover>

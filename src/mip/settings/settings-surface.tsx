@@ -17,7 +17,8 @@ import { AssistantTab } from "./tabs/assistant-tab";
 import { ProfileTab } from "./tabs/profile-tab";
 import { UsersTab } from "./tabs/users-tab";
 
-type TabId = "profile" | "appearance" | "connections" | "apps" | "assistant" | "access" | "users";
+export type SettingsTabId = "profile" | "appearance" | "connections" | "apps" | "assistant" | "access" | "users";
+type TabId = SettingsTabId;
 
 const TABS: Array<{ id: TabId; label: string; icon: ComponentType<{ className?: string }>; content: ComponentType }> = [
     { id: "profile", label: "Profile", icon: User01, content: ProfileTab },
@@ -29,8 +30,8 @@ const TABS: Array<{ id: TabId; label: string; icon: ComponentType<{ className?: 
     { id: "users", label: "Users", icon: Users01, content: UsersTab },
 ];
 
-export function SettingsSurface({ onClose }: { onClose: () => void }) {
-    const [active, setActive] = useState<TabId>("profile");
+export function SettingsSurface({ onClose, initialTab = "profile" }: { onClose: () => void; initialTab?: TabId }) {
+    const [active, setActive] = useState<TabId>(initialTab);
     const ActiveContent = TABS.find((t) => t.id === active)!.content;
 
     return (

@@ -155,7 +155,7 @@ export function AppearanceTab() {
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                     {SHADOW_TOKENS.map((name) => (
                         <div key={name} className="flex flex-col items-center gap-3 rounded-xl bg-secondary p-6">
-                            <span className="size-16 rounded-xl bg-primary" style={{ boxShadow: `var(${name})` }} />
+                            <span className="size-16 rounded-xl border border-secondary bg-white" style={{ boxShadow: `var(${name})` }} />
                             <TokenName name={name} />
                         </div>
                     ))}

@@ -9,7 +9,7 @@ Two jobs, both so the browser never holds provider keys and isn't blocked by COR
                               editor's "Test selected endpoint"), returning status
                               + parsed body.
 
-Run:  uvicorn main:app --reload --port 8787   (see README.md)
+Run:  uvicorn main:app --reload --port 8799   (see README.md)
 Deps: fastapi, uvicorn, httpx   (requirements.txt)
 """
 

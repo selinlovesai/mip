@@ -72,6 +72,10 @@ interface StoreValue {
     /** Create a new page seeded with the given widgets (template import) and activate it. */
     importTemplate: (title: string, widgets: MipWidget[]) => void;
     renamePage: (id: string, title: string) => void;
+    /** Change a page's id. Returns false if the new id is empty or collides with another page. */
+    renamePageId: (oldId: string, newId: string) => boolean;
+    /** True if `candidateId` is free (optionally excluding a page id, e.g. itself). */
+    isPageIdAvailable: (candidateId: string, exceptId?: string) => boolean;
     updatePageSettings: (id: string, patch: Partial<DashboardPage>) => void;
     deletePage: (id: string) => void;
     duplicatePage: (id: string) => void;
@@ -125,6 +129,29 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
     const updatePageSettings = useCallback((id: string, patch: Partial<DashboardPage>) => {
         setState((s) => ({ ...s, pages: s.pages.map((page) => (page.id === id ? { ...page, ...patch } : page)) }));
+    }, []);
+
+    const isPageIdAvailable = useCallback(
+        (candidateId: string, exceptId?: string) => {
+            const next = candidateId.trim();
+            if (!next) return false;
+            return !state.pages.some((page) => page.id === next && page.id !== exceptId);
+        },
+        [state.pages],
+    );
+
+    const renamePageId = useCallback((oldId: string, newId: string) => {
+        const next = newId.trim();
+        let ok = false;
+        setState((s) => {
+            if (!next || s.pages.some((page) => page.id === next && page.id !== oldId)) return s;
+            ok = true;
+            return {
+                pages: s.pages.map((page) => (page.id === oldId ? { ...page, id: next } : page)),
+                activePageId: s.activePageId === oldId ? next : s.activePageId,
+            };
+        });
+        return ok;
     }, []);
 
     const deletePage = useCallback((id: string) => {
@@ -186,8 +213,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     );
 
     const value = useMemo<StoreValue>(
-        () => ({ state, activePage, editMode, setEditMode, viewMode, setViewMode, setActivePage, addPage, importTemplate, renamePage, updatePageSettings, deletePage, duplicatePage, addWidget, updateWidget, removeWidget, applyLayout }),
-        [state, activePage, editMode, viewMode, setActivePage, addPage, importTemplate, renamePage, updatePageSettings, deletePage, duplicatePage, addWidget, updateWidget, removeWidget, applyLayout],
+        () => ({ state, activePage, editMode, setEditMode, viewMode, setViewMode, setActivePage, addPage, importTemplate, renamePage, renamePageId, isPageIdAvailable, updatePageSettings, deletePage, duplicatePage, addWidget, updateWidget, removeWidget, applyLayout }),
+        [state, activePage, editMode, viewMode, setActivePage, addPage, importTemplate, renamePage, renamePageId, isPageIdAvailable, updatePageSettings, deletePage, duplicatePage, addWidget, updateWidget, removeWidget, applyLayout],
     );
 
     return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>;
