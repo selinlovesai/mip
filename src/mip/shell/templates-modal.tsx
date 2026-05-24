@@ -65,8 +65,8 @@ export function TemplatesModal({ open, onClose, onOpenConnections }: { open: boo
                                     <CloseButton onPress={close} label="Close" />
                                 </div>
                                 <div className="flex flex-col gap-5 p-6">
-                                    <div className={cx("flex items-start gap-2.5 rounded-lg p-3 ring-1", selected.needsKeys ? "bg-utility-warning-50 ring-utility-warning-200" : "bg-utility-success-50 ring-utility-success-200")}>
-                                        {selected.needsKeys ? <AlertTriangle className="mt-0.5 size-4 shrink-0 text-utility-warning-500" /> : <CheckCircle className="mt-0.5 size-4 shrink-0 text-utility-success-500" />}
+                                    <div className={cx("flex items-start gap-2.5 rounded-lg p-3 ring-1", selected.needsKeys ? "bg-utility-orange-50 ring-utility-orange-200" : "bg-utility-green-50 ring-utility-green-200")}>
+                                        {selected.needsKeys ? <AlertTriangle className="mt-0.5 size-4 shrink-0 text-utility-orange-500" /> : <CheckCircle className="mt-0.5 size-4 shrink-0 text-utility-green-500" />}
                                         <p className="text-sm text-secondary">
                                             {selected.needsKeys
                                                 ? `Some widgets need API keys (${selected.connectors.join(", ")}). You can set them up in Connections, or continue with mock data.`
@@ -131,7 +131,7 @@ export function TemplatesModal({ open, onClose, onOpenConnections }: { open: boo
                                                 <span className="flex size-10 items-center justify-center rounded-lg bg-secondary text-xl">{t.icon}</span>
                                                 <div className="flex items-center gap-1.5">
                                                     <Badge size="sm" color="gray">{t.widgets.length} widgets</Badge>
-                                                    {t.needsKeys ? <AlertTriangle className="size-4 text-utility-warning-500" /> : null}
+                                                    {t.needsKeys ? <AlertTriangle className="size-4 text-utility-orange-500" /> : null}
                                                 </div>
                                             </div>
                                             <span className="text-sm font-semibold text-primary">{t.name}</span>

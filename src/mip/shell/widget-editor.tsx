@@ -158,7 +158,7 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
                             rows={14}
                             textAreaClassName="font-mono text-xs"
                         />
-                        {error ? <p className="text-sm text-utility-error-500">{error}</p> : null}
+                        {error ? <p className="text-sm text-error-primary">{error}</p> : null}
                     </div>
                 ) : (
                     <div className="flex flex-col gap-6">

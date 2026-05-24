@@ -325,11 +325,17 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             disabled={transcribing}
             onClick={toggleRecording}
             className={cx(
-                "flex items-center px-2 transition-colors disabled:opacity-40",
-                recording ? "text-utility-error-500" : "text-tertiary hover:text-secondary",
+                "flex items-center justify-center px-2 transition-colors disabled:opacity-40",
+                recording ? "text-utility-red-500" : "text-tertiary hover:text-secondary",
             )}
         >
-            {transcribing ? <Loading02 className="size-4 animate-spin" /> : recording ? <StopCircle className="size-4" /> : <Microphone01 className="size-4" />}
+            {transcribing ? (
+                <Loading02 className="size-4 animate-spin" />
+            ) : recording ? (
+                <StopCircle className="size-4 animate-pulse" />
+            ) : (
+                <Microphone01 className="size-4" />
+            )}
         </button>
     );
 

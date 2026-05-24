@@ -53,7 +53,7 @@ export function ProfileTab() {
                 <Button color="primary" size="md" onClick={save}>
                     Save changes
                 </Button>
-                {saved ? <span className="text-sm text-utility-success-500">Saved ✓</span> : null}
+                {saved ? <span className="text-sm text-success-primary">Saved ✓</span> : null}
             </div>
         </div>
     );
