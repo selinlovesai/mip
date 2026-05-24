@@ -55,3 +55,85 @@ export async function testEndpoint(args: { method: string; url: string; headers?
 }
 
 export const API_BASE = BASE;
+
+// ---------------------------------------------------------------------------
+// Generic document-store client (Postgres-backed CRUD on the FastAPI backend).
+// Collections: dashboards · connections · settings · tokens · components · apps
+//            · conversations · themes · templates · users · access_tokens.
+// Every call degrades gracefully: when the backend/DB is down, reads resolve to
+// null/[] and writes resolve to false, so callers keep using localStorage.
+// ---------------------------------------------------------------------------
+
+export type DbCollection =
+    | "dashboards"
+    | "connections"
+    | "settings"
+    | "tokens"
+    | "components"
+    | "apps"
+    | "conversations"
+    | "themes"
+    | "templates"
+    | "users"
+    | "access_tokens";
+
+export interface DbRecord<T = unknown> {
+    id: string;
+    data: T;
+    updatedAt: string;
+}
+
+/** True if the backend is reachable AND has a live DB connection. */
+export async function dbAvailable(): Promise<boolean> {
+    try {
+        const res = await fetch(`${BASE}/api/health`);
+        const json = (await res.json()) as { db?: boolean };
+        return json.db === true;
+    } catch {
+        return false;
+    }
+}
+
+export async function dbList<T = unknown>(collection: DbCollection): Promise<DbRecord<T>[]> {
+    try {
+        const res = await fetch(`${BASE}/api/db/${collection}`);
+        const json = (await res.json()) as { ok: boolean; records?: DbRecord<T>[] };
+        return json.ok && json.records ? json.records : [];
+    } catch {
+        return [];
+    }
+}
+
+export async function dbGet<T = unknown>(collection: DbCollection, id: string): Promise<DbRecord<T> | null> {
+    try {
+        const res = await fetch(`${BASE}/api/db/${collection}/${encodeURIComponent(id)}`);
+        const json = (await res.json()) as { ok: boolean; record?: DbRecord<T> | null };
+        return json.ok ? (json.record ?? null) : null;
+    } catch {
+        return null;
+    }
+}
+
+export async function dbPut<T = unknown>(collection: DbCollection, id: string, data: T): Promise<boolean> {
+    try {
+        const res = await fetch(`${BASE}/api/db/${collection}/${encodeURIComponent(id)}`, {
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(data),
+        });
+        const json = (await res.json()) as { ok: boolean };
+        return json.ok === true;
+    } catch {
+        return false;
+    }
+}
+
+export async function dbDelete(collection: DbCollection, id: string): Promise<boolean> {
+    try {
+        const res = await fetch(`${BASE}/api/db/${collection}/${encodeURIComponent(id)}`, { method: "DELETE" });
+        const json = (await res.json()) as { ok: boolean; deleted?: boolean };
+        return json.ok === true && json.deleted !== false;
+    } catch {
+        return false;
+    }
+}

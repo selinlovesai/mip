@@ -19,11 +19,23 @@ import time
 from typing import Any
 
 import httpx
-from fastapi import FastAPI
+from fastapi import Body, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+import db
+
 app = FastAPI(title="MIP-Tailwind backend", version="0.1.0")
+
+
+@app.on_event("startup")
+async def _startup() -> None:
+    await db.init_db()
+
+
+@app.on_event("shutdown")
+async def _shutdown() -> None:
+    await db.dispose()
 
 app.add_middleware(
     CORSMiddleware,
@@ -137,5 +149,54 @@ async def test_endpoint(req: TestRequest) -> dict[str, Any]:
 
 
 @app.get("/api/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
+async def health() -> dict[str, Any]:
+    return {"status": "ok", "db": db.is_enabled()}
+
+
+# ---------------------------------------------------------------------------
+# Generic document-store CRUD (Postgres)
+#   GET    /api/db/{collection}          -> list records
+#   GET    /api/db/{collection}/{id}     -> one record
+#   PUT    /api/db/{collection}/{id}     -> upsert (body = the document)
+#   DELETE /api/db/{collection}/{id}     -> delete
+# When the DB is unavailable, every route returns {ok: False, db: False} so the
+# frontend keeps working off its localStorage cache.
+# ---------------------------------------------------------------------------
+
+def _check(collection: str) -> dict[str, Any] | None:
+    if not db.is_enabled():
+        return {"ok": False, "db": False, "error": "database not configured"}
+    if collection not in db.COLLECTIONS:
+        raise HTTPException(status_code=404, detail=f"unknown collection '{collection}'")
+    return None
+
+
+@app.get("/api/db/{collection}")
+async def db_list(collection: str) -> dict[str, Any]:
+    if (early := _check(collection)) is not None:
+        return early
+    return {"ok": True, "db": True, "records": await db.list_records(collection)}
+
+
+@app.get("/api/db/{collection}/{rid}")
+async def db_get(collection: str, rid: str) -> dict[str, Any]:
+    if (early := _check(collection)) is not None:
+        return early
+    record = await db.get_record(collection, rid)
+    if record is None:
+        return {"ok": True, "db": True, "record": None}
+    return {"ok": True, "db": True, "record": record}
+
+
+@app.put("/api/db/{collection}/{rid}")
+async def db_put(collection: str, rid: str, data: Any = Body(...)) -> dict[str, Any]:
+    if (early := _check(collection)) is not None:
+        return early
+    return {"ok": True, "db": True, "record": await db.upsert_record(collection, rid, data)}
+
+
+@app.delete("/api/db/{collection}/{rid}")
+async def db_delete(collection: str, rid: str) -> dict[str, Any]:
+    if (early := _check(collection)) is not None:
+        return early
+    return {"ok": True, "db": True, "deleted": await db.delete_record(collection, rid)}
