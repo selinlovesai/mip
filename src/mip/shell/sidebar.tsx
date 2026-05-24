@@ -10,17 +10,20 @@
  */
 
 import { useState } from "react";
-import { ChevronLeft, Grid01, Plus } from "@untitledui/icons";
+import { ChevronLeft, Copy01, DotsVertical, Grid01, Plus, Trash01 } from "@untitledui/icons";
 import { Avatar } from "@/components/base/avatar/avatar";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
+import { Dropdown } from "@/components/base/dropdown/dropdown";
 import { Input } from "@/components/base/input/input";
 import { NavItemBase } from "@/components/application/app-navigation/base-components/nav-item";
 import { useDashboard } from "@/mip/store";
 
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
-    const { state, activePage, setActivePage, addPage } = useDashboard();
+    const { state, activePage, setActivePage, addPage, renamePage, deletePage, duplicatePage } = useDashboard();
     const [adding, setAdding] = useState(false);
     const [draft, setDraft] = useState("");
+    const [renamingId, setRenamingId] = useState<string | null>(null);
+    const [renameDraft, setRenameDraft] = useState("");
 
     const commitAdd = () => {
         const title = draft.trim();
@@ -28,6 +31,22 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
         setDraft("");
         setAdding(false);
     };
+
+    const startRename = (id: string, title: string) => {
+        setRenamingId(id);
+        setRenameDraft(title);
+    };
+
+    const commitRename = () => {
+        if (renamingId) {
+            const title = renameDraft.trim();
+            if (title) renamePage(renamingId, title);
+        }
+        setRenamingId(null);
+        setRenameDraft("");
+    };
+
+    const canDelete = state.pages.length > 1;
 
     if (collapsed) {
         return (
@@ -68,22 +87,51 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
                     <ButtonUtility color="tertiary" size="xs" icon={Plus} tooltip="Add page" onClick={() => setAdding(true)} />
                 </div>
                 <ul className="flex flex-col gap-0.5">
-                    {state.pages.map((page) => (
-                        <li key={page.id} className="py-px">
-                            <NavItemBase
-                                type="link"
-                                href="#"
-                                icon={Grid01}
-                                current={page.id === activePage.id}
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    setActivePage(page.id);
-                                }}
-                            >
-                                {page.title}
-                            </NavItemBase>
-                        </li>
-                    ))}
+                    {state.pages.map((page) =>
+                        renamingId === page.id ? (
+                            <li key={page.id} className="px-2 py-1">
+                                <Input
+                                    size="sm"
+                                    autoFocus
+                                    aria-label="Rename page"
+                                    value={renameDraft}
+                                    onChange={setRenameDraft}
+                                    onBlur={commitRename}
+                                    onKeyDown={(e) => e.key === "Enter" && commitRename()}
+                                    placeholder="Page name…"
+                                />
+                            </li>
+                        ) : (
+                            <li key={page.id} className="group/page relative py-px">
+                                <NavItemBase
+                                    type="link"
+                                    href="#"
+                                    icon={Grid01}
+                                    current={page.id === activePage.id}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        setActivePage(page.id);
+                                    }}
+                                >
+                                    {page.title}
+                                </NavItemBase>
+                                <div className="absolute inset-y-0 right-1.5 flex items-center opacity-0 transition-opacity group-hover/page:opacity-100">
+                                    <Dropdown.Root>
+                                        <ButtonUtility color="tertiary" size="xs" icon={DotsVertical} tooltip="Page actions" aria-label="Page actions" />
+                                        <Dropdown.Popover>
+                                            <Dropdown.Menu>
+                                                <Dropdown.Item icon={Plus} label="Rename" onAction={() => startRename(page.id, page.title)} />
+                                                <Dropdown.Item icon={Copy01} label="Duplicate" onAction={() => duplicatePage(page.id)} />
+                                                {canDelete ? (
+                                                    <Dropdown.Item icon={Trash01} label="Delete" onAction={() => deletePage(page.id)} />
+                                                ) : null}
+                                            </Dropdown.Menu>
+                                        </Dropdown.Popover>
+                                    </Dropdown.Root>
+                                </div>
+                            </li>
+                        ),
+                    )}
                     {adding ? (
                         <li className="px-2 py-1">
                             <Input

@@ -43,6 +43,9 @@ interface StoreValue {
     setEditMode: (next: boolean) => void;
     setActivePage: (id: string) => void;
     addPage: (title: string) => void;
+    renamePage: (id: string, title: string) => void;
+    deletePage: (id: string) => void;
+    duplicatePage: (id: string) => void;
     addWidget: (widget: MipWidget) => void;
     updateWidget: (widgetId: string, patch: Partial<MipWidget>) => void;
     removeWidget: (widgetId: string) => void;
@@ -77,6 +80,33 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     const addPage = useCallback((title: string) => {
         const id = `page-${Date.now()}`;
         setState((s) => ({ pages: [...s.pages, { id, title, cols: 12, rowHeight: 140, widgets: [] }], activePageId: id }));
+    }, []);
+
+    const renamePage = useCallback((id: string, title: string) => {
+        const next = title.trim();
+        if (!next) return;
+        setState((s) => ({ ...s, pages: s.pages.map((page) => (page.id === id ? { ...page, title: next } : page)) }));
+    }, []);
+
+    const deletePage = useCallback((id: string) => {
+        setState((s) => {
+            if (s.pages.length <= 1) return s; // keep at least one page
+            const pages = s.pages.filter((page) => page.id !== id);
+            const activePageId = s.activePageId === id ? pages[0]!.id : s.activePageId;
+            return { pages, activePageId };
+        });
+    }, []);
+
+    const duplicatePage = useCallback((id: string) => {
+        setState((s) => {
+            const source = s.pages.find((page) => page.id === id);
+            if (!source) return s;
+            const newId = `page-${Date.now()}`;
+            const clone: DashboardPage = { ...source, id: newId, title: `${source.title} (copy)`, widgets: source.widgets.map((w) => ({ ...w })) };
+            const index = s.pages.findIndex((page) => page.id === id);
+            const pages = [...s.pages.slice(0, index + 1), clone, ...s.pages.slice(index + 1)];
+            return { pages, activePageId: newId };
+        });
     }, []);
 
     const addWidget = useCallback(
@@ -117,8 +147,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     );
 
     const value = useMemo<StoreValue>(
-        () => ({ state, activePage, editMode, setEditMode, setActivePage, addPage, addWidget, updateWidget, removeWidget, applyLayout }),
-        [state, activePage, editMode, setActivePage, addPage, addWidget, updateWidget, removeWidget, applyLayout],
+        () => ({ state, activePage, editMode, setEditMode, setActivePage, addPage, renamePage, deletePage, duplicatePage, addWidget, updateWidget, removeWidget, applyLayout }),
+        [state, activePage, editMode, setActivePage, addPage, renamePage, deletePage, duplicatePage, addWidget, updateWidget, removeWidget, applyLayout],
     );
 
     return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>;
