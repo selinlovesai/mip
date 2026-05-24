@@ -102,6 +102,8 @@ export interface MipWidgetData {
     sourceId: string;
     request: MipRequest;
     map?: Record<string, string>;
+    /** Auto-refresh interval in ms. 0/undefined = fetch once (no polling). */
+    refreshMs?: number;
 }
 
 export interface MipWidgetSubmit {

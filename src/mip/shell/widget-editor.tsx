@@ -13,12 +13,20 @@ import { ChevronRight, Edit03 } from "@untitledui/icons";
 import { Button } from "@/components/base/buttons/button";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { Input } from "@/components/base/input/input";
+import { Select } from "@/components/base/select/select";
 import { TextArea } from "@/components/base/textarea/textarea";
 import { SlideoutMenu } from "@/components/application/slideout-menus/slideout-menu";
 import { COLOR_TOKEN_GROUPS } from "@/mip/design-tokens";
 import { useDashboard } from "@/mip/store";
 import type { MipWidget, MipWidgetColors } from "@/mip/schema";
 import { cx } from "@/utils/cx";
+
+const REFRESH_OPTIONS = [
+    { id: "0", label: "Off" },
+    { id: "15000", label: "Every 15s" },
+    { id: "30000", label: "Every 30s" },
+    { id: "60000", label: "Every 60s" },
+];
 
 /** The color slots shown for every widget in the Design tab. */
 const COLOR_FIELDS: Array<{ key: keyof MipWidgetColors; label: string; hint: string }> = [
@@ -111,8 +119,10 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
         border: widget.style?.colors?.border ?? widget.style?.borderColor ?? "",
         background: widget.style?.colors?.background ?? widget.style?.backgroundColor ?? "",
     });
+    const [refreshMs, setRefreshMs] = useState<string>(String(widget.data?.refreshMs ?? 0));
     const [error, setError] = useState<string | null>(null);
 
+    const isBound = !!widget.data?.sourceId;
     const setColor = (key: keyof MipWidgetColors, v: string) => setColors((c) => ({ ...c, [key]: v }));
 
     const save = () => {
@@ -129,10 +139,12 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
         (Object.keys(colors) as Array<keyof MipWidgetColors>).forEach((k) => {
             if (colors[k]?.trim()) cleaned[k] = colors[k];
         });
+        const ms = Number(refreshMs) || 0;
         updateWidget(widget.id, {
             title: title.trim() || undefined,
             settings,
             style: { ...widget.style, borderColor: undefined, backgroundColor: undefined, colors: cleaned },
+            ...(widget.data ? { data: { ...widget.data, refreshMs: ms || undefined } } : {}),
         });
         close();
     };
@@ -179,6 +191,15 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
                             textAreaClassName="font-mono text-xs"
                         />
                         {error ? <p className="text-sm text-error-primary">{error}</p> : null}
+                        {isBound ? (
+                            <div className="flex flex-col gap-1.5 border-t border-secondary pt-4">
+                                <span className="text-sm font-medium text-secondary">Auto-refresh</span>
+                                <Select aria-label="Auto-refresh interval" selectedKey={refreshMs} items={REFRESH_OPTIONS} onSelectionChange={(k) => setRefreshMs(String(k))}>
+                                    {(item) => <Select.Item id={item.id}>{item.label}</Select.Item>}
+                                </Select>
+                                <span className="text-xs text-tertiary">Re-fetch this widget's live data on an interval. Off by default.</span>
+                            </div>
+                        ) : null}
                     </div>
                 ) : (
                     <div className="flex flex-col gap-6">

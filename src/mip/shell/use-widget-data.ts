@@ -58,9 +58,10 @@ export function useWidgetData(widget: MipWidget): WidgetDataState {
         }
 
         let cancelled = false;
-        setState({ status: "loading" });
 
-        (async () => {
+        // `showLoading` only on the first fetch — refresh ticks update in place
+        // (anti-flicker) so a polling widget doesn't blink on every interval.
+        const fetchOnce = async (showLoading: boolean) => {
             // Inline payloads (mock/json/csv) — parse locally, no network.
             if (conn.type !== "rest") {
                 try {
@@ -71,7 +72,7 @@ export function useWidgetData(widget: MipWidget): WidgetDataState {
                 }
                 return;
             }
-
+            if (showLoading) setState({ status: "loading" });
             const req = binding.request;
             const url = buildUrl(conn, req?.path ?? "", req?.params as Record<string, unknown> | undefined);
             const headers = buildHeaders(conn, req?.headers);
@@ -79,10 +80,16 @@ export function useWidgetData(widget: MipWidget): WidgetDataState {
             if (cancelled) return;
             if (res.ok) setState({ status: "success", data: res.body });
             else setState({ status: "error", error: typeof res.error === "string" ? res.error : `Request failed (${res.status ?? "?"}).` });
-        })();
+        };
+
+        void fetchOnce(true);
+
+        const refreshMs = binding.refreshMs ?? 0;
+        const timer = refreshMs > 0 ? setInterval(() => void fetchOnce(false), refreshMs) : undefined;
 
         return () => {
             cancelled = true;
+            if (timer) clearInterval(timer);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [depKey]);
