@@ -162,6 +162,8 @@ Mapping the original **mip** (vanilla-CSS, `mdp`) system onto **mip-tailwind** (
 
 Screen-by-screen UI/UX inventory across **both** systems. Status: ✅ built in mip-tailwind · 🟡 built, needs DB/real-data wiring · ⬜ exists in mip, not yet in mip-tailwind (target to migrate).
 
+📷 **Screenshots:** drop PNGs in [`docs/screens/`](screens/README.md) named per the index there; they then embed inline per screen.
+
 | Screen | Entry / Route | UI (layout & components) | UX (interaction & behavior) | Status |
 |---|---|---|---|---|
 | **App shell** | `/` | Three columns: collapsible left **Sidebar** (w-64) · center column (Topbar + main) · optional right **AI chat** panel. Dark Untitled theme. | Sidebar collapses to width-0 (animated); chat panel pushes content as a sibling; everything themed by tokens. | ✅ |
