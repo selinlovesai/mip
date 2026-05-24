@@ -86,7 +86,15 @@ export const TEMPLATES: DashboardTemplate[] = [
                 settings: { valueFormat: "currency", deltaLabel: "24h" },
                 data: { sourceId: "coingecko", request: { method: "GET", path: "/api/v3/global" }, map: { value: "$.data.total_market_cap.usd", delta: "$.data.market_cap_change_percentage_24h_usd" } },
             },
-            { id: "c-chart", type: "lineChart", title: "BTC price (7d)", layout: L(0, 1, 12, 3), settings: { valueFormat: "currency", points: [{ label: "D1", value: 64200 }, { label: "D2", value: 65100 }, { label: "D3", value: 63800 }, { label: "D4", value: 66200 }, { label: "D5", value: 66900 }, { label: "D6", value: 67100 }, { label: "D7", value: 67400 }] } },
+            // Live: Binance daily klines — label = openTime (idx 0), value = close (idx 4).
+            {
+                id: "c-chart",
+                type: "lineChart",
+                title: "BTC price (7d)",
+                layout: L(0, 1, 12, 3),
+                settings: { valueFormat: "currency", labelKey: "0", valueKey: "4" },
+                data: { sourceId: "binance", request: { method: "GET", path: "/api/v3/klines", params: { symbol: "BTCUSDT", interval: "1d", limit: 7 } }, map: { series: "$" } },
+            },
         ],
     },
     {

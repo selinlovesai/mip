@@ -61,13 +61,18 @@ export function resolveRows(widget: MipWidget, dataState: WidgetDataState, mapKe
     return asRows(settings.points ?? settings.rows ?? settings.items ?? settings.data);
 }
 
-/** Map records to {name, value} chart points using configured/falling-back keys. */
+/** Map records to {name, value} chart points using configured/falling-back keys.
+ *  Rows may be objects OR arrays (e.g. Binance klines [openTime,…,close,…]);
+ *  bracket access works for both. A label that looks like an epoch-ms timestamp
+ *  is rendered as a short date. */
 export function toChartPoints(rows: Row[], labelKey = "label", valueKey = "value"): ChartPoint[] {
     return rows.map((row, index) => {
         const rawName = row[labelKey] ?? row.name ?? index + 1;
+        const ts = typeof rawName === "number" ? rawName : Number(rawName);
+        const name = Number.isFinite(ts) && ts > 1e11 ? new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : String(rawName);
         const rawValue = row[valueKey] ?? row.value;
         const num = typeof rawValue === "number" ? rawValue : Number(rawValue);
-        return { name: String(rawName), value: Number.isFinite(num) ? num : 0 };
+        return { name, value: Number.isFinite(num) ? num : 0 };
     });
 }
 
