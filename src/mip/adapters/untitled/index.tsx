@@ -7,7 +7,11 @@
  */
 
 import type { UiKitAdapter, WidgetRenderProps } from "@/mip/adapter/types";
+import { ChartWidget } from "./chart-widget";
 import { KpiWidget } from "./kpi-widget";
+import { ListWidget } from "./list-widget";
+import { ProgressWidget } from "./progress-widget";
+import { TableWidget } from "./table-widget";
 import { WidgetCard } from "./widget-card";
 
 function ComingSoon({ widget }: WidgetRenderProps) {
@@ -27,6 +31,14 @@ export const untitledAdapter: UiKitAdapter = {
     name: "Untitled UI",
     widgets: {
         kpi: KpiWidget,
+        progress: ProgressWidget,
+        lineChart: ChartWidget,
+        barChart: ChartWidget,
+        areaChart: ChartWidget,
+        pieChart: ChartWidget,
+        donutChart: ChartWidget,
+        table: TableWidget,
+        list: ListWidget,
     },
     fallback: ComingSoon,
 };

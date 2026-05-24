@@ -33,10 +33,91 @@ const widgets: MipWidget[] = [
         settings: { value: 2.3, valueFormat: "percent", delta: -0.8, deltaLabel: "vs. last month" },
     },
     {
+        id: "goal",
+        type: "progress",
+        title: "Quarterly goal",
+        layout: { x: 0, y: 1, w: 1, h: 1 },
+        settings: { value: 74, target: 100, label: "$740k of $1M" },
+    },
+    {
         id: "trend",
-        type: "lineChart",
+        type: "areaChart",
         title: "Signups over time",
-        layout: { x: 0, y: 1, w: 3, h: 2 },
+        layout: { x: 1, y: 1, w: 2, h: 2 },
+        settings: {
+            points: [
+                { label: "Jan", value: 120 },
+                { label: "Feb", value: 210 },
+                { label: "Mar", value: 180 },
+                { label: "Apr", value: 320 },
+                { label: "May", value: 290 },
+                { label: "Jun", value: 410 },
+            ],
+        },
+    },
+    {
+        id: "channels",
+        type: "donutChart",
+        title: "Traffic by channel",
+        layout: { x: 0, y: 2, w: 1, h: 2 },
+        settings: {
+            points: [
+                { label: "Organic", value: 45 },
+                { label: "Paid", value: 25 },
+                { label: "Referral", value: 18 },
+                { label: "Social", value: 12 },
+            ],
+        },
+    },
+    {
+        id: "revenue-by-region",
+        type: "barChart",
+        title: "Revenue by region",
+        layout: { x: 0, y: 4, w: 2, h: 2 },
+        settings: {
+            valueFormat: "currency",
+            points: [
+                { label: "NA", value: 52000 },
+                { label: "EMEA", value: 38000 },
+                { label: "APAC", value: 24000 },
+                { label: "LATAM", value: 14400 },
+            ],
+        },
+    },
+    {
+        id: "recent-orders",
+        type: "table",
+        title: "Recent orders",
+        layout: { x: 2, y: 4, w: 1, h: 2 },
+        settings: {
+            columns: [
+                { key: "order", label: "Order" },
+                { key: "customer", label: "Customer" },
+                { key: "status", label: "Status" },
+            ],
+            rows: [
+                { order: "#1042", customer: "Acme Inc.", status: "Paid" },
+                { order: "#1041", customer: "Globex", status: "Pending" },
+                { order: "#1040", customer: "Initech", status: "Failed" },
+                { order: "#1039", customer: "Umbrella", status: "Paid" },
+            ],
+        },
+    },
+    {
+        id: "top-customers",
+        type: "list",
+        title: "Top customers",
+        layout: { x: 0, y: 6, w: 1, h: 2 },
+        settings: {
+            primaryKey: "name",
+            secondaryKey: "email",
+            valueKey: "spend",
+            items: [
+                { name: "Olivia Rhye", email: "olivia@acme.com", spend: "$24,500" },
+                { name: "Phoenix Baker", email: "phoenix@globex.com", spend: "$18,200" },
+                { name: "Lana Steiner", email: "lana@initech.com", spend: "$12,800" },
+            ],
+        },
     },
 ];
 
