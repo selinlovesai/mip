@@ -298,7 +298,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
     // ---- COMPACT mode ----
     if (mode === "compact") {
         return (
-            <div className="fixed right-0 top-0 z-50 flex w-64 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-l-xl rounded-br-xl border-b border-l border-secondary bg-primary shadow-xl">
+            <div className="fixed right-0 top-0 z-50 flex w-90 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-l-xl rounded-br-xl border-b border-l border-secondary bg-primary shadow-xl">
                 <div className="flex items-center justify-between gap-2 border-b border-secondary px-3 py-2">
                     <div className="flex min-w-0 items-center gap-2">
                         <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-brand-solid">
@@ -310,11 +310,11 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                 </div>
                 {lastAssistant ? (
                     <div
-                        className="prose prose-sm dark:prose-invert line-clamp-3 max-h-24 overflow-hidden px-3 py-2 text-xs text-secondary prose-headings:text-primary prose-strong:text-primary prose-a:text-brand-secondary"
+                        className="prose prose-sm dark:prose-invert line-clamp-3 max-h-24 overflow-hidden px-3 py-2 text-xs text-secondary prose-headings:text-primary prose-strong:text-primary prose-a:text-brand-secondary prose-p:text-xs prose-p:leading-4 prose-p:my-1"
                         dangerouslySetInnerHTML={{ __html: markdownToHtml(thinking ? "thinking…" : lastAssistant.text) }}
                     />
                 ) : null}
-                <div className="flex items-end gap-2 border-t border-secondary p-2">
+                <div className="flex items-stretch border-t border-secondary">
                     <TextArea
                         aria-label="Message"
                         size="sm"
@@ -324,9 +324,9 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                         onKeyDown={onComposerKeyDown}
                         placeholder="Ask anything…"
                         className="flex-1"
-                        textAreaClassName="max-h-20 resize-none"
+                        textAreaClassName="max-h-20 resize-none rounded-none border-0 shadow-none ring-0 text-xs leading-4 focus:ring-0"
                     />
-                    <Button size="sm" color="primary" iconLeading={Send01} isDisabled={!draft.trim() || thinking} onClick={() => void sendText(draft)} aria-label="Send" />
+                    <Button size="sm" color="primary" iconLeading={Send01} className="rounded-none" isDisabled={!draft.trim() || thinking} onClick={() => void sendText(draft)} aria-label="Send" />
                 </div>
                 {assistantSettingsPopover}
             </div>
