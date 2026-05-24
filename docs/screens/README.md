@@ -1,40 +1,44 @@
 # Screen captures
 
-Drop PNG screenshots here, named to match the **Screen** rows in
-`../migration-plan.md` (section I — UI/UX inventory). Once a file exists, it is
-referenced from the plan as `![](screens/<id>.png)`.
+Click any thumbnail to open it full-size. Captured live from the running
+mip-tailwind app (`localhost:5183`). See `../migration-plan.md` (section I) for
+each screen's UI/UX description.
 
-| Screen | File |
+## Captured (mip-tailwind)
+
+| Screen | Preview |
 |---|---|
-| App shell | `app-shell.png` |
-| Sidebar | `sidebar.png` |
-| Topbar | `topbar.png` |
-| Dashboard canvas | `dashboard-canvas.png` |
-| Edit mode | `edit-mode.png` |
-| Widget picker | `widget-picker.png` |
-| Widget editor | `widget-editor.png` |
-| Widget expand | `widget-expand.png` |
-| AI chat — sidebar | `chat-sidebar.png` |
-| AI chat — chat mode | `chat-mode.png` |
-| AI chat — compact | `chat-compact.png` |
-| Assistant Settings (in-chat popover) | `assistant-settings-popover.png` |
-| Settings shell | `settings-shell.png` |
-| Settings · Profile | `settings-profile.png` |
-| Settings · Appearance | `settings-appearance.png` |
-| Settings · Connections (list) | `settings-connections.png` |
-| Connection editor | `connection-editor.png` |
-| Settings · Apps | `settings-apps.png` |
-| Settings · Assistant | `settings-assistant.png` |
-| Settings · Users | `settings-users.png` |
-| Dashboard Settings · General | `dashboard-settings-general.png` |
-| Dashboard Settings · Access | `dashboard-settings-access.png` |
-| Dashboard Settings · Dynamic Variables | `dashboard-settings-dynamic-vars.png` |
-| Dashboard Templates | `dashboard-templates.png` |
-| Template import (confirm) | `template-import.png` |
-| Start screen | `start.png` |
-| Gallery | `gallery.png` |
+| App shell / Dashboard | [![app-shell](app-shell.png)](app-shell.png) |
+| Widget gallery | [![gallery](gallery.png)](gallery.png) |
+| Widget picker | [![widget-picker](widget-picker.png)](widget-picker.png) |
+| AI chat — sidebar | [![chat-sidebar](chat-sidebar.png)](chat-sidebar.png) |
+| Settings · Appearance (tokens) | [![settings-appearance](settings-appearance.png)](settings-appearance.png) |
+| Settings · Apps | [![settings-apps](settings-apps.png)](settings-apps.png) |
+| Settings · Connections | [![settings-connections](settings-connections.png)](settings-connections.png) |
+| Connection editor | [![connection-editor](connection-editor.png)](connection-editor.png) |
+| Settings · Assistant | [![settings-assistant](settings-assistant.png)](settings-assistant.png) |
 
-Two ways to populate:
-1. **You drop the PNGs here** with the names above — they'll render in the plan.
-2. **Ask me to capture them live** — for screens reachable in the running app
-   I can screenshot via the browser and save them here automatically.
+Direct links: [app-shell](app-shell.png) · [gallery](gallery.png) · [widget-picker](widget-picker.png) · [chat-sidebar](chat-sidebar.png) · [settings-appearance](settings-appearance.png) · [settings-apps](settings-apps.png) · [settings-connections](settings-connections.png) · [connection-editor](connection-editor.png) · [settings-assistant](settings-assistant.png)
+
+## Pending (drop a PNG with the name below, or ask me to capture live)
+
+These are mostly **mip-only** screens (⬜ in the plan) or sub-states not yet
+shot. Add `docs/screens/<file>` and it becomes a link here.
+
+- `topbar.png` — Topbar
+- `edit-mode.png` — Edit mode (drag/resize handles)
+- `widget-editor.png` — Widget editor drawer
+- `widget-expand.png` — Widget expand modal
+- `chat-mode.png` — AI chat (floating)
+- `chat-compact.png` — AI chat (compact bar)
+- `assistant-settings-popover.png` — Assistant Settings (in-chat popover)
+- `settings-profile.png` — Settings · Profile
+- `settings-users.png` — Settings · Users
+- `settings-access.png` — Settings · Access (mip)
+- `layout-feed.png` — Layout / Feed responsive view (mip)
+- `dashboard-settings-general.png` — Dashboard Settings · General (mip)
+- `dashboard-settings-access.png` — Dashboard Settings · Access (mip)
+- `dashboard-settings-dynamic-vars.png` — Dashboard Settings · Dynamic Variables (mip)
+- `dashboard-templates.png` — Dashboard Templates (mip)
+- `template-import.png` — Template import confirm (mip)
+- `start.png` — Start screen
