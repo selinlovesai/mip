@@ -85,6 +85,10 @@ const widgets: MipWidget[] = [
     { id: "modal", type: "modal", title: "Modal", layout: { ...layout, w: 1, h: 1 }, settings: { triggerLabel: "Open modal", heading: "Hello from a modal", body: "This overlay is rendered by the modal widget." } },
     { id: "drawer", type: "drawer", title: "Drawer", layout: { ...layout, w: 1, h: 1 }, settings: { triggerLabel: "Open drawer", heading: "Side drawer", body: "Slides in from the right." } },
     { id: "image", type: "image", title: "Image", layout: { ...layout, w: 1, h: 1 }, settings: { url: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600", alt: "Dashboard" } },
+    { id: "flow", type: "flowchart", title: "Flowchart", layout: { ...layout, w: 2 } },
+    { id: "seq", type: "sequenceDiagram", title: "Sequence", layout: { ...layout, w: 2 } },
+    { id: "gantt", type: "ganttChart", title: "Gantt", layout: { ...layout, w: 2 } },
+    { id: "map", type: "googleMap", title: "Office", layout: { ...layout, w: 2 }, settings: { query: "Empire State Building, New York", zoom: 14 } },
 ];
 
 export const GalleryScreen = () => {

@@ -12,9 +12,11 @@ import { CardWidget } from "./card-widget";
 import { ChartWidget } from "./chart-widget";
 import { CtaWidget, ContentSectionWidget, FaqWidget, FeatureGridWidget, HeroWidget, PricingWidget, StatsGridWidget, TestimonialWidget } from "./design-blocks";
 import { DetailWidget } from "./detail-widget";
+import { DiagramWidget } from "./diagram-widget";
 import { FormWidget } from "./form-widget";
 import { KpiWidget } from "./kpi-widget";
 import { ListWidget } from "./list-widget";
+import { GoogleMapWidget } from "./map-widget";
 import { MarkdownWidget } from "./markdown-widget";
 import { DrawerWidget, ImageWidget, ModalWidget, PageHeaderWidget } from "./misc-widgets";
 import { ProgressWidget } from "./progress-widget";
@@ -66,6 +68,14 @@ export const untitledAdapter: UiKitAdapter = {
         featureGrid: FeatureGridWidget,
         statsGrid: StatsGridWidget,
         faq: FaqWidget,
+        // Diagrams (mermaid, lazy-loaded)
+        flowchart: DiagramWidget,
+        sequenceDiagram: DiagramWidget,
+        mindmap: DiagramWidget,
+        timeline: DiagramWidget,
+        ganttChart: DiagramWidget,
+        // Integrations
+        googleMap: GoogleMapWidget,
     },
     fallback: ComingSoon,
 };

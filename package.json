@@ -19,6 +19,7 @@
         "@untitledui/icons": "^0.0.22",
         "embla-carousel-react": "^8.6.0",
         "input-otp": "^1.4.2",
+        "mermaid": "^11.15.0",
         "motion": "^12.38.0",
         "qr-code-styling": "^1.9.2",
         "react": "^19.2.4",
