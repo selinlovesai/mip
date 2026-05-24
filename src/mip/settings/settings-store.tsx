@@ -10,11 +10,45 @@ import type { AuthMethod } from "./apps-catalog";
 
 export type DataSourceType = "mock" | "rest" | "json" | "csv";
 
+export type AuthType = "none" | "bearer" | "basic" | "apiKeyHeader" | "apiKeyQuery" | "digest" | "custom";
+
+export interface ConnectionAuth {
+    type: AuthType;
+    token?: string; // bearer
+    username?: string; // basic/digest
+    password?: string; // basic/digest
+    keyName?: string; // apiKey header/query name (or custom header name)
+    keyValue?: string; // apiKey value (or custom header value)
+}
+
+export interface ConnectionHeader {
+    key: string;
+    value: string;
+}
+
+export interface ConnectionEndpoint {
+    id: string;
+    label: string;
+    method: string; // GET/POST/PUT/PATCH/DELETE
+    path: string;
+    mapPath?: string; // default JSON path, e.g. $.data
+    description?: string;
+    body?: string;
+}
+
 export interface Connection {
     id: string;
     name: string;
     type: DataSourceType;
-    /** REST base URL / JSON or CSV inline payload, depending on type. */
+    baseUrl?: string;
+    auth?: ConnectionAuth;
+    headers?: ConnectionHeader[];
+    endpoints?: ConnectionEndpoint[];
+    /** When true, this connection is selectable as the assistant's AI model. */
+    isAiModel?: boolean;
+    aiProvider?: string; // "openai" | "anthropic" | provider id
+    aiModel?: string; // model name
+    /** REST base URL / JSON or CSV inline payload, depending on type (legacy). */
     detail?: string;
 }
 
@@ -24,9 +58,16 @@ export interface AppConnection {
     connectedAt: string;
 }
 
+export interface AssistantConfig {
+    connectionId?: string;
+    model?: string;
+    systemPrompt?: string;
+}
+
 interface SettingsState {
     connections: Connection[];
     apps: AppConnection[];
+    assistant: AssistantConfig;
 }
 
 const STORAGE_KEY = "mip-settings-v1";
@@ -34,6 +75,7 @@ const STORAGE_KEY = "mip-settings-v1";
 const DEFAULT_STATE: SettingsState = {
     connections: [{ id: "mock", name: "Sample data", type: "mock" }],
     apps: [],
+    assistant: {},
 };
 
 function load(): SettingsState {
@@ -52,8 +94,14 @@ interface SettingsValue {
     isAppConnected: (appId: string) => boolean;
     connectApp: (appId: string, method: AuthMethod) => void;
     disconnectApp: (appId: string) => void;
-    addConnection: (conn: Omit<Connection, "id">) => void;
+    addConnection: (conn: Omit<Connection, "id">) => string;
+    updateConnection: (id: string, patch: Partial<Connection>) => void;
     removeConnection: (id: string) => void;
+    getConnection: (id: string) => Connection | undefined;
+    /** Connections flagged as AI models — selectable by the assistant. */
+    aiConnections: Connection[];
+    assistant: AssistantConfig;
+    setAssistant: (patch: Partial<AssistantConfig>) => void;
 }
 
 const SettingsContext = createContext<SettingsValue | null>(null);
@@ -80,16 +128,30 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const addConnection = useCallback((conn: Omit<Connection, "id">) => {
-        setState((s) => ({ ...s, connections: [...s.connections, { ...conn, id: `conn-${Date.now()}` }] }));
+        const id = `conn-${Date.now()}`;
+        setState((s) => ({ ...s, connections: [...s.connections, { ...conn, id }] }));
+        return id;
+    }, []);
+
+    const updateConnection = useCallback((id: string, patch: Partial<Connection>) => {
+        setState((s) => ({ ...s, connections: s.connections.map((c) => (c.id === id ? { ...c, ...patch } : c)) }));
     }, []);
 
     const removeConnection = useCallback((id: string) => {
         setState((s) => ({ ...s, connections: s.connections.filter((c) => c.id !== id) }));
     }, []);
 
+    const getConnection = useCallback((id: string) => state.connections.find((c) => c.id === id), [state.connections]);
+
+    const aiConnections = useMemo(() => state.connections.filter((c) => c.isAiModel), [state.connections]);
+
+    const setAssistant = useCallback((patch: Partial<AssistantConfig>) => {
+        setState((s) => ({ ...s, assistant: { ...s.assistant, ...patch } }));
+    }, []);
+
     const value = useMemo<SettingsValue>(
-        () => ({ connections: state.connections, apps: state.apps, isAppConnected, connectApp, disconnectApp, addConnection, removeConnection }),
-        [state, isAppConnected, connectApp, disconnectApp, addConnection, removeConnection],
+        () => ({ connections: state.connections, apps: state.apps, isAppConnected, connectApp, disconnectApp, addConnection, updateConnection, removeConnection, getConnection, aiConnections, assistant: state.assistant, setAssistant }),
+        [state, isAppConnected, connectApp, disconnectApp, addConnection, updateConnection, removeConnection, getConnection, aiConnections, setAssistant],
     );
 
     return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

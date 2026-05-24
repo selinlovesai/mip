@@ -1,17 +1,21 @@
 /**
- * Apps settings tab — connector gallery + connect flow.
+ * Apps settings tab — connector gallery + connect flow (mip parity).
  *
- * Renders the AI-app catalog grouped by category, with search, per-app connect
- * state (Connected badge + Disconnect), and a modal connect flow that supports
- * API-key and/or OAuth credentials depending on the connector. Credentials are
- * not persisted — connecting only records which apps are linked (client demo).
+ * Renders the AI-app catalog grouped by category, with search. Each card shows
+ * a colored logo tile (app.color + initials), the name, the category in a small
+ * brand uppercase label, a clamped description, and a status affordance:
+ *   - installed         → green "✓ Installed" badge + Disconnect
+ *   - coming_soon        → gray "Coming soon" badge (disabled)
+ *   - scheduled          → amber "Scheduled" badge (disabled)
+ *   - active, not installed → "Connect" button + modal connect flow
+ * Only "active" connectors are installable. Credentials are not persisted —
+ * connecting only records which apps are linked (client demo).
  */
 
 import { useMemo, useState } from "react";
 import { CheckCircle, SearchMd } from "@untitledui/icons";
 import { Dialog, Modal, ModalOverlay } from "@/components/application/modals/modal";
-import { Avatar } from "@/components/base/avatar/avatar";
-import { BadgeWithDot } from "@/components/base/badges/badges";
+import { Badge } from "@/components/base/badges/badges";
 import { Button } from "@/components/base/buttons/button";
 import { CloseButton } from "@/components/base/buttons/close-button";
 import { Input } from "@/components/base/input/input";
@@ -24,6 +28,20 @@ const METHOD_LABEL: Record<AuthMethod, string> = {
     oauth: "OAuth",
 };
 
+/** Logo tile using the connector's brand color + initials. */
+function LogoTile({ app, size = "md" }: { app: AppConnector; size?: "sm" | "md" }) {
+    const dim = size === "sm" ? "size-8 text-xs" : "size-10 text-sm";
+    return (
+        <span
+            className={cx("flex shrink-0 items-center justify-center rounded-lg font-semibold text-white", dim)}
+            style={{ backgroundColor: app.color }}
+            aria-hidden
+        >
+            {appInitials(app.name)}
+        </span>
+    );
+}
+
 export function AppsTab() {
     const { isAppConnected, connectApp, disconnectApp } = useSettings();
     const [query, setQuery] = useState("");
@@ -32,7 +50,12 @@ export function AppsTab() {
     const groups = useMemo(() => {
         const q = query.trim().toLowerCase();
         const filtered = q
-            ? APP_CATALOG.filter((app) => app.name.toLowerCase().includes(q) || app.category.toLowerCase().includes(q))
+            ? APP_CATALOG.filter(
+                  (app) =>
+                      app.name.toLowerCase().includes(q) ||
+                      app.category.toLowerCase().includes(q) ||
+                      app.description.toLowerCase().includes(q),
+              )
             : APP_CATALOG;
         return APP_CATEGORIES.map((category) => ({
             category,
@@ -45,7 +68,9 @@ export function AppsTab() {
             <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
                     <h2 className="text-lg font-semibold text-primary">Apps</h2>
-                    <p className="text-sm text-tertiary">Connect AI providers and tools.</p>
+                    <p className="text-sm text-tertiary">
+                        Install or remove applications. Installed apps appear as data providers in Connections.
+                    </p>
                 </div>
                 <Input
                     size="sm"
@@ -68,29 +93,46 @@ export function AppsTab() {
                             {group.apps.map((app) => {
                                 const connected = isAppConnected(app.id);
                                 return (
-                                    <div key={app.id} className="flex items-start gap-3 rounded-xl p-4 ring-1 ring-secondary">
-                                        <Avatar size="md" rounded={false} initials={appInitials(app.name)} />
-                                        <div className="flex min-w-0 flex-1 flex-col gap-2">
+                                    <div
+                                        key={app.id}
+                                        className={cx(
+                                            "flex items-start gap-3 rounded-xl p-4 ring-1",
+                                            connected ? "ring-2 ring-brand" : "ring-secondary",
+                                        )}
+                                    >
+                                        <LogoTile app={app} />
+                                        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                                             <div className="flex min-w-0 flex-col">
                                                 <span className="truncate text-sm font-semibold text-primary">{app.name}</span>
-                                                <span className="truncate text-xs text-tertiary">{app.category}</span>
+                                                <span className="truncate text-[11px] font-semibold uppercase tracking-wide text-brand-secondary">
+                                                    {app.category}
+                                                </span>
                                             </div>
-                                            {connected ? (
-                                                <div className="flex items-center gap-2">
-                                                    <BadgeWithDot type="pill-color" color="success" size="sm">
-                                                        Connected
-                                                    </BadgeWithDot>
-                                                    <Button size="sm" color="link-gray" onClick={() => disconnectApp(app.id)}>
-                                                        Disconnect
-                                                    </Button>
-                                                </div>
-                                            ) : (
-                                                <div>
+                                            <p className="line-clamp-2 text-xs text-tertiary">{app.description}</p>
+                                            <div className="mt-1 flex items-center gap-2">
+                                                {connected ? (
+                                                    <>
+                                                        <Badge type="pill-color" color="success" size="sm">
+                                                            ✓ Installed
+                                                        </Badge>
+                                                        <Button size="sm" color="link-gray" onClick={() => disconnectApp(app.id)}>
+                                                            Disconnect
+                                                        </Button>
+                                                    </>
+                                                ) : app.status === "coming_soon" ? (
+                                                    <Badge type="pill-color" color="gray" size="sm">
+                                                        Coming soon
+                                                    </Badge>
+                                                ) : app.status === "scheduled" ? (
+                                                    <Badge type="pill-color" color="warning" size="sm">
+                                                        Scheduled
+                                                    </Badge>
+                                                ) : (
                                                     <Button size="sm" color="secondary" onClick={() => setActive(app)}>
                                                         Connect
                                                     </Button>
-                                                </div>
-                                            )}
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 );
@@ -144,13 +186,14 @@ function ConnectForm({
     const [clientId, setClientId] = useState("");
     const [clientSecret, setClientSecret] = useState("");
 
-    const canConnect = method === "apiKey" ? apiKey.trim().length > 0 : clientId.trim().length > 0 && clientSecret.trim().length > 0;
+    const canConnect =
+        method === "apiKey" ? apiKey.trim().length > 0 : clientId.trim().length > 0 && clientSecret.trim().length > 0;
 
     return (
         <div className="flex w-full flex-col overflow-hidden rounded-xl bg-primary shadow-xl ring-1 ring-secondary">
             <div className="flex items-start justify-between gap-4 border-b border-secondary px-5 py-4">
                 <div className="flex items-center gap-3">
-                    <Avatar size="sm" rounded={false} initials={appInitials(app.name)} />
+                    <LogoTile app={app} size="sm" />
                     <div className="flex flex-col">
                         <h2 className="text-lg font-semibold text-primary">Connect {app.name}</h2>
                         <span className="text-xs text-tertiary">{app.category}</span>
@@ -201,7 +244,7 @@ function ConnectForm({
                     </>
                 )}
 
-                <p className={cx("text-xs text-tertiary")}>Credentials are used only for this demo session and are not stored.</p>
+                <p className="text-xs text-tertiary">Credentials are used only for this demo session and are not stored.</p>
             </div>
 
             <div className="flex justify-end gap-3 border-t border-secondary px-5 py-4">

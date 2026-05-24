@@ -1,65 +1,75 @@
 /**
  * App connector catalog: the AI-app ecosystem surfaced in Settings > Apps.
  * Mirrors the original app's data/apps manifest set (id, name, category,
- * supported auth methods). Used by the Apps tab to render the connector
+ * supported auth methods, a short description, install status, and a brand
+ * color for the logo tile). Used by the Apps tab to render the connector
  * gallery and the connect flow.
  */
 
 export type AuthMethod = "apiKey" | "oauth";
+
+/** Install/availability state for a connector, matching the original app. */
+export type AppStatus = "active" | "coming_soon" | "scheduled";
 
 export interface AppConnector {
     id: string;
     name: string;
     category: string;
     auth: AuthMethod[];
+    /** One-line summary shown on the connector card. */
+    description: string;
+    /** Whether the connector is installable now, soon, or scheduled. */
+    status: AppStatus;
+    /** Brand-ish hex used as the logo tile background. */
+    color: string;
 }
 
 export const APP_CATALOG: AppConnector[] = [
     // AI
-    { id: "anthropic", name: "Anthropic", category: "AI", auth: ["apiKey", "oauth"] },
-    { id: "openai", name: "OpenAI", category: "AI", auth: ["apiKey", "oauth"] },
-    { id: "gemini", name: "Google AI (Gemini)", category: "AI", auth: ["apiKey", "oauth"] },
-    { id: "mistral", name: "Mistral AI", category: "AI", auth: ["apiKey", "oauth"] },
-    { id: "cohere", name: "Cohere", category: "AI", auth: ["apiKey", "oauth"] },
-    { id: "perplexity", name: "Perplexity", category: "AI", auth: ["apiKey", "oauth"] },
-    { id: "deepseek", name: "DeepSeek", category: "AI", auth: ["apiKey", "oauth"] },
-    { id: "hugging-face", name: "Hugging Face", category: "AI", auth: ["apiKey", "oauth"] },
-    { id: "elevenlabs", name: "ElevenLabs", category: "AI", auth: ["apiKey"] },
-    { id: "replicate", name: "Replicate", category: "AI", auth: ["apiKey", "oauth"] },
+    { id: "anthropic", name: "Anthropic", category: "AI", auth: ["apiKey", "oauth"], description: "Claude AI models for text generation, analysis, and code.", status: "active", color: "#D97757" },
+    { id: "openai", name: "OpenAI", category: "AI", auth: ["apiKey", "oauth"], description: "GPT models for chat, completions, embeddings, and vision.", status: "active", color: "#10A37F" },
+    { id: "gemini", name: "Google AI (Gemini)", category: "AI", auth: ["apiKey", "oauth"], description: "Gemini multimodal models for text, images, and reasoning.", status: "active", color: "#4285F4" },
+    { id: "mistral", name: "Mistral AI", category: "AI", auth: ["apiKey", "oauth"], description: "Open-weight and frontier models for fast, efficient inference.", status: "active", color: "#FF7000" },
+    { id: "cohere", name: "Cohere", category: "AI", auth: ["apiKey", "oauth"], description: "Command models and embeddings tuned for enterprise RAG.", status: "coming_soon", color: "#39594D" },
+    { id: "perplexity", name: "Perplexity", category: "AI", auth: ["apiKey", "oauth"], description: "Answer engine with live web grounding and citations.", status: "coming_soon", color: "#1FB8CD" },
+    { id: "deepseek", name: "DeepSeek", category: "AI", auth: ["apiKey", "oauth"], description: "Reasoning and code models with strong price-performance.", status: "coming_soon", color: "#4D6BFE" },
+    { id: "hugging-face", name: "Hugging Face", category: "AI", auth: ["apiKey", "oauth"], description: "Inference endpoints across thousands of open models.", status: "scheduled", color: "#FFD21E" },
+    { id: "elevenlabs", name: "ElevenLabs", category: "AI", auth: ["apiKey"], description: "Lifelike text-to-speech and voice synthesis.", status: "coming_soon", color: "#000000" },
+    { id: "replicate", name: "Replicate", category: "AI", auth: ["apiKey", "oauth"], description: "Run and fine-tune open ML models via a hosted API.", status: "scheduled", color: "#000000" },
     // Google Workspace
-    { id: "google-sheets", name: "Google Sheets", category: "Google Workspace", auth: ["oauth"] },
-    { id: "google-docs", name: "Google Docs", category: "Google Workspace", auth: ["oauth"] },
-    { id: "google-drive", name: "Google Drive", category: "Google Workspace", auth: ["oauth"] },
-    { id: "google-slides", name: "Google Slides", category: "Google Workspace", auth: ["oauth"] },
+    { id: "google-sheets", name: "Google Sheets", category: "Google Workspace", auth: ["oauth"], description: "Read and write spreadsheet data as a live data source.", status: "active", color: "#0F9D58" },
+    { id: "google-docs", name: "Google Docs", category: "Google Workspace", auth: ["oauth"], description: "Pull document content and collaborate programmatically.", status: "coming_soon", color: "#4285F4" },
+    { id: "google-drive", name: "Google Drive", category: "Google Workspace", auth: ["oauth"], description: "Browse, fetch, and sync files from your Drive.", status: "coming_soon", color: "#FBBC05" },
+    { id: "google-slides", name: "Google Slides", category: "Google Workspace", auth: ["oauth"], description: "Generate and update presentation decks.", status: "scheduled", color: "#F4B400" },
     // Databases
-    { id: "postgresql", name: "PostgreSQL", category: "Databases", auth: ["apiKey"] },
-    { id: "mysql", name: "MySQL", category: "Databases", auth: ["apiKey"] },
-    { id: "mongodb", name: "MongoDB", category: "Databases", auth: ["apiKey"] },
-    { id: "redis", name: "Redis", category: "Databases", auth: ["apiKey"] },
-    { id: "firebase", name: "Firebase", category: "Databases", auth: ["apiKey"] },
+    { id: "postgresql", name: "PostgreSQL", category: "Databases", auth: ["apiKey"], description: "Query a Postgres database as a dashboard data source.", status: "active", color: "#336791" },
+    { id: "mysql", name: "MySQL", category: "Databases", auth: ["apiKey"], description: "Connect a MySQL database for live metrics and tables.", status: "coming_soon", color: "#00758F" },
+    { id: "mongodb", name: "MongoDB", category: "Databases", auth: ["apiKey"], description: "Query collections from a MongoDB cluster.", status: "coming_soon", color: "#47A248" },
+    { id: "redis", name: "Redis", category: "Databases", auth: ["apiKey"], description: "Read keys and streams from a Redis instance.", status: "scheduled", color: "#DC382D" },
+    { id: "firebase", name: "Firebase", category: "Databases", auth: ["apiKey"], description: "Realtime Database and Firestore as a data source.", status: "coming_soon", color: "#FFCA28" },
     // Project Management
-    { id: "jira", name: "Jira", category: "Project Management", auth: ["oauth"] },
-    { id: "linear", name: "Linear", category: "Project Management", auth: ["oauth", "apiKey"] },
-    { id: "asana", name: "Asana", category: "Project Management", auth: ["oauth"] },
+    { id: "jira", name: "Jira", category: "Project Management", auth: ["oauth"], description: "Track issues, sprints, and project metrics.", status: "coming_soon", color: "#0052CC" },
+    { id: "linear", name: "Linear", category: "Project Management", auth: ["oauth", "apiKey"], description: "Sync issues, cycles, and team velocity.", status: "active", color: "#5E6AD2" },
+    { id: "asana", name: "Asana", category: "Project Management", auth: ["oauth"], description: "Pull tasks, projects, and workload data.", status: "scheduled", color: "#F06A6A" },
     // CRM & Sales
-    { id: "salesforce", name: "Salesforce", category: "CRM & Sales", auth: ["oauth"] },
-    { id: "hubspot", name: "HubSpot", category: "CRM & Sales", auth: ["oauth", "apiKey"] },
-    { id: "intercom", name: "Intercom", category: "CRM & Sales", auth: ["oauth"] },
+    { id: "salesforce", name: "Salesforce", category: "CRM & Sales", auth: ["oauth"], description: "Sync accounts, opportunities, and pipeline data.", status: "coming_soon", color: "#00A1E0" },
+    { id: "hubspot", name: "HubSpot", category: "CRM & Sales", auth: ["oauth", "apiKey"], description: "Contacts, deals, and marketing analytics.", status: "coming_soon", color: "#FF7A59" },
+    { id: "intercom", name: "Intercom", category: "CRM & Sales", auth: ["oauth"], description: "Conversations, customers, and support metrics.", status: "scheduled", color: "#1F8DED" },
     // Developer
-    { id: "github", name: "GitHub", category: "Developer", auth: ["oauth", "apiKey"] },
-    { id: "gitlab", name: "GitLab", category: "Developer", auth: ["oauth", "apiKey"] },
-    { id: "graphql", name: "GraphQL", category: "Developer", auth: ["apiKey"] },
+    { id: "github", name: "GitHub", category: "Developer", auth: ["oauth", "apiKey"], description: "Repos, issues, pull requests, and CI activity.", status: "active", color: "#181717" },
+    { id: "gitlab", name: "GitLab", category: "Developer", auth: ["oauth", "apiKey"], description: "Projects, merge requests, and pipeline status.", status: "coming_soon", color: "#FC6D26" },
+    { id: "graphql", name: "GraphQL", category: "Developer", auth: ["apiKey"], description: "Query any GraphQL endpoint as a data source.", status: "active", color: "#E10098" },
     // Communication
-    { id: "discord", name: "Discord", category: "Communication", auth: ["oauth"] },
-    { id: "sendgrid", name: "SendGrid", category: "Communication", auth: ["apiKey"] },
+    { id: "discord", name: "Discord", category: "Communication", auth: ["oauth"], description: "Read channels and post messages to your servers.", status: "coming_soon", color: "#5865F2" },
+    { id: "sendgrid", name: "SendGrid", category: "Communication", auth: ["apiKey"], description: "Send transactional email and track delivery stats.", status: "scheduled", color: "#1A82E2" },
     // Marketing & Analytics
-    { id: "mailchimp", name: "Mailchimp", category: "Marketing", auth: ["apiKey", "oauth"] },
-    { id: "google-analytics", name: "Google Analytics", category: "Analytics", auth: ["oauth"] },
-    { id: "meta-ads", name: "Meta Ads", category: "Marketing", auth: ["oauth"] },
+    { id: "mailchimp", name: "Mailchimp", category: "Marketing", auth: ["apiKey", "oauth"], description: "Campaign performance, audiences, and automations.", status: "coming_soon", color: "#FFE01B" },
+    { id: "google-analytics", name: "Google Analytics", category: "Analytics", auth: ["oauth"], description: "Traffic, conversions, and engagement metrics (GA4).", status: "active", color: "#E37400" },
+    { id: "meta-ads", name: "Meta Ads", category: "Marketing", auth: ["oauth"], description: "Ad spend, reach, and ROAS across Facebook and Instagram.", status: "coming_soon", color: "#0866FF" },
     // Productivity & Commerce
-    { id: "notion", name: "Notion", category: "Productivity", auth: ["oauth", "apiKey"] },
-    { id: "airtable", name: "Airtable", category: "Productivity", auth: ["apiKey"] },
-    { id: "shopify", name: "Shopify", category: "Commerce & Finance", auth: ["oauth"] },
+    { id: "notion", name: "Notion", category: "Productivity", auth: ["oauth", "apiKey"], description: "Databases and pages as structured data sources.", status: "active", color: "#000000" },
+    { id: "airtable", name: "Airtable", category: "Productivity", auth: ["apiKey"], description: "Bases and tables as a flexible data backend.", status: "coming_soon", color: "#18BFFF" },
+    { id: "shopify", name: "Shopify", category: "Commerce & Finance", auth: ["oauth"], description: "Orders, products, and storefront sales analytics.", status: "coming_soon", color: "#95BF47" },
 ];
 
 export const APP_CATEGORIES = [...new Set(APP_CATALOG.map((a) => a.category))];
