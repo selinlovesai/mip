@@ -27,7 +27,7 @@ function initialsOf(name: string): string {
     return (parts[0]![0]! + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
-export function Sidebar({ onToggle, onOpenSettings }: { onToggle: () => void; onOpenSettings: (tab?: SettingsTabId) => void }) {
+export function Sidebar({ onToggle, onOpenSettings, onNavigate }: { onToggle: () => void; onOpenSettings: (tab?: SettingsTabId) => void; onNavigate?: () => void }) {
     const { state, activePage, setActivePage, addPage, renamePage, deletePage, duplicatePage } = useDashboard();
     const { profile } = useSettings();
     const [adding, setAdding] = useState(false);
@@ -101,6 +101,7 @@ export function Sidebar({ onToggle, onOpenSettings }: { onToggle: () => void; on
                                     onClick={(e) => {
                                         e.preventDefault();
                                         setActivePage(page.id);
+                                        onNavigate?.();
                                     }}
                                 >
                                     {page.title}

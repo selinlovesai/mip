@@ -29,6 +29,13 @@ export function applyAccent(key: string) {
     root.style.setProperty("--color-brand-500", accent.ramp[500]);
     root.style.setProperty("--color-brand-600", accent.ramp[600]);
     root.style.setProperty("--color-brand-700", accent.ramp[700]);
+    // The utility-brand ramp is a SEPARATE token family in the Untitled theme
+    // (it doesn't derive from --color-brand-*), and it's what widgets actually
+    // use — chart series, progress bars, accents. Override it too so the chosen
+    // accent reaches every widget.
+    root.style.setProperty("--color-utility-brand-500", accent.ramp[500]);
+    root.style.setProperty("--color-utility-brand-600", accent.ramp[600]);
+    root.style.setProperty("--color-utility-brand-700", accent.ramp[700]);
 }
 
 export function getSavedAccent(): string {

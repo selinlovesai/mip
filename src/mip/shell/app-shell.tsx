@@ -45,7 +45,7 @@ export const AppShell = () => {
                 <DashboardProvider>
                     <div className="flex h-dvh overflow-hidden bg-secondary">
                         <div className={`shrink-0 overflow-hidden transition-[width] duration-200 ease-in-out ${sidebarCollapsed ? "w-0" : "w-64"}`}>
-                            <Sidebar onToggle={() => setSidebarCollapsed(true)} onOpenSettings={openSettings} />
+                            <Sidebar onToggle={() => setSidebarCollapsed(true)} onOpenSettings={openSettings} onNavigate={() => setSettingsOpen(false)} />
                         </div>
                         <div className="flex min-w-0 flex-1 flex-col">
                             <Topbar
