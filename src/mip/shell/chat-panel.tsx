@@ -12,7 +12,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Expand01, LayoutRight, MessageChatCircle, Minimize01, Send01, Settings01, Stars01, X } from "@untitledui/icons";
-import { Button } from "@/components/base/buttons/button";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { Checkbox } from "@/components/base/checkbox/checkbox";
 import { Input } from "@/components/base/input/input";
@@ -214,7 +213,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
     const assistantSettingsPopover = acfgOpen ? (
         <>
             <button type="button" aria-label="Close assistant settings" className="fixed inset-0 z-[60] cursor-default" onClick={() => setAcfgOpen(false)} />
-            <div className="fixed top-16 right-4 z-[61] flex max-h-[70vh] w-64 max-w-[calc(100vw-2rem)] flex-col gap-4 overflow-y-auto rounded-xl bg-primary p-4 shadow-xl ring-1 ring-secondary">
+            <div className="fixed top-16 right-4 z-[61] flex max-h-[70vh] w-80 max-w-[calc(100vw-2rem)] flex-col gap-4 overflow-y-auto rounded-xl bg-primary p-4 shadow-xl ring-1 ring-secondary">
                 <div className="flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-primary">Assistant Settings</h3>
                     <ButtonUtility size="xs" color="tertiary" icon={X} tooltip="Close" onClick={() => setAcfgOpen(false)} />
@@ -276,9 +275,9 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
 
     // ---- Composer footer (shared by sidebar + chat) ----
     const footer = (
-        <div className="flex flex-col gap-2 border-t border-secondary p-3">
-            {modeToolbar}
-            <div className="flex items-end gap-2">
+        <div className="flex flex-col border-t border-secondary">
+            <div className="px-3 py-2">{modeToolbar}</div>
+            <div className="flex items-stretch border-t border-secondary">
                 <TextArea
                     aria-label="Message"
                     size="sm"
@@ -288,9 +287,17 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                     onKeyDown={onComposerKeyDown}
                     placeholder="Ask anything…"
                     className="flex-1"
-                    textAreaClassName="max-h-32 resize-none"
+                    textAreaClassName="max-h-32 resize-none rounded-none border-0 shadow-none ring-0 text-xs leading-4 focus:ring-0"
                 />
-                <Button size="md" color="primary" iconLeading={Send01} isDisabled={!draft.trim() || thinking} onClick={() => void sendText(draft)} aria-label="Send" />
+                <button
+                    type="button"
+                    aria-label="Send"
+                    disabled={!draft.trim() || thinking}
+                    onClick={() => void sendText(draft)}
+                    className="flex items-center px-3 text-tertiary transition-colors hover:text-secondary disabled:opacity-40"
+                >
+                    <Send01 className="size-4" />
+                </button>
             </div>
         </div>
     );
@@ -344,7 +351,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
     // ---- FLOATING CHAT mode ----
     if (mode === "chat") {
         return (
-            <div className="fixed right-0 top-0 z-50 flex h-[560px] max-h-[calc(100vh-1rem)] w-64 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-l-2xl rounded-br-2xl border-b border-l border-secondary bg-primary shadow-xl">
+            <div className="fixed right-0 top-0 z-50 flex h-[560px] max-h-[calc(100vh-1rem)] w-80 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-l-2xl rounded-br-2xl border-b border-l border-secondary bg-primary shadow-xl">
                 {header}
                 {messageList}
                 {footer}
@@ -355,7 +362,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
 
     // ---- SIDEBAR mode (default) ----
     return (
-        <aside className="flex w-64 shrink-0 flex-col border-l border-secondary bg-primary">
+        <aside className="flex w-80 shrink-0 flex-col border-l border-secondary bg-primary">
             {header}
             {messageList}
             {footer}
