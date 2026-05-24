@@ -15,7 +15,9 @@ import { SettingsSurface } from "@/mip/settings/settings-surface";
 import { applyAccent, getSavedAccent } from "./appearance";
 import { ChatPanel } from "./chat-panel";
 import { DashboardGrid } from "./dashboard-grid";
+import { DashboardSettingsModal } from "./dashboard-settings-modal";
 import { Sidebar } from "./sidebar";
+import { TemplatesModal } from "./templates-modal";
 import { Topbar } from "./topbar";
 import { WidgetPicker } from "./widget-picker";
 
@@ -24,6 +26,8 @@ export const AppShell = () => {
     const [chatOpen, setChatOpen] = useState(false);
     const [pickerOpen, setPickerOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [dashboardSettingsOpen, setDashboardSettingsOpen] = useState(false);
+    const [templatesOpen, setTemplatesOpen] = useState(false);
 
     useEffect(() => {
         applyAccent(getSavedAccent());
@@ -42,8 +46,9 @@ export const AppShell = () => {
                                 onAddWidget={() => setPickerOpen(true)}
                                 onToggleChat={() => setChatOpen((v) => !v)}
                                 chatOpen={chatOpen}
-                                onOpenSettings={() => setSettingsOpen(true)}
-                                settingsOpen={settingsOpen}
+                                onOpenDashboardSettings={() => setDashboardSettingsOpen(true)}
+                                dashboardSettingsOpen={dashboardSettingsOpen}
+                                onOpenTemplates={() => setTemplatesOpen(true)}
                                 sidebarCollapsed={sidebarCollapsed}
                                 onExpandSidebar={() => setSidebarCollapsed(false)}
                             />
@@ -59,6 +64,8 @@ export const AppShell = () => {
                         </div>
                         <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
                         <WidgetPicker open={pickerOpen} onClose={() => setPickerOpen(false)} />
+                        <DashboardSettingsModal open={dashboardSettingsOpen} onClose={() => setDashboardSettingsOpen(false)} />
+                        <TemplatesModal open={templatesOpen} onClose={() => setTemplatesOpen(false)} onOpenConnections={() => setSettingsOpen(true)} />
                     </div>
                 </DashboardProvider>
             </SettingsProvider>

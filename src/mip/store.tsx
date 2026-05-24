@@ -10,12 +10,35 @@ import type { Layout } from "react-grid-layout/core";
 import type { MipWidget, MipWidgetLayout } from "@/mip/schema";
 import { seedPages } from "./seed";
 
+/** Per-page access level granted to a role (mirrors mip `pagePermissions`). */
+export type PageAccessLevel = "edit" | "view" | "none";
+
+/** A typed input variable for a dynamic (parameterized) page. */
+export interface PageVariable {
+    id: string;
+    name: string;
+    source: "query" | "path" | "body";
+    required: boolean;
+}
+
 export interface DashboardPage {
     id: string;
     title: string;
     cols: number;
     rowHeight: number;
     widgets: MipWidget[];
+    /** --- per-page Dashboard Settings (topbar gear) --- */
+    description?: string;
+    /** "dashboard" = sidebar + topbar shell · "fullpage" = standalone */
+    layoutMode?: "dashboard" | "fullpage";
+    /** added to the assistant's system prompt while this page is open */
+    systemPrompt?: string;
+    /** role id -> access level (Access Control tab) */
+    permissions?: Record<string, PageAccessLevel>;
+    /** whether the AI assistant may access/see this page */
+    aiAccess?: boolean;
+    /** input variables for dynamic pages */
+    variables?: PageVariable[];
 }
 
 interface DashboardState {
@@ -41,9 +64,15 @@ interface StoreValue {
     activePage: DashboardPage;
     editMode: boolean;
     setEditMode: (next: boolean) => void;
+    /** "layout" = multi-column grid · "feed" = single-column responsive stack */
+    viewMode: "layout" | "feed";
+    setViewMode: (next: "layout" | "feed") => void;
     setActivePage: (id: string) => void;
     addPage: (title: string) => void;
+    /** Create a new page seeded with the given widgets (template import) and activate it. */
+    importTemplate: (title: string, widgets: MipWidget[]) => void;
     renamePage: (id: string, title: string) => void;
+    updatePageSettings: (id: string, patch: Partial<DashboardPage>) => void;
     deletePage: (id: string) => void;
     duplicatePage: (id: string) => void;
     addWidget: (widget: MipWidget) => void;
@@ -57,6 +86,7 @@ const DashboardContext = createContext<StoreValue | null>(null);
 export function DashboardProvider({ children }: { children: ReactNode }) {
     const [state, setState] = useState<DashboardState>(load);
     const [editMode, setEditMode] = useState(false);
+    const [viewMode, setViewMode] = useState<"layout" | "feed">("layout");
 
     useEffect(() => {
         try {
@@ -82,10 +112,19 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ pages: [...s.pages, { id, title, cols: 12, rowHeight: 140, widgets: [] }], activePageId: id }));
     }, []);
 
+    const importTemplate = useCallback((title: string, widgets: MipWidget[]) => {
+        const id = `page-${Date.now()}`;
+        setState((s) => ({ pages: [...s.pages, { id, title, cols: 12, rowHeight: 140, widgets }], activePageId: id }));
+    }, []);
+
     const renamePage = useCallback((id: string, title: string) => {
         const next = title.trim();
         if (!next) return;
         setState((s) => ({ ...s, pages: s.pages.map((page) => (page.id === id ? { ...page, title: next } : page)) }));
+    }, []);
+
+    const updatePageSettings = useCallback((id: string, patch: Partial<DashboardPage>) => {
+        setState((s) => ({ ...s, pages: s.pages.map((page) => (page.id === id ? { ...page, ...patch } : page)) }));
     }, []);
 
     const deletePage = useCallback((id: string) => {
@@ -147,8 +186,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     );
 
     const value = useMemo<StoreValue>(
-        () => ({ state, activePage, editMode, setEditMode, setActivePage, addPage, renamePage, deletePage, duplicatePage, addWidget, updateWidget, removeWidget, applyLayout }),
-        [state, activePage, editMode, setActivePage, addPage, renamePage, deletePage, duplicatePage, addWidget, updateWidget, removeWidget, applyLayout],
+        () => ({ state, activePage, editMode, setEditMode, viewMode, setViewMode, setActivePage, addPage, importTemplate, renamePage, updatePageSettings, deletePage, duplicatePage, addWidget, updateWidget, removeWidget, applyLayout }),
+        [state, activePage, editMode, viewMode, setActivePage, addPage, importTemplate, renamePage, updatePageSettings, deletePage, duplicatePage, addWidget, updateWidget, removeWidget, applyLayout],
     );
 
     return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>;

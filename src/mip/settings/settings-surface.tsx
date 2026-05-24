@@ -6,9 +6,10 @@
  */
 
 import { useState, type ComponentType } from "react";
-import { ArrowLeft, Database01, LayoutAlt01, Palette, Stars01, User01, Users01 } from "@untitledui/icons";
+import { ArrowLeft, Database01, Key01, LayoutAlt01, Palette, Stars01, User01, Users01 } from "@untitledui/icons";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { cx } from "@/utils/cx";
+import { AccessTab } from "./tabs/access-tab";
 import { AppsTab } from "./tabs/apps-tab";
 import { ConnectionsTab } from "./tabs/connections-tab";
 import { AppearanceTab } from "./tabs/appearance-tab";
@@ -16,7 +17,7 @@ import { AssistantTab } from "./tabs/assistant-tab";
 import { ProfileTab } from "./tabs/profile-tab";
 import { UsersTab } from "./tabs/users-tab";
 
-type TabId = "profile" | "appearance" | "connections" | "apps" | "assistant" | "users";
+type TabId = "profile" | "appearance" | "connections" | "apps" | "assistant" | "access" | "users";
 
 const TABS: Array<{ id: TabId; label: string; icon: ComponentType<{ className?: string }>; content: ComponentType }> = [
     { id: "profile", label: "Profile", icon: User01, content: ProfileTab },
@@ -24,6 +25,7 @@ const TABS: Array<{ id: TabId; label: string; icon: ComponentType<{ className?: 
     { id: "connections", label: "Connections", icon: Database01, content: ConnectionsTab },
     { id: "apps", label: "Apps", icon: LayoutAlt01, content: AppsTab },
     { id: "assistant", label: "Assistant", icon: Stars01, content: AssistantTab },
+    { id: "access", label: "Access", icon: Key01, content: AccessTab },
     { id: "users", label: "Users", icon: Users01, content: UsersTab },
 ];
 

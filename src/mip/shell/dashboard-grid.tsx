@@ -15,7 +15,7 @@ import { WidgetChrome } from "./widget-chrome";
 const MARGIN: [number, number] = [16, 16];
 
 export function DashboardGrid() {
-    const { activePage, editMode, applyLayout, removeWidget } = useDashboard();
+    const { activePage, editMode, viewMode, applyLayout, removeWidget } = useDashboard();
     const { width, mounted, containerRef } = useContainerWidth();
 
     const layout = useMemo<Layout>(
@@ -34,6 +34,21 @@ export function DashboardGrid() {
 
     if (activePage.widgets.length === 0) {
         return <div className="flex h-64 items-center justify-center rounded-xl border border-dashed border-secondary text-sm text-tertiary">This page has no widgets yet. Add one from the toolbar.</div>;
+    }
+
+    // Feed view — every widget full-width, stacked vertically in the saved
+    // top-to-bottom order. A responsive/mobile preview that ignores columns.
+    if (viewMode === "feed") {
+        const ordered = [...activePage.widgets].sort((a, b) => a.layout.y - b.layout.y || a.layout.x - b.layout.x);
+        return (
+            <div className="mx-auto flex max-w-2xl flex-col gap-4">
+                {ordered.map((widget) => (
+                    <div key={widget.id} data-mip-widget-id={widget.id} style={{ minHeight: widget.layout.h * activePage.rowHeight }}>
+                        <WidgetChrome widget={widget} editMode={false} onDelete={removeWidget} />
+                    </div>
+                ))}
+            </div>
+        );
     }
 
     return (

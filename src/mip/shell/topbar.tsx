@@ -4,14 +4,14 @@
  * assistant. Icon controls use the Untitled UI ButtonUtility component.
  */
 
-import { ChevronRight, Lock01, LockUnlocked01, Moon01, PlusCircle, Settings01, Stars01, Sun } from "@untitledui/icons";
+import { ChevronRight, Grid01, Lock01, LockUnlocked01, Monitor04, Moon01, Phone01, PlusCircle, Settings01, Stars01, Sun } from "@untitledui/icons";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { useTheme } from "@/providers/theme-provider";
 import { useDashboard } from "@/mip/store";
 import { cx } from "@/utils/cx";
 
-export function Topbar({ onAddWidget, onToggleChat, chatOpen, onOpenSettings, settingsOpen, sidebarCollapsed, onExpandSidebar }: { onAddWidget: () => void; onToggleChat: () => void; chatOpen: boolean; onOpenSettings: () => void; settingsOpen: boolean; sidebarCollapsed: boolean; onExpandSidebar: () => void }) {
-    const { activePage, editMode, setEditMode } = useDashboard();
+export function Topbar({ onAddWidget, onToggleChat, chatOpen, onOpenDashboardSettings, dashboardSettingsOpen, onOpenTemplates, sidebarCollapsed, onExpandSidebar }: { onAddWidget: () => void; onToggleChat: () => void; chatOpen: boolean; onOpenDashboardSettings: () => void; dashboardSettingsOpen: boolean; onOpenTemplates: () => void; sidebarCollapsed: boolean; onExpandSidebar: () => void }) {
+    const { activePage, editMode, setEditMode, viewMode, setViewMode } = useDashboard();
     const { theme, setTheme } = useTheme();
     const isDark = theme === "dark" || (theme === "system" && typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches);
 
@@ -33,7 +33,15 @@ export function Topbar({ onAddWidget, onToggleChat, chatOpen, onOpenSettings, se
                     tooltip={isDark ? "Light mode" : "Dark mode"}
                     onClick={() => setTheme(isDark ? "light" : "dark")}
                 />
-                <ButtonUtility color="tertiary" icon={Settings01} tooltip="Settings" className={cx(settingsOpen && activeClass)} onClick={onOpenSettings} />
+                <ButtonUtility
+                    color="tertiary"
+                    icon={viewMode === "feed" ? Monitor04 : Phone01}
+                    tooltip={viewMode === "feed" ? "Layout view" : "Responsive (feed) view"}
+                    className={cx(viewMode === "feed" && activeClass)}
+                    onClick={() => setViewMode(viewMode === "feed" ? "layout" : "feed")}
+                />
+                <ButtonUtility color="tertiary" icon={Settings01} tooltip="Dashboard settings" className={cx(dashboardSettingsOpen && activeClass)} onClick={onOpenDashboardSettings} />
+                <ButtonUtility color="tertiary" icon={Grid01} tooltip="Templates" onClick={onOpenTemplates} />
                 <ButtonUtility color="tertiary" icon={PlusCircle} tooltip="Add widget" onClick={onAddWidget} />
                 <ButtonUtility
                     color="tertiary"

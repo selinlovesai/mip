@@ -62,6 +62,8 @@ export interface AssistantConfig {
     connectionId?: string;
     model?: string;
     systemPrompt?: string;
+    /** Connection ids the assistant is allowed to call as tools (live requests). */
+    callableConnectionIds?: string[];
 }
 
 interface SettingsState {

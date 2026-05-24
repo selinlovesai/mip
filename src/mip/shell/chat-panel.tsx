@@ -14,6 +14,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Expand01, LayoutRight, MessageChatCircle, Minimize01, Send01, Settings01, Stars01, X } from "@untitledui/icons";
 import { Button } from "@/components/base/buttons/button";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
+import { Checkbox } from "@/components/base/checkbox/checkbox";
+import { Input } from "@/components/base/input/input";
+import { Select } from "@/components/base/select/select";
 import { TextArea } from "@/components/base/textarea/textarea";
 import { chat } from "@/mip/api";
 import { markdownToHtml } from "@/mip/adapters/untitled/markdown";
@@ -39,11 +42,12 @@ function demoRespond(prompt: string, page: string): string {
 
 export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
     const { activePage } = useDashboard();
-    const { assistant, aiConnections, getConnection } = useSettings();
+    const { assistant, aiConnections, connections, getConnection, setAssistant } = useSettings();
     const [mode, setMode] = useState<ChatMode>("sidebar");
     const [messages, setMessages] = useState<Message[]>([{ id: "intro", role: "assistant", text: INTRO }]);
     const [draft, setDraft] = useState("");
     const [thinking, setThinking] = useState(false);
+    const [acfgOpen, setAcfgOpen] = useState(false);
     const listRef = useRef<HTMLDivElement>(null);
 
     // The configured AI connection (from Settings → Assistant), if any.
@@ -195,11 +199,73 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                 size="xs"
                 color="tertiary"
                 icon={Settings01}
-                tooltip="Assistant settings · Settings → Assistant"
-                onClick={() => listRef.current?.scrollTo({ top: 0, behavior: "smooth" })}
+                tooltip="Assistant settings"
+                className={cx(acfgOpen && "bg-active text-fg-brand-primary")}
+                onClick={() => setAcfgOpen((v) => !v)}
             />
         </div>
     );
+
+    // ---- Assistant Settings popover (provider/model + callable connections) ----
+    const callableIds = assistant.callableConnectionIds ?? [];
+    const toggleCallable = (id: string, on: boolean) =>
+        setAssistant({ callableConnectionIds: on ? [...new Set([...callableIds, id])] : callableIds.filter((c) => c !== id) });
+
+    const assistantSettingsPopover = acfgOpen ? (
+        <>
+            <button type="button" aria-label="Close assistant settings" className="fixed inset-0 z-[60] cursor-default" onClick={() => setAcfgOpen(false)} />
+            <div className="fixed top-16 right-4 z-[61] flex max-h-[70vh] w-[360px] max-w-[calc(100vw-2rem)] flex-col gap-4 overflow-y-auto rounded-xl bg-primary p-4 shadow-xl ring-1 ring-secondary">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-primary">Assistant Settings</h3>
+                    <ButtonUtility size="xs" color="tertiary" icon={X} tooltip="Close" onClick={() => setAcfgOpen(false)} />
+                </div>
+
+                <section className="flex flex-col gap-3">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-quaternary">AI provider</span>
+                    {aiConnections.length === 0 ? (
+                        <p className="rounded-lg bg-secondary px-3 py-2 text-xs text-tertiary ring-1 ring-secondary">No AI-model connections. Add one in Settings → Connections (toggle “provides an AI model”).</p>
+                    ) : (
+                        <>
+                            <Select
+                                label="Connection"
+                                selectedKey={conn?.id}
+                                items={aiConnections.map((c) => ({ id: c.id, label: c.name }))}
+                                onSelectionChange={(key) => setAssistant({ connectionId: String(key) })}
+                            >
+                                {(item) => <Select.Item id={item.id}>{item.label}</Select.Item>}
+                            </Select>
+                            <Input
+                                label="Model"
+                                value={assistant.model ?? conn?.aiModel ?? ""}
+                                onChange={(v) => setAssistant({ model: v })}
+                                placeholder="gpt-4o-mini / deepseek-chat"
+                            />
+                            <p className="text-xs text-tertiary">Used automatically on send — no apply button.</p>
+                        </>
+                    )}
+                </section>
+
+                <section className="flex flex-col gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-quaternary">Connections the assistant can call</span>
+                    {connections.length === 0 ? (
+                        <p className="text-xs text-tertiary">No connections yet.</p>
+                    ) : (
+                        <div className="flex flex-col gap-2">
+                            {connections.map((c) => (
+                                <label key={c.id} className="flex items-start gap-2.5 rounded-lg p-2 ring-1 ring-secondary">
+                                    <Checkbox isSelected={callableIds.includes(c.id)} onChange={(on) => toggleCallable(c.id, on)} />
+                                    <span className="flex min-w-0 flex-col">
+                                        <span className="truncate text-sm font-medium text-secondary">{c.name}</span>
+                                        {c.baseUrl ? <span className="truncate font-mono text-xs text-tertiary">{c.baseUrl}</span> : <span className="text-xs text-tertiary">{c.type}</span>}
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
+                    )}
+                </section>
+            </div>
+        </>
+    ) : null;
 
     const onComposerKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -262,6 +328,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                     />
                     <Button size="sm" color="primary" iconLeading={Send01} isDisabled={!draft.trim() || thinking} onClick={() => void sendText(draft)} aria-label="Send" />
                 </div>
+                {assistantSettingsPopover}
             </div>
         );
     }
@@ -273,6 +340,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                 {header}
                 {messageList}
                 {footer}
+                {assistantSettingsPopover}
             </div>
         );
     }
@@ -283,6 +351,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             {header}
             {messageList}
             {footer}
+            {assistantSettingsPopover}
         </aside>
     );
 }
