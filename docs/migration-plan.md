@@ -160,7 +160,7 @@ Mapping the original **mip** (vanilla-CSS, `mdp`) system onto **mip-tailwind** (
 
 ## I. Screens — UI/UX inventory (current mip-tailwind state)
 
-Exactly how each screen looks and behaves today. Status: ✅ built · 🟡 built, needs DB/real-data wiring.
+Screen-by-screen UI/UX inventory across **both** systems. Status: ✅ built in mip-tailwind · 🟡 built, needs DB/real-data wiring · ⬜ exists in mip, not yet in mip-tailwind (target to migrate).
 
 | Screen | Entry / Route | UI (layout & components) | UX (interaction & behavior) | Status |
 |---|---|---|---|---|
@@ -183,6 +183,9 @@ Exactly how each screen looks and behaves today. Status: ✅ built · 🟡 built
 | **Settings · Apps** | Settings | Connector gallery grouped by category: colored brand logo tile + name + category + description + status (Connect button / "Coming soon" / "Scheduled" Badge); installed cards get a brand ring. Search bar. | Search filters; Connect → modal (API key / OAuth fields) → marks installed; installed → Disconnect. | ✅ (UI) / 🟡 (DB) |
 | **Settings · Assistant** | Settings | Select AI-model connection + Model `Input` + System-prompt `TextArea` + Save; empty-state guidance when no AI connection. | Pick connection/model/prompt → Save; feeds the chat panel. | ✅ (UI) / 🟡 (DB) |
 | **Settings · Users** | Settings | Member list (avatar + name + email + role Badge) + Invite button. | Mock list now; CRUD + roles → DB/auth later. | 🟡 (mock) |
+| **Dashboard Settings · General** | per-page settings (topbar gear / page menu) | Modal "Dashboard Settings" with left tabs (General · Access · Dynamic Variables). General = "Page Settings": Title `Input`, **Page ID** (e.g. `new-page-17-5zdir`), Description `TextArea`, **Layout Mode** `Select` (Dashboard sidebar+topbar / Fullpage) with helper, **AI assistant context (system prompt)** `TextArea` ("added to the assistant's system prompt whenever this dashboard is open"). Footer: Cancel / Save Settings. | Edit page identity, layout mode, and per-page assistant context; Save persists to the page (→ DB). | ⬜ |
+| **Dashboard Settings · Access** | same modal | "Access Control" — role rows each with a Page-Access `Select`: **Admin** = Can edit (locked, can't restrict), **Editor** = Can edit, **Viewer** = View only, **Public** = No access; note re storage + workspace RBAC; **AI assistant access** checkbox "Allow the assistant to access this page" (off → hidden from assistant tools). | Set per-role page access; toggle assistant page access; Save. Mirrors mip `pagePermissions`. | ⬜ |
+| **Dashboard Settings · Dynamic Variables** | same modal | "Define input variables for this dynamic page": **Add Variable**; each row = Variable name `Input` + source `Select` (**$_GET / Query · Path Variable · Body JSON**) + Required checkbox + delete. | Add/remove typed page variables for parameterized (dynamic) pages; Save. | ⬜ |
 | **Start screen** | `/start` | The Untitled starter home (logo + "add component" hint). | Reference/landing; not the main app. | ✅ |
 | **Gallery** | `/gallery` | One sample of every design-block/diagram/misc widget rendered via the adapter. | Visual QA surface for all renderers. | ✅ |
 
