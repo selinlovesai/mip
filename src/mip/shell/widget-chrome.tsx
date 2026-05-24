@@ -21,38 +21,34 @@ export const DEFAULT_BORDER_COLOR = "var(--color-border-secondary)";
 export const DEFAULT_BACKGROUND_COLOR = "var(--color-bg-primary)";
 
 /**
- * Token overrides for a per-widget light/dark scheme. We remap the *semantic*
- * tokens (which inherit into the card's descendants) to that mode's own neutral
- * shades — so text, sub-text, labels, border and surface each get the right
- * value, not a single flat color.
+ * Build the per-widget card style from the Design-tab color overrides. We set
+ * the *utility-facing* CSS vars (the ones Tailwind's text-/bg- utilities read,
+ * e.g. `--text-color-primary`) so overrides actually recolor the rendered text,
+ * plus the brand ramp for accents (chart series / progress / badges). Border and
+ * background are applied directly. Empty values inherit the theme.
  */
-const SCHEME_VARS: Record<"light" | "dark", Record<string, string>> = {
-    light: {
-        "--color-text-primary": "var(--color-neutral-900)",
-        "--color-text-secondary": "var(--color-neutral-700)",
-        "--color-text-tertiary": "var(--color-neutral-600)",
-        "--color-text-quaternary": "var(--color-neutral-500)",
-        "--color-border-secondary": "var(--color-neutral-200)",
-        "--color-bg-primary": "var(--color-white, #fff)",
-        "--color-bg-secondary": "var(--color-neutral-50)",
-    },
-    dark: {
-        "--color-text-primary": "var(--color-neutral-50)",
-        "--color-text-secondary": "var(--color-neutral-300)",
-        "--color-text-tertiary": "var(--color-neutral-400)",
-        "--color-text-quaternary": "var(--color-neutral-400)",
-        "--color-border-secondary": "var(--color-neutral-800)",
-        "--color-bg-primary": "var(--color-neutral-950)",
-        "--color-bg-secondary": "var(--color-neutral-900)",
-    },
-};
-
 export function widgetCardStyle(widget: MipWidget): CSSProperties {
-    const scheme = widget.style?.colorScheme;
-    const schemeVars = scheme ? SCHEME_VARS[scheme] : {};
-    const borderColor = widget.style?.borderColor ?? DEFAULT_BORDER_COLOR;
-    const backgroundColor = widget.style?.backgroundColor ?? DEFAULT_BACKGROUND_COLOR;
-    return { ...schemeVars, backgroundColor, border: `1px solid ${borderColor}` } as CSSProperties;
+    const c = widget.style?.colors ?? {};
+    const vars: Record<string, string> = {};
+
+    if (c.text) vars["--text-color-primary"] = c.text;
+    if (c.subtext) {
+        vars["--text-color-secondary"] = c.subtext;
+        vars["--text-color-tertiary"] = c.subtext;
+        vars["--text-color-quaternary"] = c.subtext;
+    }
+    if (c.accent) {
+        for (const n of [400, 500, 600, 700]) {
+            vars[`--color-utility-brand-${n}`] = c.accent;
+            vars[`--color-brand-${n}`] = c.accent;
+        }
+    }
+
+    const background = c.background || widget.style?.backgroundColor || DEFAULT_BACKGROUND_COLOR;
+    const border = c.border || widget.style?.borderColor || DEFAULT_BORDER_COLOR;
+    if (c.background) vars["--background-color-primary"] = c.background;
+
+    return { ...vars, backgroundColor: background, border: `1px solid ${border}` } as CSSProperties;
 }
 
 export function WidgetChrome({ widget, editMode, onDelete }: { widget: MipWidget; editMode: boolean; onDelete: (id: string) => void }) {

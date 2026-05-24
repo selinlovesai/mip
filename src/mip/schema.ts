@@ -134,15 +134,23 @@ export interface MipWidgetStyle {
     density?: DensityValue;
     variant?: ButtonVariant;
     size?: SizeValue;
-    /** Raw CSS color overrides (Design tab) — any CSS color or "transparent". */
+    /** Legacy raw color overrides (superseded by `colors`; kept for back-compat). */
     borderColor?: string;
     backgroundColor?: string;
     /**
-     * Per-widget color scheme (Design tab → "Text & Border"). "light"/"dark"
-     * remap text / sub-text / border (and surface) tokens to that mode's own
-     * shades for this widget only; undefined follows the app theme.
+     * Per-widget color overrides (Design tab). Each is any CSS color / var() /
+     * "transparent"; empty/undefined means inherit the theme. Applied as scoped
+     * CSS vars on the widget so they recolor whatever the widget renders.
      */
-    colorScheme?: "light" | "dark";
+    colors?: MipWidgetColors;
+}
+
+export interface MipWidgetColors {
+    text?: string; // primary text (titles, values)
+    subtext?: string; // secondary/tertiary/quaternary (labels, captions)
+    border?: string;
+    background?: string;
+    accent?: string; // chart series, progress, badges (brand ramp)
 }
 
 export interface MipPermissions {

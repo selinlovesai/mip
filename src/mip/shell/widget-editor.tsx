@@ -13,19 +13,20 @@ import { ChevronRight, Edit03 } from "@untitledui/icons";
 import { Button } from "@/components/base/buttons/button";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { Input } from "@/components/base/input/input";
-import { Select } from "@/components/base/select/select";
 import { TextArea } from "@/components/base/textarea/textarea";
 import { SlideoutMenu } from "@/components/application/slideout-menus/slideout-menu";
 import { COLOR_TOKEN_GROUPS } from "@/mip/design-tokens";
 import { useDashboard } from "@/mip/store";
-import type { MipWidget } from "@/mip/schema";
+import type { MipWidget, MipWidgetColors } from "@/mip/schema";
 import { cx } from "@/utils/cx";
-import { DEFAULT_BACKGROUND_COLOR } from "./widget-chrome";
 
-const COLOR_SCHEMES = [
-    { id: "default", label: "Default (follow theme)" },
-    { id: "light", label: "Light" },
-    { id: "dark", label: "Dark" },
+/** The color slots shown for every widget in the Design tab. */
+const COLOR_FIELDS: Array<{ key: keyof MipWidgetColors; label: string; hint: string }> = [
+    { key: "text", label: "Text", hint: "Titles and primary values." },
+    { key: "subtext", label: "Sub-text", hint: "Labels, captions, secondary text." },
+    { key: "accent", label: "Accent", hint: "Chart series, progress, badges." },
+    { key: "border", label: "Border", hint: "The widget's outline." },
+    { key: "background", label: "Background", hint: "The widget surface." },
 ];
 
 type EditorTab = "settings" | "design";
@@ -53,9 +54,9 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
                         className="absolute inset-0 size-full cursor-pointer opacity-0"
                     />
                 </span>
-                <Input aria-label={label} value={value} onChange={onChange} placeholder="transparent" />
-                <Button color="secondary" size="sm" onClick={() => onChange("transparent")}>
-                    Clear
+                <Input aria-label={label} value={value} onChange={onChange} placeholder="inherit" />
+                <Button color="secondary" size="sm" onClick={() => onChange("")}>
+                    Reset
                 </Button>
             </div>
 
@@ -103,9 +104,16 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
     const [tab, setTab] = useState<EditorTab>("settings");
     const [title, setTitle] = useState(widget.title ?? "");
     const [settingsText, setSettingsText] = useState(JSON.stringify(widget.settings ?? {}, null, 2));
-    const [scheme, setScheme] = useState<string>(widget.style?.colorScheme ?? "default");
-    const [backgroundColor, setBackgroundColor] = useState(widget.style?.backgroundColor ?? DEFAULT_BACKGROUND_COLOR);
+    const [colors, setColors] = useState<MipWidgetColors>({
+        text: widget.style?.colors?.text ?? "",
+        subtext: widget.style?.colors?.subtext ?? "",
+        accent: widget.style?.colors?.accent ?? "",
+        border: widget.style?.colors?.border ?? widget.style?.borderColor ?? "",
+        background: widget.style?.colors?.background ?? widget.style?.backgroundColor ?? "",
+    });
     const [error, setError] = useState<string | null>(null);
+
+    const setColor = (key: keyof MipWidgetColors, v: string) => setColors((c) => ({ ...c, [key]: v }));
 
     const save = () => {
         let settings: Record<string, unknown>;
@@ -116,10 +124,15 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
             setTab("settings");
             return;
         }
+        // Keep only non-empty overrides; empty means "inherit theme".
+        const cleaned: MipWidgetColors = {};
+        (Object.keys(colors) as Array<keyof MipWidgetColors>).forEach((k) => {
+            if (colors[k]?.trim()) cleaned[k] = colors[k];
+        });
         updateWidget(widget.id, {
             title: title.trim() || undefined,
             settings,
-            style: { ...widget.style, backgroundColor, colorScheme: scheme === "default" ? undefined : (scheme as "light" | "dark") },
+            style: { ...widget.style, borderColor: undefined, backgroundColor: undefined, colors: cleaned },
         });
         close();
     };
@@ -169,14 +182,13 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
                     </div>
                 ) : (
                     <div className="flex flex-col gap-6">
-                        <div className="flex flex-col gap-1.5">
-                            <span className="text-sm font-medium text-secondary">Text &amp; Border</span>
-                            <Select aria-label="Text and border color scheme" selectedKey={scheme} items={COLOR_SCHEMES} onSelectionChange={(k) => setScheme(String(k))}>
-                                {(item) => <Select.Item id={item.id}>{item.label}</Select.Item>}
-                            </Select>
-                            <span className="text-xs text-tertiary">Light or Dark adjusts text, sub-text and border to their own shades.</span>
-                        </div>
-                        <ColorField label="Background" value={backgroundColor} onChange={setBackgroundColor} />
+                        <p className="text-xs text-tertiary">Override any of the widget's colors. Leave a field empty (Reset) to inherit the theme.</p>
+                        {COLOR_FIELDS.map((f) => (
+                            <div key={f.key} className="flex flex-col gap-1">
+                                <ColorField label={f.label} value={colors[f.key] ?? ""} onChange={(v) => setColor(f.key, v)} />
+                                <span className="text-xs text-tertiary">{f.hint}</span>
+                            </div>
+                        ))}
                     </div>
                 )}
             </SlideoutMenu.Content>
