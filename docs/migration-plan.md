@@ -4,7 +4,7 @@ Mapping the original **mip** (vanilla-CSS, `mdp`) system onto **mip-tailwind** (
 
 ## Architecture directives (the "new system" rules)
 
-1. **Everything persists to PostgreSQL.** All data currently in JSON files (dashboards, widgets, connections, apps, conversations, users, settings, themes, templates, tokens, components) is saved to a Postgres DB owned by the `server/` backend — localStorage becomes a cache only.
+1. **Everything persists to PostgreSQL.** All data currently in JSON files (dashboards, widgets, connections, apps, conversations, users, settings, themes, templates, tokens, components) is saved to a Postgres DB owned by the `server/` backend — localStorage becomes a cache only. Read-heavy catalogs (**tokens, components, apps, widgets/dashboards, themes, templates**) are additionally **cached as JSON** (server-emitted, cache-busted on write) for fast reads / offline.
 2. **Design system is DB-driven.** Every **design token** and every **component** is a first-class row in the DB. Widgets do **not** hardcode styles/markup — they **pull from tokens/components** by id. Tokens are edited in Settings → Appearance and compiled to a **cached JSON** artifact + a **Tailwind-compatible CSS** (`@theme` / `:root` CSS vars) that the app and Tailwind utilities consume.
 3. **Elements, Components, and Patterns are all widgetized.** Every atom (button/input/badge), molecule (form field/KPI card), and pattern/block is a placeable **widget type** in the registry. The widget catalog spans the full design-system hierarchy.
 4. **Settings → Appearance is the token browser.** Foundations are managed there via categorized tabs (Colors / Typography / Shadows / Spacing & Radius), later synced from Figma.
@@ -116,13 +116,13 @@ Mapping the original **mip** (vanilla-CSS, `mdp`) system onto **mip-tailwind** (
 | Item | Type | What it Does | How to Migrate | Prerequisites | Complexity | Status | Success Criteria |
 |---|---|---|---|---|---|---|---|
 | `tokens` | Data model (DB) | Design tokens (color/type/spacing/radius/shadow) | New table; seed from Untitled `@theme`; serve as CSS vars | Postgres + backend | L | ⬜ | Tokens CRUD; app reads from DB |
-| `components` | Data model (DB) | Atom/molecule/pattern defs widgets pull from | New table (id, kind, props schema, token refs, variant); registry resolves by id | Postgres + registry | XL | ⬜ | Widgets render from DB component rows |
-| `widgets`/`dashboards`/`pages` | Data model (DB) | Dashboard docs (reference token/component ids) | Replace seed.ts + localStorage with DB (jsonb, mip parity) | Postgres + backend | L | ⬜ (localStorage) | Dashboards load/save from DB |
+| `components` | Data model (DB) | Atom/molecule/pattern defs widgets pull from | New table (id, kind, props schema, token refs, variant); registry resolves by id; **cached as JSON** | Postgres + registry | XL | ⬜ | Widgets render from DB component rows; JSON cache busts on edit |
+| `widgets`/`dashboards`/`pages` | Data model (DB) | Dashboard docs (reference token/component ids) | Replace seed.ts + localStorage with DB (jsonb, mip parity); **cached as JSON** | Postgres + backend | L | ⬜ (localStorage) | Dashboards load/save from DB; JSON cache |
 | `connections` | Data model (DB) | Data sources (auth/headers/endpoints/isAiModel) | Persist settings-store connections to DB; **encrypt credential fields at rest** (API keys/tokens/passwords) via app-level AES-GCM or pgcrypto, key from env/KMS; decrypt only server-side at request time; never return secrets to the browser (masked) | Postgres + encryption key | L | ⬜ | Connections persist + survive devices; secrets encrypted at rest, never sent to client in plaintext |
-| `apps` / `installed_apps` | Data model (DB) | Connector catalog + install state | Move `apps-catalog.ts` → DB | Postgres | M | ⬜ | Catalog + install state from DB |
+| `apps` / `installed_apps` | Data model (DB) | Connector catalog + install state | Move `apps-catalog.ts` → DB; **cached as JSON** | Postgres | M | ⬜ | Catalog + install state from DB; JSON cache |
 | `conversations` | Data model (DB) | Chat transcripts per dashboard/page | New table (mip composite PK) | Postgres + backend | M | ⬜ (in-memory) | Chat history persists |
 | `users` | Data model (DB) | Identity, roles, scopes | New table (mip parity); hash server-only | Postgres + auth | L | ⬜ (mock) | Users CRUD; roles enforced |
-| `themes` / `templates` | Data model (DB) | Palettes + starter dashboards | JSON → DB | Postgres | M | ⬜ | From DB |
+| `themes` / `templates` | Data model (DB) | Palettes + starter dashboards | JSON → DB; **cached as JSON** | Postgres | M | ⬜ | From DB; JSON cache |
 | `access_tokens` | Data model (DB) | API tokens (hash only) | New table (mip parity) | Postgres + auth | M | ⬜ | Mint/revoke tokens |
 
 ---
@@ -157,6 +157,34 @@ Mapping the original **mip** (vanilla-CSS, `mdp`) system onto **mip-tailwind** (
 | Google Sheets builder | Feature / Flow | Sheets → chart widget | Port modals; fetch via backend | backend + sheets conn | M | ⬜ | Sheets range → chart |
 
 ---
+
+## I. Screens — UI/UX inventory (current mip-tailwind state)
+
+Exactly how each screen looks and behaves today. Status: ✅ built · 🟡 built, needs DB/real-data wiring.
+
+| Screen | Entry / Route | UI (layout & components) | UX (interaction & behavior) | Status |
+|---|---|---|---|---|
+| **App shell** | `/` | Three columns: collapsible left **Sidebar** (w-64) · center column (Topbar + main) · optional right **AI chat** panel. Dark Untitled theme. | Sidebar collapses to width-0 (animated); chat panel pushes content as a sibling; everything themed by tokens. | ✅ |
+| **Sidebar** | left of `/` | Brand header ("M" tile + "Protocol Foundation / MIP runtime"), **WORKSPACE** section with page nav items (Untitled `NavItemBase`, active highlight), `+` add page, user footer (avatar + "Super Admin" + chevron). | Click page → switch; hover page row → `•••` menu (Rename inline / Duplicate / Delete); collapse chevron hides sidebar; footer opens account menu (Profile / Settings / Sign out). | ✅ |
+| **Topbar** | top of `/` | Left: chevron-right reopen (when collapsed) + "Page / <title>". Right: theme toggle (sun/moon), Settings gear, Add-widget `+`, Edit-mode lock, AI sparkle — all Untitled `ButtonUtility`. | Toggles light/dark; gear opens Settings surface; `+` opens widget picker; lock toggles edit mode (drag/resize); sparkle opens chat. Active controls get a brand ring. | ✅ |
+| **Dashboard canvas** | `/` main | `react-grid-layout` grid of widget cards on the secondary bg; each widget is an Untitled-styled card (ring, rounded, token colors). | Read mode: hover a widget → expand button (top-right). Renders KPIs/charts/table/list/etc. from authored settings (→ live data later). | ✅ / 🟡 (live data) |
+| **Edit mode** | lock toggle | Each widget shows a top-right toolbar: drag grip, edit (pencil), expand, delete; a brand ring on hover. | Drag by the grip to reorder; resize from SE corner; layout persists (localStorage → DB later). | ✅ / 🟡 (DB) |
+| **Widget picker** | topbar `+` | Untitled `Modal`: title "Add widget", search `Input`, catalog grouped by category (Data/Charts/Content/Marketing/Diagrams/Integrations) as ring cards with type label. | Search filters; click a card → widget added to bottom of page; modal closes. | ✅ |
+| **Widget editor** | edit-mode pencil | Untitled `SlideoutMenu` drawer: "Edit widget / <type>", Title `Input`, **Settings (JSON)** `TextArea`, Cancel / Save. | Edit title + settings JSON → Save persists via store; invalid JSON shows error. **Design tab planned** (token-bound color/spacing/font/layout + nested elements). | ✅ (JSON) / ⬜ (Design tab) |
+| **Widget expand** | hover expand | Untitled `Modal` (≤900px): header (title + close) + the widget rendered large. | Opens the widget full-size; click outside / X to close. | ✅ |
+| **AI chat — sidebar** | topbar sparkle | Full-height right panel (w-96, border-l): header (sparkle avatar + "AI assistant" + connection/"No AI connection"), message list (user bubbles right, assistant markdown left w/ avatar), composer (`TextArea` + send), footer mode toolbar. | Type + Enter to send; suggestion chips when empty + unconfigured; "thinking…" while awaiting; real reply when an AI connection is set (else demo responder). | ✅ (UI) / 🟡 (real AI) |
+| **AI chat — chat mode** | footer toggle | Same content as a **floating** rounded ~420px panel pinned top-right, shadowed/detached. | Toggle from the footer; overlaps content rather than pushing it. | ✅ |
+| **AI chat — compact mode** | footer toggle | Small floating bar: last assistant line + composer only. | Minimal footprint for quick prompts; expand back to chat/sidebar. | ✅ |
+| **Settings shell** | gear → main swaps | Dedicated surface with its **own inner sidebar** (Profile · Appearance · Connections · Apps · Assistant · Users) + content pane; outer workspace sidebar/topbar stay. Back arrow returns to dashboard. | Click a tab → content swaps; back arrow closes settings. | ✅ |
+| **Settings · Profile** | Settings | Avatar + name/role, Name & Email `Input`s, Save. | Edit fields → Save (local; → DB later). | ✅ (UI) / 🟡 (DB) |
+| **Settings · Appearance** | Settings | **Token browser**: inner tabs Theme · Colors · Typography · Shadows · Spacing & Radius. Colors = Brand/Text/Bg/Border/Fg/Utility swatch grids w/ token name + live value; Type = font + display scale samples; Shadows = elevation boxes; Spacing/Radius = sized samples. Theme tab = light/dark/system + accent swatches. | Browse tokens (read-only now); accent swatch + mode apply live. **Inline editing → DB planned.** | ✅ (browser) / ⬜ (editable) |
+| **Settings · Connections (list)** | Settings | "Quick connect from installed apps" card grid + "Saved connections" list (avatar + name + type Badge) + "Custom connection" button. | Click an app/saved row → opens editor; Custom → new blank connection in editor. | ✅ (UI) / 🟡 (DB) |
+| **Settings · Connection editor** | from list | mip-parity editor: Data source / Source type (REST/JSON/CSV) / Name; Base URL + Authentication (7 modes); "This connection provides an AI model" toggle (+ provider/model); Connection headers; Endpoint index (per-endpoint method/path/map-path/body/params editor); Add/Discover endpoints; Import Postman; footer Save / Test selected endpoint / Delete / Close + Response preview. | Edit fields; Test posts via backend → JSON response preview; Save persists; AI-model toggle makes it selectable in Assistant. Secrets → encrypted at rest (planned). | ✅ (UI) / 🟡 (DB+encrypt) |
+| **Settings · Apps** | Settings | Connector gallery grouped by category: colored brand logo tile + name + category + description + status (Connect button / "Coming soon" / "Scheduled" Badge); installed cards get a brand ring. Search bar. | Search filters; Connect → modal (API key / OAuth fields) → marks installed; installed → Disconnect. | ✅ (UI) / 🟡 (DB) |
+| **Settings · Assistant** | Settings | Select AI-model connection + Model `Input` + System-prompt `TextArea` + Save; empty-state guidance when no AI connection. | Pick connection/model/prompt → Save; feeds the chat panel. | ✅ (UI) / 🟡 (DB) |
+| **Settings · Users** | Settings | Member list (avatar + name + email + role Badge) + Invite button. | Mock list now; CRUD + roles → DB/auth later. | 🟡 (mock) |
+| **Start screen** | `/start` | The Untitled starter home (logo + "add component" hint). | Reference/landing; not the main app. | ✅ |
+| **Gallery** | `/gallery` | One sample of every design-block/diagram/misc widget rendered via the adapter. | Visual QA surface for all renderers. | ✅ |
 
 ## Recommended migration order (critical path)
 
