@@ -8,8 +8,8 @@
  */
 
 import { TrendDown01, TrendUp01 } from "@untitledui/icons";
+import { BadgeWithIcon } from "@/components/base/badges/badges";
 import type { WidgetRenderProps } from "@/mip/adapter/types";
-import { cx } from "@/utils/cx";
 import { formatNumber, formatValue } from "./format";
 import { WidgetCard } from "./widget-card";
 
@@ -41,17 +41,13 @@ export function KpiWidget({ widget, dataState }: WidgetRenderProps) {
                 </span>
                 {hasDelta ? (
                     <div className="flex items-center gap-2 text-sm">
-                        <span
-                            className={cx(
-                                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
-                                deltaIsUp && "bg-utility-green-50 text-utility-green-700 ring-utility-green-200",
-                                deltaIsDown && "bg-utility-red-50 text-utility-red-700 ring-utility-red-200",
-                                !deltaIsUp && !deltaIsDown && "bg-utility-neutral-50 text-utility-neutral-700 ring-utility-neutral-200",
-                            )}
+                        <BadgeWithIcon
+                            size="sm"
+                            color={deltaIsUp ? "success" : deltaIsDown ? "error" : "gray"}
+                            iconLeading={deltaIsUp ? TrendUp01 : deltaIsDown ? TrendDown01 : undefined}
                         >
-                            {deltaIsUp ? <TrendUp01 className="size-3" /> : deltaIsDown ? <TrendDown01 className="size-3" /> : null}
                             {deltaDisplay}
-                        </span>
+                        </BadgeWithIcon>
                         <span className="text-tertiary">{deltaLabel}</span>
                     </div>
                 ) : null}

@@ -4,6 +4,7 @@
  * fetched payload), mirroring the original app's progress widget.
  */
 
+import { ProgressBar } from "@/components/base/progress-indicators/progress-indicators";
 import type { WidgetRenderProps } from "@/mip/adapter/types";
 import { formatNumber } from "./format";
 import { WidgetCard } from "./widget-card";
@@ -24,9 +25,7 @@ export function ProgressWidget({ widget, dataState }: WidgetRenderProps) {
                     <span className="font-medium text-secondary">{label}</span>
                     <span className="font-semibold text-primary">{Math.round(pct)}%</span>
                 </div>
-                <div className="h-2.5 w-full overflow-hidden rounded-full bg-secondary" role="progressbar" aria-valuemin={0} aria-valuemax={target} aria-valuenow={value}>
-                    <div className="h-full rounded-full bg-brand-solid transition-[width] duration-500" style={{ width: `${pct}%` }} />
-                </div>
+                <ProgressBar value={value} min={0} max={target} />
             </div>
         </WidgetCard>
     );

@@ -5,10 +5,15 @@
  * pie / donut), selected by `widget.type`. Series come from the shared data
  * resolver; colors use the theme's `--color-utility-*` tokens so charts track
  * light/dark mode automatically.
+ *
+ * Tooltips, legends, and active dots are rendered with the official Untitled UI
+ * chart helpers (`ChartTooltipContent`, `ChartLegendContent`, `ChartActiveDot`)
+ * for an on-brand look instead of recharts' defaults.
  */
 
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { WidgetRenderProps } from "@/mip/adapter/types";
+import { ChartActiveDot, ChartLegendContent, ChartTooltipContent } from "@/components/application/charts/charts-base";
 import { resolveRows, toChartPoints } from "./data";
 import { formatValue } from "./format";
 import { WidgetCard } from "./widget-card";
@@ -35,19 +40,20 @@ export function ChartWidget({ widget, dataState }: WidgetRenderProps) {
 
     const points = toChartPoints(resolveRows(widget, dataState, "series"), labelKey, valueKey);
 
+    const isPie = widget.type === "pieChart" || widget.type === "donutChart";
+
+    // Shared Untitled-styled tooltip. The `formatter` runs every numeric value
+    // through the widget's value format; `ChartTooltipContent` reads `active`,
+    // `payload`, and `label` straight from recharts' render-prop signature.
     const tooltip = (
         <Tooltip
-            cursor={{ fill: "var(--color-utility-neutral-100)", opacity: 0.4 }}
-            formatter={(value) => formatValue(value, valueFormat)}
-            contentStyle={{
-                borderRadius: 8,
-                border: "1px solid var(--color-border-secondary)",
-                background: "var(--color-bg-primary)",
-                color: "var(--color-text-primary)",
-                fontSize: 12,
-            }}
+            cursor={isPie ? false : { fill: "var(--color-utility-neutral-100)", opacity: 0.4 }}
+            content={<ChartTooltipContent isPieChart={isPie} formatter={(value) => formatValue(value, valueFormat)} />}
         />
     );
+
+    const legend = <Legend verticalAlign="bottom" content={<ChartLegendContent className="pt-3" />} />;
+
     const axisProps = { tick: { fill: "var(--color-text-tertiary)", fontSize: 12 }, stroke: "var(--color-border-secondary)" } as const;
     const grid = <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-secondary)" vertical={false} />;
 
@@ -58,10 +64,20 @@ export function ChartWidget({ widget, dataState }: WidgetRenderProps) {
             ) : (
                 <div className="min-h-[200px] flex-1">
                     <ResponsiveContainer width="100%" height="100%">
-                        {widget.type === "pieChart" || widget.type === "donutChart" ? (
+                        {isPie ? (
                             <PieChart>
                                 {tooltip}
-                                <Pie data={points} dataKey="value" nameKey="name" innerRadius={widget.type === "donutChart" ? "55%" : 0} outerRadius="80%" paddingAngle={2} stroke="var(--color-bg-primary)" isAnimationActive={false}>
+                                {legend}
+                                <Pie
+                                    data={points}
+                                    dataKey="value"
+                                    nameKey="name"
+                                    innerRadius={widget.type === "donutChart" ? "55%" : 0}
+                                    outerRadius="80%"
+                                    paddingAngle={2}
+                                    stroke="var(--color-bg-primary)"
+                                    isAnimationActive={false}
+                                >
                                     {points.map((point, index) => (
                                         <Cell key={point.name} fill={SLICE_COLORS[index % SLICE_COLORS.length]} />
                                     ))}
@@ -73,7 +89,8 @@ export function ChartWidget({ widget, dataState }: WidgetRenderProps) {
                                 <XAxis dataKey="name" {...axisProps} />
                                 <YAxis {...axisProps} />
                                 {tooltip}
-                                <Bar dataKey="value" fill={SERIES_COLOR} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                                {legend}
+                                <Bar name="Value" dataKey="value" fill={SERIES_COLOR} radius={[4, 4, 0, 0]} isAnimationActive={false} />
                             </BarChart>
                         ) : widget.type === "areaChart" ? (
                             <AreaChart data={points} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -87,7 +104,17 @@ export function ChartWidget({ widget, dataState }: WidgetRenderProps) {
                                 <XAxis dataKey="name" {...axisProps} />
                                 <YAxis {...axisProps} />
                                 {tooltip}
-                                <Area type="monotone" dataKey="value" stroke={SERIES_COLOR} strokeWidth={2} fill={`url(#fill-${widget.id})`} isAnimationActive={false} />
+                                {legend}
+                                <Area
+                                    name="Value"
+                                    type="monotone"
+                                    dataKey="value"
+                                    stroke={SERIES_COLOR}
+                                    strokeWidth={2}
+                                    fill={`url(#fill-${widget.id})`}
+                                    activeDot={<ChartActiveDot />}
+                                    isAnimationActive={false}
+                                />
                             </AreaChart>
                         ) : (
                             <LineChart data={points} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -95,7 +122,17 @@ export function ChartWidget({ widget, dataState }: WidgetRenderProps) {
                                 <XAxis dataKey="name" {...axisProps} />
                                 <YAxis {...axisProps} />
                                 {tooltip}
-                                <Line type="monotone" dataKey="value" stroke={SERIES_COLOR} strokeWidth={2} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} />
+                                {legend}
+                                <Line
+                                    name="Value"
+                                    type="monotone"
+                                    dataKey="value"
+                                    stroke={SERIES_COLOR}
+                                    strokeWidth={2}
+                                    dot={false}
+                                    activeDot={<ChartActiveDot />}
+                                    isAnimationActive={false}
+                                />
                             </LineChart>
                         )}
                     </ResponsiveContainer>

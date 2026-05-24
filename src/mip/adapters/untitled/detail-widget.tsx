@@ -5,9 +5,21 @@
  * `settings.record`. Falls back to every key on the record.
  */
 
+import { Badge } from "@/components/base/badges/badges";
+import type { BadgeColor } from "@/components/base/badges/badges";
 import type { WidgetRenderProps } from "@/mip/adapter/types";
 import { resolveColumns, type Row } from "./data";
 import { WidgetCard } from "./widget-card";
+
+const STATUS_TONE: Record<string, BadgeColor<"pill-color">> = {
+    active: "success",
+    success: "success",
+    paid: "success",
+    pending: "warning",
+    inactive: "gray",
+    failed: "error",
+    overdue: "error",
+};
 
 function resolveRecord(props: WidgetRenderProps): Row {
     const { widget, dataState } = props;
@@ -32,12 +44,25 @@ export function DetailWidget(props: WidgetRenderProps) {
                 <div className="flex flex-1 items-center justify-center text-sm text-tertiary">No record data.</div>
             ) : (
                 <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2.5 text-sm">
-                    {fields.map((field) => (
-                        <div key={field.key} className="contents">
-                            <dt className="text-tertiary">{field.label}</dt>
-                            <dd className="text-right font-medium text-secondary">{record[field.key] == null ? "--" : String(record[field.key])}</dd>
-                        </div>
-                    ))}
+                    {fields.map((field) => {
+                        const raw = record[field.key];
+                        const text = raw == null ? "--" : String(raw);
+                        const tone = field.key.toLowerCase().includes("status") ? STATUS_TONE[text.toLowerCase()] : undefined;
+                        return (
+                            <div key={field.key} className="contents">
+                                <dt className="text-tertiary">{field.label}</dt>
+                                <dd className="flex justify-end text-right font-medium text-secondary">
+                                    {tone ? (
+                                        <Badge size="sm" color={tone}>
+                                            {text}
+                                        </Badge>
+                                    ) : (
+                                        text
+                                    )}
+                                </dd>
+                            </div>
+                        );
+                    })}
                 </dl>
             )}
         </WidgetCard>

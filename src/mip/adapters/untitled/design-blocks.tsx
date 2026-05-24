@@ -5,10 +5,17 @@
  * These are presentational and read their content from `settings.content`
  * (or `settings` directly), matching the original app's content shapes. Each
  * sits on its own surface and spans whatever grid width it's given.
+ *
+ * Built on real Untitled UI components (Button, Badge, Avatar, RatingStars)
+ * for full design-system compatibility.
  */
 
 import { useState } from "react";
-import { Check, ChevronDown, Star01 } from "@untitledui/icons";
+import { Check, ChevronDown } from "@untitledui/icons";
+import { Avatar } from "@/components/base/avatar/avatar";
+import { Badge } from "@/components/base/badges/badges";
+import { Button } from "@/components/base/buttons/button";
+import { RatingStars } from "@/components/foundations/rating-stars";
 import type { WidgetRenderProps } from "@/mip/adapter/types";
 import type { MipWidget } from "@/mip/schema";
 import { cx } from "@/utils/cx";
@@ -30,24 +37,29 @@ function Prose({ text }: { text: string }) {
 // ---------------------------------------------------------------------------
 
 export function HeroWidget({ widget }: WidgetRenderProps) {
-    const c = readContent(widget, {} as { heading?: string; subheading?: string; alignment?: "left" | "center"; ctaLabel?: string; ctaUrl?: string; secondaryLabel?: string; secondaryUrl?: string });
+    const c = readContent(widget, {} as { heading?: string; subheading?: string; alignment?: "left" | "center"; eyebrow?: string; ctaLabel?: string; ctaUrl?: string; secondaryLabel?: string; secondaryUrl?: string });
     const heading = c.heading ?? widget.title ?? "Hero heading";
     const align = c.alignment ?? "center";
     return (
         <div className={cx("flex h-full flex-col justify-center gap-4 overflow-hidden rounded-xl bg-gradient-to-br from-utility-brand-100 to-bg-primary p-8 ring-1 ring-secondary", align === "center" ? "items-center text-center" : "items-start text-left")}>
+            {c.eyebrow ? (
+                <Badge type="pill-color" color="brand" size="md">
+                    {c.eyebrow}
+                </Badge>
+            ) : null}
             <h2 className="max-w-2xl text-display-sm font-semibold text-primary">{heading}</h2>
             {c.subheading ? <p className="max-w-xl text-lg text-tertiary">{c.subheading}</p> : null}
             {c.ctaLabel || c.secondaryLabel ? (
                 <div className="mt-2 flex flex-wrap gap-3">
                     {c.ctaLabel ? (
-                        <a href={c.ctaUrl ?? "#"} className="rounded-lg bg-brand-solid px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90">
+                        <Button href={c.ctaUrl ?? "#"} color="primary" size="lg">
                             {c.ctaLabel}
-                        </a>
+                        </Button>
                     ) : null}
                     {c.secondaryLabel ? (
-                        <a href={c.secondaryUrl ?? "#"} className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-secondary ring-1 ring-secondary hover:bg-secondary">
+                        <Button href={c.secondaryUrl ?? "#"} color="secondary" size="lg">
                             {c.secondaryLabel}
-                        </a>
+                        </Button>
                     ) : null}
                 </div>
             ) : null}
@@ -63,9 +75,9 @@ export function CtaWidget({ widget }: WidgetRenderProps) {
             <h3 className="text-2xl font-semibold text-white">{heading}</h3>
             {c.body ? <p className="max-w-xl text-white/80">{c.body}</p> : null}
             {c.buttonLabel ? (
-                <a href={c.buttonUrl ?? "#"} className="rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-brand-secondary hover:opacity-90">
+                <Button href={c.buttonUrl ?? "#"} color="secondary" size="lg">
                     {c.buttonLabel}
-                </a>
+                </Button>
             ) : null}
         </div>
     );
@@ -93,7 +105,14 @@ export function PricingWidget({ widget }: WidgetRenderProps) {
                 {c.tiers.map((tier, i) => (
                     <div key={i} className={cx("flex flex-col gap-4 rounded-xl p-5 ring-1", tier.highlighted ? "bg-secondary ring-brand" : "ring-secondary")}>
                         <div>
-                            <h4 className="text-sm font-semibold text-secondary">{tier.name}</h4>
+                            <div className="flex items-center gap-2">
+                                <h4 className="text-sm font-semibold text-secondary">{tier.name}</h4>
+                                {tier.highlighted ? (
+                                    <Badge type="pill-color" color="brand" size="sm">
+                                        Popular
+                                    </Badge>
+                                ) : null}
+                            </div>
                             <div className="mt-1 flex items-baseline gap-1">
                                 <span className="text-display-xs font-semibold text-primary">{tier.price}</span>
                                 {tier.period ? <span className="text-sm text-tertiary">/{tier.period}</span> : null}
@@ -109,9 +128,9 @@ export function PricingWidget({ widget }: WidgetRenderProps) {
                             ))}
                         </ul>
                         {tier.ctaLabel ? (
-                            <a href={tier.ctaUrl ?? "#"} className={cx("mt-auto rounded-lg px-4 py-2 text-center text-sm font-semibold", tier.highlighted ? "bg-brand-solid text-white hover:opacity-90" : "bg-primary text-secondary ring-1 ring-secondary hover:bg-secondary")}>
+                            <Button href={tier.ctaUrl ?? "#"} color={tier.highlighted ? "primary" : "secondary"} size="md" className="mt-auto w-full">
                                 {tier.ctaLabel}
-                            </a>
+                            </Button>
                         ) : null}
                     </div>
                 ))}
@@ -144,20 +163,10 @@ export function TestimonialWidget({ widget }: WidgetRenderProps) {
     const rating = c.rating ?? 5;
     return (
         <div className={cx(surface, "gap-4")}>
-            {rating > 0 ? (
-                <div className="flex gap-0.5" aria-label={`${rating} out of 5 stars`}>
-                    {Array.from({ length: 5 }, (_, i) => (
-                        <Star01 key={i} className={cx("size-4", i < rating ? "fill-current text-utility-yellow-400" : "text-tertiary")} />
-                    ))}
-                </div>
-            ) : null}
+            {rating > 0 ? <RatingStars rating={rating} aria-label={`${rating} out of 5 stars`} /> : null}
             <blockquote className="flex-1 text-lg font-medium text-secondary">{quote}</blockquote>
             <div className="flex items-center gap-3">
-                {c.avatarUrl ? (
-                    <img src={c.avatarUrl} alt={author} className="size-10 rounded-full object-cover" />
-                ) : (
-                    <span className="flex size-10 items-center justify-center rounded-full bg-utility-brand-50 font-semibold text-utility-brand-700">{author.charAt(0)}</span>
-                )}
+                <Avatar size="md" src={c.avatarUrl ?? undefined} alt={author} initials={author.charAt(0)} />
                 <div className="flex flex-col">
                     <strong className="text-sm font-semibold text-primary">{author}</strong>
                     {c.role ? <span className="text-xs text-tertiary">{c.role}</span> : null}
@@ -212,7 +221,11 @@ export function StatsGridWidget({ widget }: WidgetRenderProps) {
                     <div key={i} className="flex flex-col gap-1">
                         <div className="flex items-baseline gap-2">
                             <span className="text-display-sm font-semibold text-primary">{s.value}</span>
-                            {s.delta ? <span className={cx("text-sm font-medium", s.delta.startsWith("-") ? "text-utility-red-500" : "text-utility-green-500")}>{s.delta}</span> : null}
+                            {s.delta ? (
+                                <Badge type="pill-color" color={s.delta.startsWith("-") ? "error" : "success"} size="sm">
+                                    {s.delta}
+                                </Badge>
+                            ) : null}
                         </div>
                         <span className="text-sm text-tertiary">{s.label}</span>
                     </div>

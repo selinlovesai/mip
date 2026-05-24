@@ -5,6 +5,7 @@
  * (primaryKey / secondaryKey / valueKey / avatarKey).
  */
 
+import { Avatar } from "@/components/base/avatar/avatar";
 import type { WidgetRenderProps } from "@/mip/adapter/types";
 import { resolveRows, type Row } from "./data";
 import { WidgetCard } from "./widget-card";
@@ -44,11 +45,7 @@ export function ListWidget({ widget, dataState }: WidgetRenderProps) {
                     const value = read(row, valueKey);
                     return (
                         <li key={index} className="flex items-center gap-3 py-2.5">
-                            {showAvatar ? (
-                                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-utility-brand-50 text-xs font-semibold text-utility-brand-700">
-                                    {initials(primary)}
-                                </span>
-                            ) : null}
+                            {showAvatar ? <Avatar size="sm" initials={initials(primary)} alt={primary} /> : null}
                             <span className="flex min-w-0 flex-1 flex-col">
                                 <span className="truncate text-sm font-medium text-secondary">{primary}</span>
                                 {secondary ? <span className="truncate text-xs text-tertiary">{secondary}</span> : null}
