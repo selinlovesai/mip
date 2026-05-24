@@ -4,10 +4,16 @@
  * message list and composer. The send handler is a local stub that echoes an
  * assistant reply; wiring a real provider is a drop-in replacement for
  * `respond()` once the data/provider layer lands.
+ *
+ * Uses Untitled UI components for the controls: ButtonUtility (close), Button
+ * (send), and TextArea (composer).
  */
 
 import { useEffect, useRef, useState } from "react";
 import { Send01, Stars01, X } from "@untitledui/icons";
+import { Button } from "@/components/base/buttons/button";
+import { ButtonUtility } from "@/components/base/buttons/button-utility";
+import { TextArea } from "@/components/base/textarea/textarea";
 import { useDashboard } from "@/mip/store";
 import { cx } from "@/utils/cx";
 
@@ -49,9 +55,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                     <Stars01 className="size-5 text-brand-secondary" />
                     <h2 className="text-sm font-semibold text-primary">AI assistant</h2>
                 </div>
-                <button onClick={onClose} className="text-tertiary hover:text-secondary" aria-label="Close assistant">
-                    <X className="size-5" />
-                </button>
+                <ButtonUtility color="tertiary" size="xs" icon={X} tooltip="Close assistant" onClick={onClose} />
             </div>
 
             <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto p-4">
@@ -63,23 +67,24 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             </div>
 
             <div className="border-t border-secondary p-3">
-                <div className="flex items-end gap-2 rounded-xl bg-secondary p-2 ring-1 ring-secondary focus-within:ring-brand">
-                    <textarea
+                <div className="flex items-end gap-2">
+                    <TextArea
+                        aria-label="Message"
+                        size="sm"
+                        rows={1}
                         value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
+                        onChange={setDraft}
                         onKeyDown={(e) => {
                             if (e.key === "Enter" && !e.shiftKey) {
                                 e.preventDefault();
                                 send();
                             }
                         }}
-                        rows={1}
                         placeholder="Ask anything…"
-                        className="max-h-32 flex-1 resize-none bg-transparent px-1 py-1 text-sm text-primary outline-none placeholder:text-placeholder"
+                        className="flex-1"
+                        textAreaClassName="max-h-32 resize-none"
                     />
-                    <button onClick={send} disabled={!draft.trim()} className="flex size-8 items-center justify-center rounded-lg bg-brand-solid text-white disabled:opacity-40" aria-label="Send">
-                        <Send01 className="size-4" />
-                    </button>
+                    <Button size="md" color="primary" iconLeading={Send01} isDisabled={!draft.trim()} onClick={send} aria-label="Send" />
                 </div>
             </div>
         </aside>

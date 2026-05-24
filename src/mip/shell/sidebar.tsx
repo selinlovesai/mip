@@ -1,13 +1,21 @@
 /**
- * Workspace sidebar — logo + collapse, page navigation grouped under a section
- * heading, a "New page" affordance, and a user footer. Mirrors the original
- * app's sidebar layout, restyled with Untitled UI tokens.
+ * Workspace sidebar — brand header + collapse, page navigation grouped under a
+ * "WORKSPACE" section heading, a "New page" affordance, and a user footer.
+ *
+ * Composed from Untitled UI subcomponents (NavItemBase, Avatar,
+ * AvatarLabelGroup, ButtonUtility, Input) rather than the full
+ * SidebarNavigationSimple/Slim, whose fixed positioning, mobile header, hover
+ * secondary panels, and placeholder account cards are too opinionated for this
+ * app's controlled flex layout with `collapsed`/`onToggle`.
  */
 
 import { useState } from "react";
 import { ChevronLeft, Grid01, Plus } from "@untitledui/icons";
+import { Avatar } from "@/components/base/avatar/avatar";
+import { ButtonUtility } from "@/components/base/buttons/button-utility";
+import { Input } from "@/components/base/input/input";
+import { NavItemBase } from "@/components/application/app-navigation/base-components/nav-item";
 import { useDashboard } from "@/mip/store";
-import { cx } from "@/utils/cx";
 
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
     const { state, activePage, setActivePage, addPage } = useDashboard();
@@ -28,9 +36,14 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
                     M
                 </button>
                 {state.pages.map((page) => (
-                    <button key={page.id} onClick={() => setActivePage(page.id)} title={page.title} className={cx("flex size-9 items-center justify-center rounded-lg", page.id === activePage.id ? "bg-secondary text-brand-secondary" : "text-tertiary hover:bg-secondary")}>
-                        <Grid01 className="size-5" />
-                    </button>
+                    <ButtonUtility
+                        key={page.id}
+                        color={page.id === activePage.id ? "secondary" : "tertiary"}
+                        icon={Grid01}
+                        tooltip={page.title}
+                        tooltipPlacement="right"
+                        onClick={() => setActivePage(page.id)}
+                    />
                 ))}
             </aside>
         );
@@ -40,46 +53,48 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
         <aside className="flex w-64 shrink-0 flex-col border-r border-secondary bg-primary">
             <div className="flex items-center justify-between gap-2 px-4 py-4">
                 <div className="flex items-center gap-2.5">
-                    <span className="flex size-9 items-center justify-center rounded-lg bg-brand-solid font-bold text-white">M</span>
+                    <Avatar size="md" rounded={false} initials="M" className="bg-brand-solid text-white" />
                     <span className="flex flex-col leading-tight">
                         <span className="text-sm font-semibold text-primary">Protocol Foundation</span>
                         <span className="text-xs text-tertiary">MIP runtime</span>
                     </span>
                 </div>
-                <button onClick={onToggle} className="flex size-7 items-center justify-center rounded-md text-tertiary hover:bg-secondary hover:text-secondary" aria-label="Collapse sidebar">
-                    <ChevronLeft className="size-4" />
-                </button>
+                <ButtonUtility color="tertiary" size="xs" icon={ChevronLeft} tooltip="Collapse sidebar" onClick={onToggle} />
             </div>
 
             <nav className="flex-1 overflow-y-auto px-3 py-2">
                 <div className="flex items-center justify-between px-2 py-1.5">
                     <span className="text-xs font-semibold uppercase tracking-wide text-quaternary">Workspace</span>
-                    <button onClick={() => setAdding(true)} className="flex size-5 items-center justify-center rounded text-tertiary hover:bg-secondary hover:text-secondary" aria-label="Add page">
-                        <Plus className="size-4" />
-                    </button>
+                    <ButtonUtility color="tertiary" size="xs" icon={Plus} tooltip="Add page" onClick={() => setAdding(true)} />
                 </div>
                 <ul className="flex flex-col gap-0.5">
                     {state.pages.map((page) => (
-                        <li key={page.id}>
-                            <button
-                                onClick={() => setActivePage(page.id)}
-                                className={cx("flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-sm font-medium", page.id === activePage.id ? "bg-secondary text-primary" : "text-tertiary hover:bg-secondary hover:text-secondary")}
+                        <li key={page.id} className="py-px">
+                            <NavItemBase
+                                type="link"
+                                href="#"
+                                icon={Grid01}
+                                current={page.id === activePage.id}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    setActivePage(page.id);
+                                }}
                             >
-                                <Grid01 className="size-4 shrink-0" />
-                                <span className="truncate">{page.title}</span>
-                            </button>
+                                {page.title}
+                            </NavItemBase>
                         </li>
                     ))}
                     {adding ? (
                         <li className="px-2 py-1">
-                            <input
+                            <Input
+                                size="sm"
                                 autoFocus
+                                aria-label="Page name"
                                 value={draft}
-                                onChange={(e) => setDraft(e.target.value)}
+                                onChange={setDraft}
                                 onBlur={commitAdd}
                                 onKeyDown={(e) => e.key === "Enter" && commitAdd()}
                                 placeholder="Page name…"
-                                className="w-full rounded-md bg-secondary px-2 py-1.5 text-sm text-primary outline-none ring-1 ring-secondary focus:ring-brand"
                             />
                         </li>
                     ) : null}
@@ -87,7 +102,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
             </nav>
 
             <div className="flex items-center gap-2.5 border-t border-secondary px-4 py-3">
-                <span className="flex size-9 items-center justify-center rounded-full bg-utility-brand-50 text-xs font-semibold text-utility-brand-700">SA</span>
+                <Avatar size="md" initials="SA" />
                 <span className="flex flex-col leading-tight">
                     <span className="text-sm font-semibold text-primary">Super Admin</span>
                     <span className="text-xs text-tertiary">superadmin</span>
