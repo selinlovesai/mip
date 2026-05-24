@@ -5,7 +5,7 @@ Mapping the original **mip** (vanilla-CSS, `mdp`) system onto **mip-tailwind** (
 ## Architecture directives (the "new system" rules)
 
 1. **Everything persists to PostgreSQL.** All data currently in JSON files (dashboards, widgets, connections, apps, conversations, users, settings, themes, templates, tokens, components) is saved to a Postgres DB owned by the `server/` backend — localStorage becomes a cache only.
-2. **Design system is DB-driven.** Every **design token** and every **component** is a first-class row in the DB. Widgets do **not** hardcode styles/markup — they **pull from tokens/components** by id.
+2. **Design system is DB-driven.** Every **design token** and every **component** is a first-class row in the DB. Widgets do **not** hardcode styles/markup — they **pull from tokens/components** by id. Tokens are edited in Settings → Appearance and compiled to a **cached JSON** artifact + a **Tailwind-compatible CSS** (`@theme` / `:root` CSS vars) that the app and Tailwind utilities consume.
 3. **Elements, Components, and Patterns are all widgetized.** Every atom (button/input/badge), molecule (form field/KPI card), and pattern/block is a placeable **widget type** in the registry. The widget catalog spans the full design-system hierarchy.
 4. **Settings → Appearance is the token browser.** Foundations are managed there via categorized tabs (Colors / Typography / Shadows / Spacing & Radius), later synced from Figma.
 
@@ -38,7 +38,8 @@ Mapping the original **mip** (vanilla-CSS, `mdp`) system onto **mip-tailwind** (
 | Spacing tokens | Foundation (Token) | Spacing/gutter scale | Tokenize spacing; edit via Settings → Appearance | tokens table | M | 🟡 (shown in Appearance) | Spacing propagates from DB; editable from Settings → Appearance UI |
 | Radius tokens | Foundation (Token) | Corner-radius scale | Tokenize radius; edit via Settings → Appearance | tokens table | S | 🟡 (shown in Appearance) | Radius editable from DB **and** from Settings → Appearance UI |
 | Appearance token browser | Pattern / Block | Categorized token UI (Colors/Type/Shadows/Spacing) — the editing surface for every token | Done (read-only); make each token value editable inline + persist to `tokens` | tokens table | M | ✅ (read-only browser) | Editing any token in Appearance writes to DB and updates the app |
-| Figma token sync | Feature / Flow | Pull tokens from Figma → DB | Figma MCP / Tokens Studio export → `tokens` upsert job | tokens table + Figma | L | ⬜ | Figma push updates DB tokens |
+| Token emit pipeline (JSON + CSS) | Service / Feature | Compiles DB tokens to a **cached JSON** artifact and a **Tailwind-compatible CSS** (`@theme` / `:root` CSS vars) the app + Tailwind utilities consume | Backend job: `tokens` → `tokens.json` cache + generated `theme.css` (`@theme {…}`); invalidate cache on token edit; app loads the generated CSS at boot | tokens table + backend | L | ⬜ | DB tokens → JSON cache + Tailwind `@theme` CSS; `bg-primary`/`text-*`/`rounded-md` resolve from emitted vars; cache busts on edit |
+| Figma token sync | Feature / Flow | Pull tokens from Figma → DB | Figma MCP / Tokens Studio export → `tokens` upsert job (feeds the JSON+CSS emit pipeline) | tokens table + Figma | L | ⬜ | Figma push updates DB tokens → re-emits JSON + CSS |
 
 ---
 
