@@ -153,6 +153,13 @@ export interface MipWidgetStyle {
     css?: Record<string, string>;
     /** Raw custom CSS applied scoped to the widget (`&` = the widget). */
     customCss?: string;
+    /**
+     * Per-element overrides (Design tab → element tabs). Keyed by element key
+     * (e.g. "value", "title", "axis"); each targets a selector inside the widget
+     * and is emitted as a scoped, !important CSS rule. The widget root ("card")
+     * is the top-level `colors`/`css`/`customCss` above.
+     */
+    elements?: Record<string, MipElementStyle>;
 }
 
 export interface MipWidgetColors {
@@ -161,6 +168,12 @@ export interface MipWidgetColors {
     border?: string;
     background?: string;
     accent?: string; // chart series, progress, badges (brand ramp)
+}
+
+export interface MipElementStyle {
+    colors?: MipWidgetColors; // text→color, background, border, accent→fill/stroke
+    css?: Record<string, string>;
+    customCss?: string;
 }
 
 export interface MipPermissions {

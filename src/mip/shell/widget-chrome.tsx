@@ -10,10 +10,38 @@ import type { CSSProperties } from "react";
 import { DotsGrid, Trash01 } from "@untitledui/icons";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { WidgetView } from "@/mip/adapter/registry";
-import type { MipWidget } from "@/mip/schema";
+import type { MipElementStyle, MipWidget, WidgetType } from "@/mip/schema";
 import { cx } from "@/utils/cx";
 import { useWidgetData } from "./use-widget-data";
 import { WidgetEditorButton } from "./widget-editor";
+
+export interface WidgetElementDef {
+    key: string;
+    label: string;
+    /** CSS selector relative to the widget root; "" = the card itself. */
+    selector: string;
+}
+
+/** Styleable parts per widget type — drives the Design tab's element tabs. */
+export function widgetElements(type: WidgetType): WidgetElementDef[] {
+    const card: WidgetElementDef = { key: "card", label: "Widget", selector: "" };
+    const title: WidgetElementDef = { key: "title", label: "Title", selector: "h3" };
+    if (/Chart$/.test(type)) {
+        return [card, title, { key: "axis", label: "Axis", selector: ".recharts-cartesian-axis text" }, { key: "grid", label: "Grid", selector: ".recharts-cartesian-grid line" }];
+    }
+    switch (type) {
+        case "kpi":
+            return [card, { key: "value", label: "Value", selector: ".text-display-sm" }, title];
+        case "table":
+            return [card, title, { key: "header", label: "Header", selector: "th" }, { key: "cell", label: "Cell", selector: "td" }];
+        case "list":
+            return [card, title, { key: "item", label: "Item", selector: "li" }];
+        case "progress":
+            return [card, title, { key: "bar", label: "Bar", selector: '[role="progressbar"] > *' }];
+        default:
+            return [card, title];
+    }
+}
 
 /** Design-tab defaults — match the widget card's normal look (white surface,
  *  secondary border) so the controls visibly change a real surface. */
@@ -72,22 +100,66 @@ export function widgetCardStyle(widget: MipWidget): CSSProperties {
     return { ...vars, ...extra, backgroundColor: background, border: `${borderWidth} ${borderStyle} ${borderColor}` } as CSSProperties;
 }
 
-/** Scope a raw custom-CSS block to the widget. `&` → the widget selector; a bare
- *  declaration list is wrapped in the widget selector. */
-export function scopedCustomCss(widgetId: string, css?: string): string {
+/** Scope a raw custom-CSS block to a selector. `&` → that selector; a bare
+ *  declaration list is wrapped in it. */
+export function scopeCss(selector: string, css?: string): string {
     const trimmed = (css ?? "").trim();
     if (!trimmed) return "";
-    const sel = `.mip-w-${widgetId}`;
-    if (trimmed.includes("{")) return trimmed.replaceAll("&", sel);
-    return `${sel}{${trimmed}}`;
+    if (trimmed.includes("{")) return trimmed.replaceAll("&", selector);
+    return `${selector}{${trimmed}}`;
+}
+
+const CSS_PROP: Record<string, string> = {
+    fontSize: "font-size",
+    fontWeight: "font-weight",
+    textAlign: "text-align",
+    letterSpacing: "letter-spacing",
+    lineHeight: "line-height",
+    padding: "padding",
+    borderRadius: "border-radius",
+    boxShadow: "box-shadow",
+    opacity: "opacity",
+};
+const UNIT_PROPS = new Set(["fontSize", "letterSpacing", "padding", "borderRadius"]);
+
+/** Build the !important declaration list for a sub-element's colors + css. */
+function elementDecls(st: MipElementStyle): string[] {
+    const out: string[] = [];
+    const c = st.colors ?? {};
+    if (c.text) out.push(`color:${c.text} !important`);
+    if (c.background) out.push(`background-color:${c.background} !important`);
+    if (c.border) out.push(`border-color:${c.border} !important`);
+    if (c.accent) out.push(`fill:${c.accent} !important`, `stroke:${c.accent} !important`);
+    for (const [key, prop] of Object.entries(CSS_PROP)) {
+        const v = st.css?.[key];
+        if (v) out.push(`${prop}:${UNIT_PROPS.has(key) ? withUnit(v) : v} !important`);
+    }
+    return out;
+}
+
+/** All scoped CSS for a widget: the card's custom CSS + every sub-element rule. */
+export function widgetScopedCss(widget: MipWidget): string {
+    const root = `.mip-w-${widget.id}`;
+    let out = scopeCss(root, widget.style?.customCss);
+    const elements = widget.style?.elements ?? {};
+    for (const def of widgetElements(widget.type)) {
+        if (def.key === "card") continue;
+        const st = elements[def.key];
+        if (!st) continue;
+        const sel = def.selector ? `${root} ${def.selector}` : root;
+        const decls = elementDecls(st);
+        if (decls.length) out += `${sel}{${decls.join(";")}}`;
+        if (st.customCss?.trim()) out += scopeCss(sel, st.customCss);
+    }
+    return out;
 }
 
 export function WidgetChrome({ widget, editMode, onDelete }: { widget: MipWidget; editMode: boolean; onDelete: (id: string) => void }) {
     const dataState = useWidgetData(widget);
-    const customCss = scopedCustomCss(widget.id, widget.style?.customCss);
+    const scopedCss = widgetScopedCss(widget);
     return (
         <div className={cx("group relative h-full", editMode && "rounded-xl ring-1 ring-transparent transition-shadow hover:ring-brand")}>
-            {customCss ? <style>{customCss}</style> : null}
+            {scopedCss ? <style>{scopedCss}</style> : null}
             {editMode ? (
                 <div className="absolute right-2 top-2 z-10 flex items-center gap-1 opacity-60 transition-opacity group-hover:opacity-100">
                     <span className="mip-drag-handle flex size-7 cursor-grab items-center justify-center rounded-md bg-primary text-tertiary ring-1 ring-secondary hover:text-secondary active:cursor-grabbing" aria-label="Drag widget" title="Drag">

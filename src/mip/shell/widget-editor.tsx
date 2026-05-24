@@ -18,8 +18,16 @@ import { TextArea } from "@/components/base/textarea/textarea";
 import { SlideoutMenu } from "@/components/application/slideout-menus/slideout-menu";
 import { COLOR_TOKEN_GROUPS } from "@/mip/design-tokens";
 import { useDashboard } from "@/mip/store";
-import type { MipWidget, MipWidgetColors } from "@/mip/schema";
+import type { MipElementStyle, MipWidget, MipWidgetColors } from "@/mip/schema";
 import { cx } from "@/utils/cx";
+import { widgetElements } from "./widget-chrome";
+
+/** One element's editable style in the inspector. */
+interface ElState {
+    colors: MipWidgetColors;
+    css: Record<string, string>;
+    customCss: string;
+}
 
 type EditorTab = "settings" | "design";
 
@@ -111,21 +119,41 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
     const [tab, setTab] = useState<EditorTab>("settings");
     const [title, setTitle] = useState(widget.title ?? "");
     const [settingsText, setSettingsText] = useState(JSON.stringify(widget.settings ?? {}, null, 2));
-    const [colors, setColors] = useState<MipWidgetColors>({
-        text: widget.style?.colors?.text ?? "",
-        subtext: widget.style?.colors?.subtext ?? "",
-        accent: widget.style?.colors?.accent ?? "",
-        border: widget.style?.colors?.border ?? widget.style?.borderColor ?? "",
-        background: widget.style?.colors?.background ?? widget.style?.backgroundColor ?? "",
+
+    const defs = widgetElements(widget.type);
+    const [elStyles, setElStyles] = useState<Record<string, ElState>>(() => {
+        const map: Record<string, ElState> = {};
+        for (const d of defs) {
+            if (d.key === "card") {
+                map.card = {
+                    colors: {
+                        text: widget.style?.colors?.text ?? "",
+                        subtext: widget.style?.colors?.subtext ?? "",
+                        accent: widget.style?.colors?.accent ?? "",
+                        border: widget.style?.colors?.border ?? widget.style?.borderColor ?? "",
+                        background: widget.style?.colors?.background ?? widget.style?.backgroundColor ?? "",
+                    },
+                    css: { ...(widget.style?.css ?? {}) },
+                    customCss: widget.style?.customCss ?? "",
+                };
+            } else {
+                const e = widget.style?.elements?.[d.key];
+                map[d.key] = { colors: { ...(e?.colors ?? {}) }, css: { ...(e?.css ?? {}) }, customCss: e?.customCss ?? "" };
+            }
+        }
+        return map;
     });
-    const [css, setCss] = useState<Record<string, string>>({ ...(widget.style?.css ?? {}) });
-    const [customCss, setCustomCss] = useState(widget.style?.customCss ?? "");
+    const [activeEl, setActiveEl] = useState<string>("card");
     const [refreshMs, setRefreshMs] = useState<string>(String(widget.data?.refreshMs ?? 0));
     const [error, setError] = useState<string | null>(null);
 
     const isBound = !!widget.data?.sourceId;
-    const setColor = (key: keyof MipWidgetColors, v: string) => setColors((c) => ({ ...c, [key]: v }));
-    const setProp = (key: string, v: string) => setCss((c) => ({ ...c, [key]: v }));
+    const cur = elStyles[activeEl]!;
+    const setColor = (key: keyof MipWidgetColors, v: string) =>
+        setElStyles((s) => ({ ...s, [activeEl]: { ...s[activeEl]!, colors: { ...s[activeEl]!.colors, [key]: v } } }));
+    const setProp = (key: string, v: string) =>
+        setElStyles((s) => ({ ...s, [activeEl]: { ...s[activeEl]!, css: { ...s[activeEl]!.css, [key]: v } } }));
+    const setCustom = (v: string) => setElStyles((s) => ({ ...s, [activeEl]: { ...s[activeEl]!, customCss: v } }));
 
     const save = () => {
         let settings: Record<string, unknown>;
@@ -136,19 +164,41 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
             setTab("settings");
             return;
         }
-        const cleanedColors: MipWidgetColors = {};
-        (Object.keys(colors) as Array<keyof MipWidgetColors>).forEach((k) => {
-            if (colors[k]?.trim()) cleanedColors[k] = colors[k];
-        });
-        const cleanedCss: Record<string, string> = {};
-        Object.entries(css).forEach(([k, v]) => {
-            if (v?.trim()) cleanedCss[k] = v.trim();
-        });
+        const cleanColors = (src: MipWidgetColors) => {
+            const out: MipWidgetColors = {};
+            (Object.keys(src) as Array<keyof MipWidgetColors>).forEach((k) => { if (src[k]?.trim()) out[k] = src[k]; });
+            return out;
+        };
+        const cleanCss = (src: Record<string, string>) => {
+            const out: Record<string, string> = {};
+            Object.entries(src).forEach(([k, v]) => { if (v?.trim()) out[k] = v.trim(); });
+            return out;
+        };
+        const card = elStyles.card!;
+        const elements: Record<string, MipElementStyle> = {};
+        for (const d of defs) {
+            if (d.key === "card") continue;
+            const st = elStyles[d.key]!;
+            const cc = cleanColors(st.colors);
+            const cs = cleanCss(st.css);
+            const custom = st.customCss.trim();
+            if (Object.keys(cc).length || Object.keys(cs).length || custom) {
+                elements[d.key] = { ...(Object.keys(cc).length ? { colors: cc } : {}), ...(Object.keys(cs).length ? { css: cs } : {}), ...(custom ? { customCss: custom } : {}) };
+            }
+        }
         const ms = Number(refreshMs) || 0;
         updateWidget(widget.id, {
             title: title.trim() || undefined,
             settings,
-            style: { ...widget.style, borderColor: undefined, backgroundColor: undefined, colors: cleanedColors, css: cleanedCss, customCss: customCss.trim() || undefined },
+            style: {
+                ...widget.style,
+                borderColor: undefined,
+                backgroundColor: undefined,
+                colors: cleanColors(card.colors),
+                css: cleanCss(card.css),
+                customCss: card.customCss.trim() || undefined,
+                elements: Object.keys(elements).length ? elements : undefined,
+            },
             ...(widget.data ? { data: { ...widget.data, refreshMs: ms || undefined } } : {}),
         });
         close();
@@ -203,35 +253,58 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
                         ) : null}
                     </div>
                 ) : (
-                    /* ---- Figma-style inspector ---- */
+                    /* ---- Figma-style inspector (per-element) ---- */
                     <div className="flex flex-col gap-5">
+                        {/* element tabs */}
+                        <div className="-mx-1 flex flex-wrap gap-1 border-b border-secondary px-1 pb-2">
+                            {defs.map((d) => (
+                                <button
+                                    key={d.key}
+                                    type="button"
+                                    onClick={() => setActiveEl(d.key)}
+                                    className={cx("rounded-md px-2 py-1 text-xs font-medium transition-colors", activeEl === d.key ? "bg-secondary text-primary" : "text-tertiary hover:text-secondary")}
+                                >
+                                    {d.label}
+                                </button>
+                            ))}
+                        </div>
+
                         <Section title="Color">
-                            <ColorRow label="Text" value={colors.text ?? ""} onChange={(v) => setColor("text", v)} />
-                            <ColorRow label="Sub-text" value={colors.subtext ?? ""} onChange={(v) => setColor("subtext", v)} />
-                            <ColorRow label="Accent" value={colors.accent ?? ""} onChange={(v) => setColor("accent", v)} />
+                            {activeEl === "card" ? (
+                                <>
+                                    <ColorRow label="Text" value={cur.colors.text ?? ""} onChange={(v) => setColor("text", v)} />
+                                    <ColorRow label="Sub-text" value={cur.colors.subtext ?? ""} onChange={(v) => setColor("subtext", v)} />
+                                    <ColorRow label="Accent" value={cur.colors.accent ?? ""} onChange={(v) => setColor("accent", v)} />
+                                </>
+                            ) : (
+                                <>
+                                    <ColorRow label="Color" value={cur.colors.text ?? ""} onChange={(v) => setColor("text", v)} />
+                                    <ColorRow label="Accent" value={cur.colors.accent ?? ""} onChange={(v) => setColor("accent", v)} />
+                                </>
+                            )}
                         </Section>
 
                         <Section title="Fill">
-                            <ColorRow label="Background" value={colors.background ?? ""} onChange={(v) => setColor("background", v)} />
+                            <ColorRow label="Background" value={cur.colors.background ?? ""} onChange={(v) => setColor("background", v)} />
                         </Section>
 
                         <Section title="Stroke">
-                            <ColorRow label="Border" value={colors.border ?? ""} onChange={(v) => setColor("border", v)} />
+                            <ColorRow label="Border" value={cur.colors.border ?? ""} onChange={(v) => setColor("border", v)} />
                             <Row label="Width">
-                                <input className={inputCls} value={css.borderWidth ?? ""} onChange={(e) => setProp("borderWidth", e.target.value)} placeholder="1" />
-                                <select className={inputCls} value={css.borderStyle ?? ""} onChange={(e) => setProp("borderStyle", e.target.value)} aria-label="Border style">
+                                <input className={inputCls} value={cur.css.borderWidth ?? ""} onChange={(e) => setProp("borderWidth", e.target.value)} placeholder="1" />
+                                <select className={inputCls} value={cur.css.borderStyle ?? ""} onChange={(e) => setProp("borderStyle", e.target.value)} aria-label="Border style">
                                     {BORDER_STYLES.map((s) => <option key={s} value={s}>{s || "solid"}</option>)}
                                 </select>
                             </Row>
                             <Row label="Radius">
-                                <input className={inputCls} value={css.borderRadius ?? ""} onChange={(e) => setProp("borderRadius", e.target.value)} placeholder="12" />
+                                <input className={inputCls} value={cur.css.borderRadius ?? ""} onChange={(e) => setProp("borderRadius", e.target.value)} placeholder="12" />
                             </Row>
                         </Section>
 
                         <Section title="Text">
                             <Row label="Size">
-                                <input className={inputCls} value={css.fontSize ?? ""} onChange={(e) => setProp("fontSize", e.target.value)} placeholder="px" />
-                                <select className={inputCls} value={css.fontWeight ?? ""} onChange={(e) => setProp("fontWeight", e.target.value)} aria-label="Font weight">
+                                <input className={inputCls} value={cur.css.fontSize ?? ""} onChange={(e) => setProp("fontSize", e.target.value)} placeholder="px" />
+                                <select className={inputCls} value={cur.css.fontWeight ?? ""} onChange={(e) => setProp("fontWeight", e.target.value)} aria-label="Font weight">
                                     {WEIGHTS.map((w) => <option key={w} value={w}>{w || "weight"}</option>)}
                                 </select>
                             </Row>
@@ -241,8 +314,8 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
                                         <button
                                             key={a}
                                             type="button"
-                                            onClick={() => setProp("textAlign", css.textAlign === a ? "" : a)}
-                                            className={cx("rounded-md px-2 py-1 text-xs capitalize ring-1 transition-colors", css.textAlign === a ? "text-brand-secondary ring-brand" : "text-tertiary ring-secondary hover:text-secondary")}
+                                            onClick={() => setProp("textAlign", cur.css.textAlign === a ? "" : a)}
+                                            className={cx("rounded-md px-2 py-1 text-xs capitalize ring-1 transition-colors", cur.css.textAlign === a ? "text-brand-secondary ring-brand" : "text-tertiary ring-secondary hover:text-secondary")}
                                         >
                                             {a}
                                         </button>
@@ -250,33 +323,33 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
                                 </div>
                             </Row>
                             <Row label="Spacing">
-                                <input className={inputCls} value={css.letterSpacing ?? ""} onChange={(e) => setProp("letterSpacing", e.target.value)} placeholder="letter-spacing" />
+                                <input className={inputCls} value={cur.css.letterSpacing ?? ""} onChange={(e) => setProp("letterSpacing", e.target.value)} placeholder="letter-spacing" />
                             </Row>
                         </Section>
 
                         <Section title="Effects">
                             <Row label="Shadow">
-                                <select className={inputCls} value={css.boxShadow ?? ""} onChange={(e) => setProp("boxShadow", e.target.value)} aria-label="Shadow">
+                                <select className={inputCls} value={cur.css.boxShadow ?? ""} onChange={(e) => setProp("boxShadow", e.target.value)} aria-label="Shadow">
                                     {SHADOWS.map(([v, l]) => <option key={l} value={v}>{l}</option>)}
                                 </select>
                             </Row>
                             <Row label="Opacity">
-                                <input className={inputCls} value={css.opacity ?? ""} onChange={(e) => setProp("opacity", e.target.value)} placeholder="0–1" />
+                                <input className={inputCls} value={cur.css.opacity ?? ""} onChange={(e) => setProp("opacity", e.target.value)} placeholder="0–1" />
                             </Row>
                         </Section>
 
                         <Section title="Spacing">
                             <Row label="Padding">
-                                <input className={inputCls} value={css.padding ?? ""} onChange={(e) => setProp("padding", e.target.value)} placeholder="px" />
+                                <input className={inputCls} value={cur.css.padding ?? ""} onChange={(e) => setProp("padding", e.target.value)} placeholder="px" />
                             </Row>
                         </Section>
 
                         <Section title="Custom CSS">
                             <textarea
-                                value={customCss}
-                                onChange={(e) => setCustomCss(e.target.value)}
+                                value={cur.customCss}
+                                onChange={(e) => setCustom(e.target.value)}
                                 rows={4}
-                                placeholder={"declarations, or rules with & = this widget:\n& .recharts-line path { stroke-width: 3px }"}
+                                placeholder={"declarations, or rules with & = this element:\n& path { stroke-width: 3px }"}
                                 className="w-full rounded-md bg-primary p-2 font-mono text-xs text-primary ring-1 ring-secondary outline-none focus:ring-2 focus:ring-brand"
                             />
                         </Section>
