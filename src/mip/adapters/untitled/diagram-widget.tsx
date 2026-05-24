@@ -44,7 +44,7 @@ export function DiagramWidget(props: WidgetRenderProps) {
         (async () => {
             try {
                 const mermaid = (await import("mermaid")).default;
-                const isLight = document.documentElement.dataset.theme === "light";
+                const isLight = !document.documentElement.classList.contains("dark-mode");
                 mermaid.initialize({ startOnLoad: false, theme: isLight ? "default" : "dark", securityLevel: "strict" });
                 const { svg } = await mermaid.render(`mmd-${id}`, source);
                 if (!cancelled && containerRef.current) {
