@@ -20,15 +20,22 @@ import { WidgetEditorButton } from "./widget-editor";
 export const DEFAULT_BORDER_COLOR = "var(--color-border-secondary)";
 export const DEFAULT_BACKGROUND_COLOR = "var(--color-bg-primary)";
 
+/** Append `px` to a bare number; pass through anything else (var(), %, etc.). */
+function withUnit(v: string): string {
+    return /^-?\d+(\.\d+)?$/.test(v.trim()) ? `${v.trim()}px` : v;
+}
+
 /**
- * Build the per-widget card style from the Design-tab color overrides. We set
- * the *utility-facing* CSS vars (the ones Tailwind's text-/bg- utilities read,
- * e.g. `--text-color-primary`) so overrides actually recolor the rendered text,
- * plus the brand ramp for accents (chart series / progress / badges). Border and
- * background are applied directly. Empty values inherit the theme.
+ * Build the per-widget card style from the Design-tab inspector. Colors set the
+ * *utility-facing* CSS vars (the ones Tailwind's text-/bg- utilities read, e.g.
+ * `--text-color-primary`) so they actually recolor rendered text, plus the brand
+ * ramp for accents (chart series / progress / badges). Structured CSS values
+ * (typography, spacing, radius, shadow, border width/style) apply directly to
+ * the card. Empty values inherit the theme.
  */
 export function widgetCardStyle(widget: MipWidget): CSSProperties {
     const c = widget.style?.colors ?? {};
+    const css = widget.style?.css ?? {};
     const vars: Record<string, string> = {};
 
     if (c.text) vars["--text-color-primary"] = c.text;
@@ -45,16 +52,42 @@ export function widgetCardStyle(widget: MipWidget): CSSProperties {
     }
 
     const background = c.background || widget.style?.backgroundColor || DEFAULT_BACKGROUND_COLOR;
-    const border = c.border || widget.style?.borderColor || DEFAULT_BORDER_COLOR;
+    const borderColor = c.border || widget.style?.borderColor || DEFAULT_BORDER_COLOR;
     if (c.background) vars["--background-color-primary"] = c.background;
 
-    return { ...vars, backgroundColor: background, border: `1px solid ${border}` } as CSSProperties;
+    const borderWidth = css.borderWidth ? withUnit(css.borderWidth) : "1px";
+    const borderStyle = css.borderStyle || "solid";
+
+    const extra: Record<string, string | number> = {};
+    if (css.fontSize) extra.fontSize = withUnit(css.fontSize);
+    if (css.fontWeight) extra.fontWeight = css.fontWeight;
+    if (css.textAlign) extra.textAlign = css.textAlign;
+    if (css.letterSpacing) extra.letterSpacing = withUnit(css.letterSpacing);
+    if (css.lineHeight) extra.lineHeight = css.lineHeight;
+    if (css.padding) extra.padding = withUnit(css.padding);
+    if (css.borderRadius) extra.borderRadius = withUnit(css.borderRadius);
+    if (css.boxShadow) extra.boxShadow = css.boxShadow;
+    if (css.opacity) extra.opacity = Number(css.opacity);
+
+    return { ...vars, ...extra, backgroundColor: background, border: `${borderWidth} ${borderStyle} ${borderColor}` } as CSSProperties;
+}
+
+/** Scope a raw custom-CSS block to the widget. `&` → the widget selector; a bare
+ *  declaration list is wrapped in the widget selector. */
+export function scopedCustomCss(widgetId: string, css?: string): string {
+    const trimmed = (css ?? "").trim();
+    if (!trimmed) return "";
+    const sel = `.mip-w-${widgetId}`;
+    if (trimmed.includes("{")) return trimmed.replaceAll("&", sel);
+    return `${sel}{${trimmed}}`;
 }
 
 export function WidgetChrome({ widget, editMode, onDelete }: { widget: MipWidget; editMode: boolean; onDelete: (id: string) => void }) {
     const dataState = useWidgetData(widget);
+    const customCss = scopedCustomCss(widget.id, widget.style?.customCss);
     return (
         <div className={cx("group relative h-full", editMode && "rounded-xl ring-1 ring-transparent transition-shadow hover:ring-brand")}>
+            {customCss ? <style>{customCss}</style> : null}
             {editMode ? (
                 <div className="absolute right-2 top-2 z-10 flex items-center gap-1 opacity-60 transition-opacity group-hover:opacity-100">
                     <span className="mip-drag-handle flex size-7 cursor-grab items-center justify-center rounded-md bg-primary text-tertiary ring-1 ring-secondary hover:text-secondary active:cursor-grabbing" aria-label="Drag widget" title="Drag">
@@ -66,9 +99,10 @@ export function WidgetChrome({ widget, editMode, onDelete }: { widget: MipWidget
             ) : null}
             {/* The chrome owns the card surface (border + background from the
                 Design tab). Neutralize the inner WidgetCard's own bg/ring/radius
-                so the chosen colors are the ones actually shown. */}
+                so the chosen colors are the ones actually shown. The
+                `mip-w-<id>` class is the scope target for custom CSS. */}
             <div
-                className="h-full overflow-hidden rounded-xl [&>section]:!rounded-none [&>section]:!bg-transparent [&>section]:!ring-0"
+                className={cx("mip-w-" + widget.id, "h-full overflow-hidden rounded-xl [&>section]:!rounded-none [&>section]:!bg-transparent [&>section]:!ring-0")}
                 style={widgetCardStyle(widget)}
             >
                 <WidgetView widget={widget} dataState={dataState} />

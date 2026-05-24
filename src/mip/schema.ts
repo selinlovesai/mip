@@ -145,6 +145,14 @@ export interface MipWidgetStyle {
      * CSS vars on the widget so they recolor whatever the widget renders.
      */
     colors?: MipWidgetColors;
+    /**
+     * Structured CSS values from the Design inspector (Figma-style): fontSize,
+     * fontWeight, textAlign, letterSpacing, lineHeight, padding, borderRadius,
+     * borderWidth, borderStyle, boxShadow, opacity. Bare numbers get `px`.
+     */
+    css?: Record<string, string>;
+    /** Raw custom CSS applied scoped to the widget (`&` = the widget). */
+    customCss?: string;
 }
 
 export interface MipWidgetColors {

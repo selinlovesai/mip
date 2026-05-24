@@ -1,14 +1,14 @@
 /**
- * Widget editor — an Untitled UI slide-out drawer with two tabs:
- *   · Settings — title + settings JSON
- *   · Design   — border + background color, each pickable from a native swatch,
- *                a free-text field (transparent / var() / rgb()), OR the shared
- *                design-token palette (same colors as Settings → Appearance).
- * Persists via the store's `updateWidget` (settings + widget.style). The edit
- * button (shown in edit mode by WidgetChrome) is the drawer trigger.
+ * Widget editor — Untitled UI slide-out with two tabs:
+ *   · Settings — title, settings JSON, and (for data-bound widgets) auto-refresh.
+ *   · Design   — a compact, Figma-style inspector: Color (text/sub-text/accent),
+ *                Fill, Stroke (color/width/style/radius), Text (size/weight/
+ *                align/spacing), Effects (shadow/opacity), Spacing (padding), and
+ *                a raw Custom CSS block. Writes to widget.style (colors / css /
+ *                customCss); empty fields inherit the theme.
  */
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ChevronRight, Edit03 } from "@untitledui/icons";
 import { Button } from "@/components/base/buttons/button";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
@@ -21,6 +21,8 @@ import { useDashboard } from "@/mip/store";
 import type { MipWidget, MipWidgetColors } from "@/mip/schema";
 import { cx } from "@/utils/cx";
 
+type EditorTab = "settings" | "design";
+
 const REFRESH_OPTIONS = [
     { id: "0", label: "Off" },
     { id: "15000", label: "Every 15s" },
@@ -28,77 +30,61 @@ const REFRESH_OPTIONS = [
     { id: "60000", label: "Every 60s" },
 ];
 
-/** The color slots shown for every widget in the Design tab. */
-const COLOR_FIELDS: Array<{ key: keyof MipWidgetColors; label: string; hint: string }> = [
-    { key: "text", label: "Text", hint: "Titles and primary values." },
-    { key: "subtext", label: "Sub-text", hint: "Labels, captions, secondary text." },
-    { key: "accent", label: "Accent", hint: "Chart series, progress, badges." },
-    { key: "border", label: "Border", hint: "The widget's outline." },
-    { key: "background", label: "Background", hint: "The widget surface." },
-];
+const inputCls = "h-7 w-full min-w-0 rounded-md bg-primary px-2 text-xs text-primary ring-1 ring-secondary outline-none focus:ring-2 focus:ring-brand";
 
-type EditorTab = "settings" | "design";
+// ---- compact inspector primitives -----------------------------------------
 
-/**
- * A full-width color control. Supports any CSS color or `transparent` / `var()`
- * via the swatch + text field, plus one-click selection from the design-token
- * palette (writes `var(--color-…)`).
- */
-function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-    const [showPresets, setShowPresets] = useState(false);
+function Section({ title, children }: { title: string; children: ReactNode }) {
+    return (
+        <section className="flex flex-col gap-2">
+            <h4 className="text-[10px] font-semibold uppercase tracking-wide text-quaternary">{title}</h4>
+            {children}
+        </section>
+    );
+}
+
+function Row({ label, children }: { label: string; children: ReactNode }) {
+    return (
+        <div className="flex items-center gap-2">
+            <span className="w-16 shrink-0 text-xs text-tertiary">{label}</span>
+            <div className="flex min-w-0 flex-1 items-center gap-1.5">{children}</div>
+        </div>
+    );
+}
+
+/** Compact color row: small swatch (opens native picker) + text + preset palette. */
+function ColorRow({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+    const [open, setOpen] = useState(false);
     const isHex = /^#[0-9a-fA-F]{6}$/.test(value);
     return (
-        <div className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-secondary">{label}</span>
-            <div className="flex items-center gap-2">
-                {/* single rounded, borderless swatch — previews the value AND
-                    opens the native picker (invisible overlay input). */}
-                <span className="relative size-9 shrink-0 overflow-hidden rounded-md" style={{ background: value || "transparent" }}>
-                    <input
-                        type="color"
-                        aria-label={`${label} color picker`}
-                        value={isHex ? value : "#000000"}
-                        onChange={(e) => onChange(e.target.value)}
-                        className="absolute inset-0 size-full cursor-pointer opacity-0"
-                    />
+        <div className="flex flex-col gap-1.5">
+            <Row label={label}>
+                <span className="relative size-6 shrink-0 overflow-hidden rounded ring-1 ring-inset ring-secondary" style={{ background: value || "transparent" }}>
+                    <input type="color" aria-label={`${label} color picker`} value={isHex ? value : "#000000"} onChange={(e) => onChange(e.target.value)} className="absolute inset-0 size-full cursor-pointer opacity-0" />
                 </span>
-                <Input aria-label={label} value={value} onChange={onChange} placeholder="inherit" />
-                <Button color="secondary" size="sm" onClick={() => onChange("")}>
-                    Reset
-                </Button>
-            </div>
-
-            {/* collapsible token palette — same colors as Settings → Appearance */}
-            <button
-                type="button"
-                onClick={() => setShowPresets((v) => !v)}
-                className="flex w-fit items-center gap-1 text-xs font-medium text-tertiary hover:text-secondary"
-            >
-                <ChevronRight className={cx("size-3.5 transition-transform", showPresets && "rotate-90")} />
-                Preset colors
-            </button>
-            {showPresets ? (
-                <div className="flex flex-col gap-2 rounded-lg bg-secondary p-2 ring-1 ring-secondary">
+                <input value={value} onChange={(e) => onChange(e.target.value)} placeholder="inherit" className={inputCls} />
+                <button type="button" aria-label={`${label} presets`} onClick={() => setOpen((o) => !o)} className="shrink-0 rounded-md p-1 text-tertiary hover:text-secondary">
+                    <ChevronRight className={cx("size-3.5 transition-transform", open && "rotate-90")} />
+                </button>
+            </Row>
+            {open ? (
+                <div className="ml-[4.5rem] flex flex-col gap-1.5 rounded-lg bg-secondary p-2 ring-1 ring-secondary">
                     {COLOR_TOKEN_GROUPS.map((g) => (
-                        <div key={g.group} className="flex flex-col gap-1">
-                            <span className="text-[10px] font-semibold uppercase tracking-wide text-quaternary">{g.group}</span>
-                            <div className="flex flex-wrap gap-1.5">
-                                {g.tokens.map((token) => {
-                                    const cssVar = `var(${token})`;
-                                    const selected = value === cssVar;
-                                    return (
-                                        <button
-                                            key={token}
-                                            type="button"
-                                            title={token.replace(/^--color-/, "")}
-                                            aria-label={token}
-                                            onClick={() => onChange(cssVar)}
-                                            className={cx("size-6 rounded-md ring-1 ring-inset ring-black/10 transition", selected ? "outline outline-2 outline-offset-1 outline-brand" : "hover:scale-110")}
-                                            style={{ backgroundColor: cssVar }}
-                                        />
-                                    );
-                                })}
-                            </div>
+                        <div key={g.group} className="flex flex-wrap gap-1">
+                            {g.tokens.map((token) => {
+                                const v = `var(${token})`;
+                                return (
+                                    <button
+                                        key={token}
+                                        type="button"
+                                        title={token.replace(/^--color-/, "")}
+                                        aria-label={token}
+                                        onClick={() => { onChange(v); setOpen(false); }}
+                                        className={cx("size-5 rounded ring-1 ring-inset ring-black/10 transition", value === v ? "outline outline-2 outline-offset-1 outline-brand" : "hover:scale-110")}
+                                        style={{ backgroundColor: v }}
+                                    />
+                                );
+                            })}
                         </div>
                     ))}
                 </div>
@@ -106,6 +92,19 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
         </div>
     );
 }
+
+const WEIGHTS = ["", "400", "500", "600", "700", "800"];
+const BORDER_STYLES = ["", "solid", "dashed", "dotted", "none"];
+const SHADOWS: Array<[string, string]> = [
+    ["", "None"],
+    ["var(--shadow-xs)", "XS"],
+    ["var(--shadow-sm)", "SM"],
+    ["var(--shadow-md)", "MD"],
+    ["var(--shadow-lg)", "LG"],
+    ["var(--shadow-xl)", "XL"],
+    ["var(--shadow-2xl)", "2XL"],
+];
+const ALIGNS = ["left", "center", "right"] as const;
 
 function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }) {
     const { updateWidget } = useDashboard();
@@ -119,11 +118,14 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
         border: widget.style?.colors?.border ?? widget.style?.borderColor ?? "",
         background: widget.style?.colors?.background ?? widget.style?.backgroundColor ?? "",
     });
+    const [css, setCss] = useState<Record<string, string>>({ ...(widget.style?.css ?? {}) });
+    const [customCss, setCustomCss] = useState(widget.style?.customCss ?? "");
     const [refreshMs, setRefreshMs] = useState<string>(String(widget.data?.refreshMs ?? 0));
     const [error, setError] = useState<string | null>(null);
 
     const isBound = !!widget.data?.sourceId;
     const setColor = (key: keyof MipWidgetColors, v: string) => setColors((c) => ({ ...c, [key]: v }));
+    const setProp = (key: string, v: string) => setCss((c) => ({ ...c, [key]: v }));
 
     const save = () => {
         let settings: Record<string, unknown>;
@@ -134,16 +136,19 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
             setTab("settings");
             return;
         }
-        // Keep only non-empty overrides; empty means "inherit theme".
-        const cleaned: MipWidgetColors = {};
+        const cleanedColors: MipWidgetColors = {};
         (Object.keys(colors) as Array<keyof MipWidgetColors>).forEach((k) => {
-            if (colors[k]?.trim()) cleaned[k] = colors[k];
+            if (colors[k]?.trim()) cleanedColors[k] = colors[k];
+        });
+        const cleanedCss: Record<string, string> = {};
+        Object.entries(css).forEach(([k, v]) => {
+            if (v?.trim()) cleanedCss[k] = v.trim();
         });
         const ms = Number(refreshMs) || 0;
         updateWidget(widget.id, {
             title: title.trim() || undefined,
             settings,
-            style: { ...widget.style, borderColor: undefined, backgroundColor: undefined, colors: cleaned },
+            style: { ...widget.style, borderColor: undefined, backgroundColor: undefined, colors: cleanedColors, css: cleanedCss, customCss: customCss.trim() || undefined },
             ...(widget.data ? { data: { ...widget.data, refreshMs: ms || undefined } } : {}),
         });
         close();
@@ -163,7 +168,6 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
                 </p>
             </SlideoutMenu.Header>
             <SlideoutMenu.Content className="flex flex-col gap-4">
-                {/* tabs */}
                 <div className="flex gap-1 border-b border-secondary">
                     {TABS.map((t) => (
                         <button
@@ -183,11 +187,8 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
                             label="Settings (JSON)"
                             hint="The widget's data/configuration. Must be valid JSON."
                             value={settingsText}
-                            onChange={(next) => {
-                                setSettingsText(next);
-                                setError(null);
-                            }}
-                            rows={14}
+                            onChange={(next) => { setSettingsText(next); setError(null); }}
+                            rows={12}
                             textAreaClassName="font-mono text-xs"
                         />
                         {error ? <p className="text-sm text-error-primary">{error}</p> : null}
@@ -202,14 +203,83 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
                         ) : null}
                     </div>
                 ) : (
-                    <div className="flex flex-col gap-6">
-                        <p className="text-xs text-tertiary">Override any of the widget's colors. Leave a field empty (Reset) to inherit the theme.</p>
-                        {COLOR_FIELDS.map((f) => (
-                            <div key={f.key} className="flex flex-col gap-1">
-                                <ColorField label={f.label} value={colors[f.key] ?? ""} onChange={(v) => setColor(f.key, v)} />
-                                <span className="text-xs text-tertiary">{f.hint}</span>
-                            </div>
-                        ))}
+                    /* ---- Figma-style inspector ---- */
+                    <div className="flex flex-col gap-5">
+                        <Section title="Color">
+                            <ColorRow label="Text" value={colors.text ?? ""} onChange={(v) => setColor("text", v)} />
+                            <ColorRow label="Sub-text" value={colors.subtext ?? ""} onChange={(v) => setColor("subtext", v)} />
+                            <ColorRow label="Accent" value={colors.accent ?? ""} onChange={(v) => setColor("accent", v)} />
+                        </Section>
+
+                        <Section title="Fill">
+                            <ColorRow label="Background" value={colors.background ?? ""} onChange={(v) => setColor("background", v)} />
+                        </Section>
+
+                        <Section title="Stroke">
+                            <ColorRow label="Border" value={colors.border ?? ""} onChange={(v) => setColor("border", v)} />
+                            <Row label="Width">
+                                <input className={inputCls} value={css.borderWidth ?? ""} onChange={(e) => setProp("borderWidth", e.target.value)} placeholder="1" />
+                                <select className={inputCls} value={css.borderStyle ?? ""} onChange={(e) => setProp("borderStyle", e.target.value)} aria-label="Border style">
+                                    {BORDER_STYLES.map((s) => <option key={s} value={s}>{s || "solid"}</option>)}
+                                </select>
+                            </Row>
+                            <Row label="Radius">
+                                <input className={inputCls} value={css.borderRadius ?? ""} onChange={(e) => setProp("borderRadius", e.target.value)} placeholder="12" />
+                            </Row>
+                        </Section>
+
+                        <Section title="Text">
+                            <Row label="Size">
+                                <input className={inputCls} value={css.fontSize ?? ""} onChange={(e) => setProp("fontSize", e.target.value)} placeholder="px" />
+                                <select className={inputCls} value={css.fontWeight ?? ""} onChange={(e) => setProp("fontWeight", e.target.value)} aria-label="Font weight">
+                                    {WEIGHTS.map((w) => <option key={w} value={w}>{w || "weight"}</option>)}
+                                </select>
+                            </Row>
+                            <Row label="Align">
+                                <div className="flex gap-1">
+                                    {ALIGNS.map((a) => (
+                                        <button
+                                            key={a}
+                                            type="button"
+                                            onClick={() => setProp("textAlign", css.textAlign === a ? "" : a)}
+                                            className={cx("rounded-md px-2 py-1 text-xs capitalize ring-1 transition-colors", css.textAlign === a ? "text-brand-secondary ring-brand" : "text-tertiary ring-secondary hover:text-secondary")}
+                                        >
+                                            {a}
+                                        </button>
+                                    ))}
+                                </div>
+                            </Row>
+                            <Row label="Spacing">
+                                <input className={inputCls} value={css.letterSpacing ?? ""} onChange={(e) => setProp("letterSpacing", e.target.value)} placeholder="letter-spacing" />
+                            </Row>
+                        </Section>
+
+                        <Section title="Effects">
+                            <Row label="Shadow">
+                                <select className={inputCls} value={css.boxShadow ?? ""} onChange={(e) => setProp("boxShadow", e.target.value)} aria-label="Shadow">
+                                    {SHADOWS.map(([v, l]) => <option key={l} value={v}>{l}</option>)}
+                                </select>
+                            </Row>
+                            <Row label="Opacity">
+                                <input className={inputCls} value={css.opacity ?? ""} onChange={(e) => setProp("opacity", e.target.value)} placeholder="0–1" />
+                            </Row>
+                        </Section>
+
+                        <Section title="Spacing">
+                            <Row label="Padding">
+                                <input className={inputCls} value={css.padding ?? ""} onChange={(e) => setProp("padding", e.target.value)} placeholder="px" />
+                            </Row>
+                        </Section>
+
+                        <Section title="Custom CSS">
+                            <textarea
+                                value={customCss}
+                                onChange={(e) => setCustomCss(e.target.value)}
+                                rows={4}
+                                placeholder={"declarations, or rules with & = this widget:\n& .recharts-line path { stroke-width: 3px }"}
+                                className="w-full rounded-md bg-primary p-2 font-mono text-xs text-primary ring-1 ring-secondary outline-none focus:ring-2 focus:ring-brand"
+                            />
+                        </Section>
                     </div>
                 )}
             </SlideoutMenu.Content>
