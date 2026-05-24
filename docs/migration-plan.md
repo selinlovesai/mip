@@ -32,12 +32,12 @@ Mapping the original **mip** (vanilla-CSS, `mdp`) system onto **mip-tailwind** (
 
 | Item | Type | What it Does | How to Migrate | Prerequisites | Complexity | Status | Success Criteria |
 |---|---|---|---|---|---|---|---|
-| Color tokens | Foundation (Token) | Brand ramp + semantic colors driving every surface | Move Untitled `@theme` colors into a `tokens` table (name, value, mode, group); emit CSS vars from DB at boot | DB + token API | L | 🟡 (browser UI + accent/mode override done; not DB-backed) | Editing a color row in DB recolors app on reload; no hardcoded hex |
-| Typography tokens | Foundation (Token) | Font families + display/text scale | Tokenize into `tokens` (group=typography); components reference token names | tokens table | M | 🟡 (shown in Appearance; not DB) | Type scale editable from DB |
-| Shadow tokens | Foundation (Token) | Elevation scale | Tokenize shadows | tokens table | S | 🟡 (shown in Appearance) | Shadows editable from DB |
-| Spacing tokens | Foundation (Token) | Spacing/gutter scale | Tokenize spacing | tokens table | M | 🟡 (shown in Appearance) | Spacing propagates from DB |
-| Radius tokens | Foundation (Token) | Corner-radius scale | Tokenize radius | tokens table | S | 🟡 (shown in Appearance) | Radius editable from DB |
-| Appearance token browser | Pattern / Block | Categorized token UI (Colors/Type/Shadows/Spacing) | Done; make values editable + persist to `tokens` | tokens table | M | ✅ (read-only browser) | Edits persist to DB |
+| Color tokens | Foundation (Token) | Brand ramp + semantic colors driving every surface | Move Untitled `@theme` colors into a `tokens` table (name, value, mode, group); emit CSS vars from DB at boot; edit via Settings → Appearance | DB + token API | L | 🟡 (browser UI + accent/mode override done; not DB-backed) | Editing a color from Settings → Appearance writes to DB and recolors app on reload; no hardcoded hex |
+| Typography tokens | Foundation (Token) | Font families + display/text scale | Tokenize into `tokens` (group=typography); components reference token names; edit via Settings → Appearance | tokens table | M | 🟡 (shown in Appearance; not DB) | Type scale editable from DB **and** from Settings → Appearance UI |
+| Shadow tokens | Foundation (Token) | Elevation scale | Tokenize shadows; edit via Settings → Appearance | tokens table | S | 🟡 (shown in Appearance) | Shadows editable from DB **and** from Settings → Appearance UI |
+| Spacing tokens | Foundation (Token) | Spacing/gutter scale | Tokenize spacing; edit via Settings → Appearance | tokens table | M | 🟡 (shown in Appearance) | Spacing propagates from DB; editable from Settings → Appearance UI |
+| Radius tokens | Foundation (Token) | Corner-radius scale | Tokenize radius; edit via Settings → Appearance | tokens table | S | 🟡 (shown in Appearance) | Radius editable from DB **and** from Settings → Appearance UI |
+| Appearance token browser | Pattern / Block | Categorized token UI (Colors/Type/Shadows/Spacing) — the editing surface for every token | Done (read-only); make each token value editable inline + persist to `tokens` | tokens table | M | ✅ (read-only browser) | Editing any token in Appearance writes to DB and updates the app |
 | Figma token sync | Feature / Flow | Pull tokens from Figma → DB | Figma MCP / Tokens Studio export → `tokens` upsert job | tokens table + Figma | L | ⬜ | Figma push updates DB tokens |
 
 ---
