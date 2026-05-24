@@ -9,6 +9,7 @@ import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { useTheme } from "@/providers/theme-provider";
 import { useDashboard } from "@/mip/store";
 import { cx } from "@/utils/cx";
+import { AppearanceButton } from "./appearance-panel";
 
 export function Topbar({ onAddWidget, onToggleChat, chatOpen }: { onAddWidget: () => void; onToggleChat: () => void; chatOpen: boolean }) {
     const { activePage, editMode, setEditMode } = useDashboard();
@@ -30,6 +31,7 @@ export function Topbar({ onAddWidget, onToggleChat, chatOpen }: { onAddWidget: (
                     tooltip={isDark ? "Light mode" : "Dark mode"}
                     onClick={() => setTheme(isDark ? "light" : "dark")}
                 />
+                <AppearanceButton />
                 <ButtonUtility color="tertiary" icon={PlusCircle} tooltip="Add widget" onClick={onAddWidget} />
                 <ButtonUtility
                     color="tertiary"

@@ -5,10 +5,11 @@
  * is themeable and kit-swappable.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { untitledAdapter } from "@/mip/adapters/untitled";
 import { UiKitProvider } from "@/mip/adapter/registry";
 import { DashboardProvider } from "@/mip/store";
+import { applyAccent, getSavedAccent } from "./appearance";
 import { ChatPanel } from "./chat-panel";
 import { DashboardGrid } from "./dashboard-grid";
 import { Sidebar } from "./sidebar";
@@ -19,6 +20,10 @@ export const AppShell = () => {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [chatOpen, setChatOpen] = useState(false);
     const [pickerOpen, setPickerOpen] = useState(false);
+
+    useEffect(() => {
+        applyAccent(getSavedAccent());
+    }, []);
 
     return (
         <UiKitProvider adapter={untitledAdapter}>
