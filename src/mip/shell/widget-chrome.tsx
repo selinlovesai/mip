@@ -14,9 +14,10 @@ import type { MipWidget } from "@/mip/schema";
 import { cx } from "@/utils/cx";
 import { WidgetEditorButton } from "./widget-editor";
 
-/** Design-tab defaults: no border, secondary surface behind the widget. */
-export const DEFAULT_BORDER_COLOR = "transparent";
-export const DEFAULT_BACKGROUND_COLOR = "var(--color-bg-secondary)";
+/** Design-tab defaults — match the widget card's normal look (white surface,
+ *  secondary border) so the controls visibly change a real surface. */
+export const DEFAULT_BORDER_COLOR = "var(--color-border-secondary)";
+export const DEFAULT_BACKGROUND_COLOR = "var(--color-bg-primary)";
 
 export function widgetCardStyle(widget: MipWidget): CSSProperties {
     const borderColor = widget.style?.borderColor ?? DEFAULT_BORDER_COLOR;
@@ -36,7 +37,13 @@ export function WidgetChrome({ widget, editMode, onDelete }: { widget: MipWidget
                     <ButtonUtility color="tertiary" size="xs" icon={Trash01} tooltip="Delete widget" onClick={() => onDelete(widget.id)} />
                 </div>
             ) : null}
-            <div className="h-full overflow-hidden rounded-xl" style={widgetCardStyle(widget)}>
+            {/* The chrome owns the card surface (border + background from the
+                Design tab). Neutralize the inner WidgetCard's own bg/ring/radius
+                so the chosen colors are the ones actually shown. */}
+            <div
+                className="h-full overflow-hidden rounded-xl [&>section]:!rounded-none [&>section]:!bg-transparent [&>section]:!ring-0"
+                style={widgetCardStyle(widget)}
+            >
                 <WidgetView widget={widget} />
             </div>
         </div>

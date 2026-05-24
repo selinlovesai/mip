@@ -9,7 +9,7 @@
  */
 
 import { useState } from "react";
-import { Edit03 } from "@untitledui/icons";
+import { ChevronRight, Edit03 } from "@untitledui/icons";
 import { Button } from "@/components/base/buttons/button";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { Input } from "@/components/base/input/input";
@@ -29,50 +29,64 @@ type EditorTab = "settings" | "design";
  * palette (writes `var(--color-…)`).
  */
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+    const [showPresets, setShowPresets] = useState(false);
     const isHex = /^#[0-9a-fA-F]{6}$/.test(value);
     return (
         <div className="flex flex-col gap-2">
             <span className="text-sm font-medium text-secondary">{label}</span>
             <div className="flex items-center gap-2">
-                {/* live preview of the current value (works for var()/keywords too) */}
-                <span className="size-9 shrink-0 rounded-md ring-1 ring-inset ring-secondary" style={{ background: value || "transparent" }} aria-hidden />
-                <input
-                    type="color"
-                    aria-label={`${label} hex picker`}
-                    value={isHex ? value : "#000000"}
-                    onChange={(e) => onChange(e.target.value)}
-                    className="size-9 shrink-0 cursor-pointer rounded-md border border-secondary bg-primary p-0.5"
-                />
+                {/* single rounded, borderless swatch — previews the value AND
+                    opens the native picker (invisible overlay input). */}
+                <span className="relative size-9 shrink-0 overflow-hidden rounded-md" style={{ background: value || "transparent" }}>
+                    <input
+                        type="color"
+                        aria-label={`${label} color picker`}
+                        value={isHex ? value : "#000000"}
+                        onChange={(e) => onChange(e.target.value)}
+                        className="absolute inset-0 size-full cursor-pointer opacity-0"
+                    />
+                </span>
                 <Input aria-label={label} value={value} onChange={onChange} placeholder="transparent" />
                 <Button color="secondary" size="sm" onClick={() => onChange("transparent")}>
                     Clear
                 </Button>
             </div>
-            {/* token palette — same colors as Settings → Appearance */}
-            <div className="flex flex-col gap-2 rounded-lg bg-secondary p-2 ring-1 ring-secondary">
-                {COLOR_TOKEN_GROUPS.map((g) => (
-                    <div key={g.group} className="flex flex-col gap-1">
-                        <span className="text-[10px] font-semibold uppercase tracking-wide text-quaternary">{g.group}</span>
-                        <div className="flex flex-wrap gap-1.5">
-                            {g.tokens.map((token) => {
-                                const cssVar = `var(${token})`;
-                                const selected = value === cssVar;
-                                return (
-                                    <button
-                                        key={token}
-                                        type="button"
-                                        title={token.replace(/^--color-/, "")}
-                                        aria-label={token}
-                                        onClick={() => onChange(cssVar)}
-                                        className={cx("size-6 rounded-md ring-1 ring-inset ring-black/10 transition", selected ? "outline outline-2 outline-offset-1 outline-brand" : "hover:scale-110")}
-                                        style={{ backgroundColor: cssVar }}
-                                    />
-                                );
-                            })}
+
+            {/* collapsible token palette — same colors as Settings → Appearance */}
+            <button
+                type="button"
+                onClick={() => setShowPresets((v) => !v)}
+                className="flex w-fit items-center gap-1 text-xs font-medium text-tertiary hover:text-secondary"
+            >
+                <ChevronRight className={cx("size-3.5 transition-transform", showPresets && "rotate-90")} />
+                Preset colors
+            </button>
+            {showPresets ? (
+                <div className="flex flex-col gap-2 rounded-lg bg-secondary p-2 ring-1 ring-secondary">
+                    {COLOR_TOKEN_GROUPS.map((g) => (
+                        <div key={g.group} className="flex flex-col gap-1">
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-quaternary">{g.group}</span>
+                            <div className="flex flex-wrap gap-1.5">
+                                {g.tokens.map((token) => {
+                                    const cssVar = `var(${token})`;
+                                    const selected = value === cssVar;
+                                    return (
+                                        <button
+                                            key={token}
+                                            type="button"
+                                            title={token.replace(/^--color-/, "")}
+                                            aria-label={token}
+                                            onClick={() => onChange(cssVar)}
+                                            className={cx("size-6 rounded-md ring-1 ring-inset ring-black/10 transition", selected ? "outline outline-2 outline-offset-1 outline-brand" : "hover:scale-110")}
+                                            style={{ backgroundColor: cssVar }}
+                                        />
+                                    );
+                                })}
+                            </div>
                         </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            ) : null}
         </div>
     );
 }
