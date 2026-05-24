@@ -126,7 +126,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             {messages.map((msg) =>
                 msg.role === "user" ? (
                     <div key={msg.id} className="flex justify-end">
-                        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-brand-solid px-3.5 py-2.5 text-sm text-white">{msg.text}</div>
+                        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-brand-solid px-3.5 py-2.5 text-xs leading-4 text-white">{msg.text}</div>
                     </div>
                 ) : (
                     <div key={msg.id} className="flex gap-2.5">
@@ -134,7 +134,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                             <Stars01 className="size-3.5 text-utility-brand-700" />
                         </span>
                         <div
-                            className="prose prose-sm dark:prose-invert max-w-[85%] rounded-2xl rounded-tl-sm bg-secondary px-3.5 py-2.5 text-secondary prose-headings:text-primary prose-strong:text-primary prose-a:text-brand-secondary"
+                            className="prose prose-sm dark:prose-invert max-w-[85%] rounded-2xl rounded-tl-sm bg-secondary px-3.5 py-2.5 text-xs text-secondary prose-headings:text-primary prose-strong:text-primary prose-a:text-brand-secondary prose-p:text-xs prose-p:leading-4 prose-p:my-1.5"
                             dangerouslySetInnerHTML={{ __html: markdownToHtml(msg.text) }}
                         />
                     </div>
@@ -146,7 +146,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                     <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-utility-brand-50">
                         <Stars01 className="size-3.5 text-utility-brand-700" />
                     </span>
-                    <div className="rounded-2xl rounded-tl-sm bg-secondary px-3.5 py-2.5 text-sm text-tertiary">thinking…</div>
+                    <div className="rounded-2xl rounded-tl-sm bg-secondary px-3.5 py-2.5 text-xs text-tertiary">thinking…</div>
                 </div>
             ) : null}
 
@@ -156,7 +156,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                         <button
                             key={s}
                             onClick={() => void sendText(s)}
-                            className="rounded-lg bg-secondary px-3 py-2 text-left text-sm text-secondary ring-1 ring-secondary transition-colors hover:ring-brand"
+                            className="rounded-lg bg-secondary px-3 py-2 text-left text-xs text-secondary ring-1 ring-secondary transition-colors hover:ring-brand"
                         >
                             {s}
                         </button>
