@@ -10,11 +10,13 @@ import type { UiKitAdapter, WidgetRenderProps } from "@/mip/adapter/types";
 import { ButtonWidget } from "./button-widget";
 import { CardWidget } from "./card-widget";
 import { ChartWidget } from "./chart-widget";
+import { CtaWidget, ContentSectionWidget, FaqWidget, FeatureGridWidget, HeroWidget, PricingWidget, StatsGridWidget, TestimonialWidget } from "./design-blocks";
 import { DetailWidget } from "./detail-widget";
 import { FormWidget } from "./form-widget";
 import { KpiWidget } from "./kpi-widget";
 import { ListWidget } from "./list-widget";
 import { MarkdownWidget } from "./markdown-widget";
+import { DrawerWidget, ImageWidget, ModalWidget, PageHeaderWidget } from "./misc-widgets";
 import { ProgressWidget } from "./progress-widget";
 import { TableWidget } from "./table-widget";
 import { TabsWidget } from "./tabs-widget";
@@ -51,6 +53,19 @@ export const untitledAdapter: UiKitAdapter = {
         card: CardWidget,
         tabs: TabsWidget,
         button: ButtonWidget,
+        image: ImageWidget,
+        pageHeader: PageHeaderWidget,
+        modal: ModalWidget,
+        drawer: DrawerWidget,
+        // Design blocks
+        hero: HeroWidget,
+        cta: CtaWidget,
+        pricing: PricingWidget,
+        contentSection: ContentSectionWidget,
+        testimonial: TestimonialWidget,
+        featureGrid: FeatureGridWidget,
+        statsGrid: StatsGridWidget,
+        faq: FaqWidget,
     },
     fallback: ComingSoon,
 };

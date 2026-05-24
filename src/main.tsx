@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router";
 import { DashboardScreen } from "@/pages/dashboard-screen";
+import { GalleryScreen } from "@/pages/gallery-screen";
 import { HomeScreen } from "@/pages/home-screen";
 import { NotFound } from "@/pages/not-found";
 import { RouteProvider } from "@/providers/router-provider";
@@ -16,6 +17,7 @@ createRoot(document.getElementById("root")!).render(
                     <Routes>
                         <Route path="/" element={<HomeScreen />} />
                         <Route path="/dashboard" element={<DashboardScreen />} />
+                        <Route path="/gallery" element={<GalleryScreen />} />
                         <Route path="*" element={<NotFound />} />
                     </Routes>
                 </RouteProvider>
