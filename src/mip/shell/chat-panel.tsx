@@ -11,13 +11,13 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Expand01, LayoutRight, MessageChatCircle, Minimize01, Send01, Settings01, Stars01, X } from "@untitledui/icons";
+import { Expand01, Loading02, Microphone01, LayoutRight, MessageChatCircle, Minimize01, Send01, Settings01, Stars01, StopCircle, X } from "@untitledui/icons";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { Checkbox } from "@/components/base/checkbox/checkbox";
 import { Input } from "@/components/base/input/input";
 import { Select } from "@/components/base/select/select";
 import { TextArea } from "@/components/base/textarea/textarea";
-import { chat } from "@/mip/api";
+import { chat, transcribe } from "@/mip/api";
 import { markdownToHtml } from "@/mip/adapters/untitled/markdown";
 import { useSettings } from "@/mip/settings/settings-store";
 import { useDashboard } from "@/mip/store";
@@ -47,7 +47,11 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
     const [draft, setDraft] = useState("");
     const [thinking, setThinking] = useState(false);
     const [acfgOpen, setAcfgOpen] = useState(false);
+    const [recording, setRecording] = useState(false);
+    const [transcribing, setTranscribing] = useState(false);
     const listRef = useRef<HTMLDivElement>(null);
+    const recorderRef = useRef<MediaRecorder | null>(null);
+    const chunksRef = useRef<Blob[]>([]);
 
     // The configured AI connection (from Settings → Assistant), if any.
     const conn = useMemo(() => {
@@ -97,6 +101,46 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                 ? result.content
                 : `**Couldn't reach the model.**\n\n${typeof result.error === "string" ? result.error : "The request failed. Check the connection's base URL and API key in Settings."}`;
         setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: "assistant", text: text2 }]);
+    };
+
+    // --- Voice input: record via MediaRecorder, transcribe with local Whisper ---
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const recorder = new MediaRecorder(stream);
+            chunksRef.current = [];
+            recorder.ondataavailable = (e) => {
+                if (e.data.size > 0) chunksRef.current.push(e.data);
+            };
+            recorder.onstop = async () => {
+                stream.getTracks().forEach((t) => t.stop());
+                const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
+                setTranscribing(true);
+                const res = await transcribe(blob);
+                setTranscribing(false);
+                if (res.ok && res.text) {
+                    setDraft((d) => (d ? `${d} ${res.text}` : res.text!));
+                } else {
+                    const msg = typeof res.error === "string" ? res.error : "Transcription failed.";
+                    setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: "assistant", text: `🎤 ${msg}` }]);
+                }
+            };
+            recorderRef.current = recorder;
+            recorder.start();
+            setRecording(true);
+        } catch {
+            setRecording(false);
+            setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: "assistant", text: "🎤 Microphone access was denied or is unavailable." }]);
+        }
+    };
+
+    const toggleRecording = () => {
+        if (recording) {
+            recorderRef.current?.stop();
+            setRecording(false);
+        } else {
+            void startRecording();
+        }
     };
 
     if (!open) return null;
@@ -273,6 +317,22 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         }
     };
 
+    // ---- Mic (voice input) button, shared by every composer ----
+    const micButton = (
+        <button
+            type="button"
+            aria-label={recording ? "Stop recording" : "Record voice"}
+            disabled={transcribing}
+            onClick={toggleRecording}
+            className={cx(
+                "flex items-center px-2 transition-colors disabled:opacity-40",
+                recording ? "text-utility-error-500" : "text-tertiary hover:text-secondary",
+            )}
+        >
+            {transcribing ? <Loading02 className="size-4 animate-spin" /> : recording ? <StopCircle className="size-4" /> : <Microphone01 className="size-4" />}
+        </button>
+    );
+
     // ---- Composer footer (shared by sidebar + chat) ----
     const footer = (
         <div className="flex flex-col border-t border-secondary">
@@ -289,6 +349,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                     className="flex-1"
                     textAreaClassName="max-h-32 resize-none rounded-none border-0 shadow-none ring-0 text-xs leading-4 focus:ring-0"
                 />
+                {micButton}
                 <button
                     type="button"
                     aria-label="Send"
@@ -333,6 +394,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                         className="flex-1"
                         textAreaClassName="max-h-20 resize-none rounded-none border-0 shadow-none ring-0 text-xs leading-4 focus:ring-0"
                     />
+                    {micButton}
                     <button
                         type="button"
                         aria-label="Send"

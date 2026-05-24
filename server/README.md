@@ -9,6 +9,7 @@ blocked by CORS.
 |---|---|
 | `POST /api/chat` | Proxy a chat completion to an OpenAI-compatible or Anthropic provider. Body: `{ provider, baseUrl, apiKey, model, messages, system? }`. Returns `{ ok, content, raw }`. |
 | `POST /api/test-endpoint` | Proxy an arbitrary REST request (Connections → "Test selected endpoint"). Body: `{ method, url, headers, body? }`. Returns `{ ok, status, durationMs, body }`. |
+| `POST /api/transcribe` | Speech-to-text via local Whisper (faster-whisper). Multipart `file` = recorded audio; returns `{ ok, text }`. Model size via `WHISPER_MODEL` (tiny/base/small/…; default `base`, CPU/int8). Weights download on first use. |
 | `GET /api/health` | Liveness + `{ db: bool }` (whether Postgres is connected). |
 | `GET /api/db/{collection}` | List records in a collection. |
 | `GET /api/db/{collection}/{id}` | Get one record. |

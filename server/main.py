@@ -18,8 +18,12 @@ from __future__ import annotations
 import time
 from typing import Any
 
+import os
+import tempfile
+
 import httpx
-from fastapi import Body, FastAPI, HTTPException
+from fastapi import Body, FastAPI, File, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -151,6 +155,51 @@ async def test_endpoint(req: TestRequest) -> dict[str, Any]:
 @app.get("/api/health")
 async def health() -> dict[str, Any]:
     return {"status": "ok", "db": db.is_enabled()}
+
+
+# ---------------------------------------------------------------------------
+# Speech-to-text — local Whisper (faster-whisper)
+# ---------------------------------------------------------------------------
+# The model is lazy-loaded (singleton) so startup isn't blocked and the ~150MB
+# weights are only downloaded on first use. Model size via WHISPER_MODEL
+# (tiny/base/small/medium/large-v3); defaults to "base" on CPU/int8.
+
+_whisper_model = None
+
+
+def _get_whisper():
+    global _whisper_model
+    if _whisper_model is None:
+        from faster_whisper import WhisperModel  # imported lazily
+
+        name = os.environ.get("WHISPER_MODEL", "base")
+        _whisper_model = WhisperModel(name, device="cpu", compute_type="int8")
+    return _whisper_model
+
+
+def _transcribe_file(path: str) -> str:
+    model = _get_whisper()
+    segments, _info = model.transcribe(path, beam_size=1)
+    return " ".join(seg.text.strip() for seg in segments).strip()
+
+
+@app.post("/api/transcribe")
+async def transcribe(file: UploadFile = File(...)) -> dict[str, Any]:
+    suffix = os.path.splitext(file.filename or "")[1] or ".webm"
+    try:
+        data = await file.read()
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(data)
+            tmp_path = tmp.name
+        try:
+            text = await run_in_threadpool(_transcribe_file, tmp_path)
+            return {"ok": True, "text": text}
+        finally:
+            os.unlink(tmp_path)
+    except ModuleNotFoundError:
+        return {"ok": False, "error": "Whisper not installed. Run: pip install faster-whisper"}
+    except Exception as exc:  # noqa: BLE001 - surface to the client
+        return {"ok": False, "error": str(exc)}
 
 
 # ---------------------------------------------------------------------------

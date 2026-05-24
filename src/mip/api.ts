@@ -137,3 +137,25 @@ export async function dbDelete(collection: DbCollection, id: string): Promise<bo
         return false;
     }
 }
+
+// ---------------------------------------------------------------------------
+// Speech-to-text — POST a recorded audio blob to the backend, which runs a
+// local Whisper model (faster-whisper) and returns the transcript.
+// ---------------------------------------------------------------------------
+
+export interface TranscribeResult {
+    ok: boolean;
+    text?: string;
+    error?: unknown;
+}
+
+export async function transcribe(blob: Blob): Promise<TranscribeResult> {
+    try {
+        const form = new FormData();
+        form.append("file", blob, "audio.webm");
+        const res = await fetch(`${BASE}/api/transcribe`, { method: "POST", body: form });
+        return (await res.json()) as TranscribeResult;
+    } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : `Backend unreachable at ${BASE}.` };
+    }
+}
