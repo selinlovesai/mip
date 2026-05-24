@@ -119,6 +119,75 @@ const widgets: MipWidget[] = [
             ],
         },
     },
+    {
+        id: "account",
+        type: "detail",
+        title: "Account",
+        layout: { x: 1, y: 6, w: 1, h: 2 },
+        settings: {
+            fields: [
+                { key: "plan", label: "Plan" },
+                { key: "seats", label: "Seats" },
+                { key: "renews", label: "Renews" },
+                { key: "owner", label: "Owner" },
+            ],
+            record: { plan: "Enterprise", seats: 120, renews: "Jan 1, 2027", owner: "Olivia Rhye" },
+        },
+    },
+    {
+        id: "notes",
+        type: "markdown",
+        title: "Release notes",
+        layout: { x: 2, y: 6, w: 1, h: 2 },
+        settings: {
+            content: "## v2.4\n\nShipped the **Tailwind** rebuild.\n\n- New adapter layer\n- `recharts` charts\n- [Docs](https://example.com)",
+        },
+    },
+    {
+        id: "contact",
+        type: "form",
+        title: "Contact us",
+        layout: { x: 0, y: 8, w: 1, h: 2 },
+        fields: [
+            { name: "name", type: "text", label: "Name", required: true },
+            { name: "email", type: "email", label: "Email", required: true },
+            { name: "topic", type: "select", label: "Topic", options: [{ label: "Sales", value: "sales" }, { label: "Support", value: "support" }] },
+            { name: "subscribe", type: "toggle", label: "Subscribe to updates" },
+        ],
+    },
+    {
+        id: "promo",
+        type: "card",
+        title: "Card",
+        layout: { x: 1, y: 8, w: 1, h: 2 },
+        settings: {
+            eyebrow: "New",
+            heading: "Kit-agnostic widgets",
+            body: "Every widget renders through a UI-kit adapter, so swapping component libraries is a one-line change.",
+            footer: "Powered by Untitled UI",
+        },
+    },
+    {
+        id: "overview-tabs",
+        type: "tabs",
+        title: "Overview",
+        layout: { x: 2, y: 8, w: 1, h: 2 },
+        settings: {
+            tabs: [
+                { label: "Summary", content: "Revenue is up 12.5% month over month with churn holding under 2.5%." },
+                { label: "Details", content: "NA leads revenue; APAC is the fastest-growing region this quarter." },
+                { label: "Notes", content: "Q3 goal at 74% — on track to close by end of period." },
+            ],
+        },
+    },
+    {
+        id: "cta-button",
+        type: "button",
+        title: "Get started",
+        layout: { x: 0, y: 10, w: 1, h: 1 },
+        settings: { label: "Get started" },
+        style: { variant: "primary", size: "lg" },
+    },
 ];
 
 export const DashboardScreen = () => {

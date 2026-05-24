@@ -7,11 +7,17 @@
  */
 
 import type { UiKitAdapter, WidgetRenderProps } from "@/mip/adapter/types";
+import { ButtonWidget } from "./button-widget";
+import { CardWidget } from "./card-widget";
 import { ChartWidget } from "./chart-widget";
+import { DetailWidget } from "./detail-widget";
+import { FormWidget } from "./form-widget";
 import { KpiWidget } from "./kpi-widget";
 import { ListWidget } from "./list-widget";
+import { MarkdownWidget } from "./markdown-widget";
 import { ProgressWidget } from "./progress-widget";
 import { TableWidget } from "./table-widget";
+import { TabsWidget } from "./tabs-widget";
 import { WidgetCard } from "./widget-card";
 
 function ComingSoon({ widget }: WidgetRenderProps) {
@@ -39,6 +45,12 @@ export const untitledAdapter: UiKitAdapter = {
         donutChart: ChartWidget,
         table: TableWidget,
         list: ListWidget,
+        detail: DetailWidget,
+        markdown: MarkdownWidget,
+        form: FormWidget,
+        card: CardWidget,
+        tabs: TabsWidget,
+        button: ButtonWidget,
     },
     fallback: ComingSoon,
 };
