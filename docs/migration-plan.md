@@ -45,6 +45,8 @@ Mapping the original **mip** (vanilla-CSS, `mdp`) system onto **mip-tailwind** (
 
 ## B. Elements (Atoms) — widgetized indivisible UI
 
+> **Design tab:** every atom widget exposes a **Design** tab in its settings — change color, spacing, font, and layout, all bound to tokens (pick a token or override). Overrides save to the widget; defaults inherit from the DB token/component.
+
 | Item | Type | What it Does | How to Migrate | Prerequisites | Complexity | Status | Success Criteria |
 |---|---|---|---|---|---|---|---|
 | Button | Element (Atom) | Action trigger (variants/sizes) | Untitled `Button`; register as widget type + `components` row referencing tokens | registry + components table | S | 🟡 (`button` widget exists; not DB-driven) | Placeable as widget; style from tokens |
@@ -60,6 +62,8 @@ Mapping the original **mip** (vanilla-CSS, `mdp`) system onto **mip-tailwind** (
 
 ## C. Components (Molecules) — widgetized simple combinations
 
+> **Design tab:** the Design tab here also targets the **nested elements** inside the molecule (e.g. a Form Field's label vs. input) — color/spacing/font/layout per sub-element, token-bound.
+
 | Item | Type | What it Does | How to Migrate | Prerequisites | Complexity | Status | Success Criteria |
 |---|---|---|---|---|---|---|---|
 | KPI / metric card | Component (Molecule) | Label + value + delta badge | Done; make style pull from tokens | tokens | S | ✅ (UI) / 🟡 (tokens) | Renders value/format/delta |
@@ -73,6 +77,8 @@ Mapping the original **mip** (vanilla-CSS, `mdp`) system onto **mip-tailwind** (
 ---
 
 ## D. Patterns & Blocks — widgetized complex sections
+
+> **Design tab:** patterns expose the deepest Design tab — restyle the block and every element/component nested inside it (e.g. a pricing block's tier card, badge, button, price text) — color/spacing/font/layout, token-bound, with per-sub-element targeting.
 
 | Item | Type | What it Does | How to Migrate | Prerequisites | Complexity | Status | Success Criteria |
 |---|---|---|---|---|---|---|---|
@@ -89,7 +95,7 @@ Mapping the original **mip** (vanilla-CSS, `mdp`) system onto **mip-tailwind** (
 | AI chat panel (3 modes) | Pattern / Block | Compact/chat/sidebar assistant | Done; add tool-injection | backend + DB convos | L | ✅ (UI) / 🟡 (real AI) | Modes switch; live replies; injects widgets |
 | Settings surface (inner sidebar) | Pattern / Block | Profile/Appearance/Connections/Apps/Assistant/Users | Done | DB settings | M | ✅ (UI) | All tabs render |
 | Connections editor | Pattern / Block | Source/auth/headers/endpoints/test/Postman | Done; persist DB + backend test | backend + DB | L | ✅ (UI) / 🟡 (DB) | Editor + test work |
-| Widget picker / editor | Pattern / Block | Add/edit widgets | Done | — | S | ✅ | Add + edit widgets |
+| Widget picker / editor | Pattern / Block | Add/edit widgets (title + settings JSON + **Design tab**) | Done (JSON settings drawer); add the Design tab (see H) | — | S | ✅ (JSON) / ⬜ (Design tab) | Add + edit widgets; Design tab present |
 
 ---
 
@@ -139,6 +145,7 @@ Mapping the original **mip** (vanilla-CSS, `mdp`) system onto **mip-tailwind** (
 
 | Item | Type | What it Does | How to Migrate | Prerequisites | Complexity | Status | Success Criteria |
 |---|---|---|---|---|---|---|---|
+| Widget Design tab | Feature / Flow | Per-widget **Design** tab in settings — edit color/spacing/font/layout of the widget **and the elements/components nested inside it**, bound to tokens (pick a token or override) | Add a Design tab to the widget editor: token-bound controls (color pickers from `tokens`, spacing/radius/font selectors, layout); for molecules/patterns, a sub-element targeting tree; overrides save to `widget.style`/per-element style, defaults inherit from token/component | tokens + components in DB; widget editor | L | ⬜ | Changing a token-bound control restyles the widget (and chosen nested element) live and persists |
 | Drag-drop + resize | Feature / Flow | Rearrange widgets | Done (RGL v2) | layout in DB | M | ✅ / 🟡 (DB) | Layout persists to DB |
 | Persistence (3-tier) | Feature / Flow | localStorage → backend → DB | Add DB write-through (mip pattern) | Postgres | L | 🟡 (localStorage) | Survives reload + device switch |
 | Live widget data | Feature / Flow | Widgets fetch from connections | Wire `WidgetDataState` → backend query (connection+endpoint+JSONPath) | connections in DB + backend | L | ⬜ (authored settings) | Widget shows live API data |
