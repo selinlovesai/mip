@@ -82,8 +82,34 @@ const DASHBOARD_SYSTEM = [
     "removeWidget { id }                    — remove a widget by id (use listWidgets first)",
     "Workflow: to build a widget from an API, call listConnections FIRST to find the right sourceId + endpoint, then addWidget with a `data` binding. For one-off numbers from the open web, fetch/search and put the RETURNED values into settings. Never invent figures or connection ids.",
     "When the request is just a question (no dashboard change), answer it in `say` with ops:[]. Markdown is supported in `say`.",
-    'Protocol: EVERY reply is ONE JSON object {"say":"<short message>","ops":[ {"kind":"…", …}, … ]} — no prose outside it. You receive each op\'s result and may continue. When the dashboard matches the request (or you\'ve answered), reply with {"say":"…","ops":[]} and STOP. Describing an action in prose does NOTHING — only ops change the dashboard.',
+    'Protocol: EVERY reply is ONE JSON object with EXACTLY two keys: "say" (string) and "ops" (array). Put EVERY action inside the "ops" array as {"kind":"…", …}. Do NOT invent other top-level keys, and do NOT return data/widgets at the top level — only {"say", "ops"}.',
+    'You receive each op\'s result and may continue. When the dashboard matches the request (or you\'ve answered a question), reply with {"say":"…","ops":[]} and STOP. Describing an action in prose does NOTHING — only ops change the dashboard.',
+    'Example — "add a pie chart of the top 6 countries by population":',
+    'Round 1 → {"say":"Fetching population data…","ops":[{"kind":"fetch","url":"https://restcountries.com/v3.1/all?fields=name,population"}]}',
+    'Round 2 (after the result) → {"say":"Added a pie chart of the 6 most populous countries.","ops":[{"kind":"addWidget","type":"pieChart","title":"Top 6 by population","settings":{"points":[{"label":"India","value":1417000000},{"label":"China","value":1412000000},{"label":"United States","value":333000000},{"label":"Indonesia","value":275000000},{"label":"Pakistan","value":240000000},{"label":"Nigeria","value":223000000}]}}]}',
 ].join("\n");
+
+/** Coerce a parsed JSON value into {say, ops}. Accepts our canonical
+ *  {say, ops[]} but also tolerates the shapes models drift into under JSON mode:
+ *  a bare ops array, ops under an alternate key (operations/actions/tools),
+ *  or a single op object ({kind, …}). Returns null if nothing op-like is found. */
+function coerceReply(o: unknown): { say?: string; ops: CanvasOp[] } | null {
+    if (Array.isArray(o)) return { ops: o as CanvasOp[] };
+    if (!o || typeof o !== "object") return null;
+    const rec = o as Record<string, unknown>;
+    const say = typeof rec.say === "string" ? rec.say : typeof rec.message === "string" ? rec.message : undefined;
+    for (const key of ["ops", "operations", "actions", "tools", "tool_calls"]) {
+        if (Array.isArray(rec[key])) return { say, ops: rec[key] as CanvasOp[] };
+    }
+    // A single op object, e.g. {"kind":"addWidget", ...} or {"say","kind",...}.
+    if (typeof rec.kind === "string") {
+        const { say: _s, message: _m, ...op } = rec;
+        return { say, ops: [op as unknown as CanvasOp] };
+    }
+    // A say-only object (model answered with no actions) — valid, no ops.
+    if (say !== undefined) return { say, ops: [] };
+    return null;
+}
 
 /** Parse an agent reply into {say, ops} — tolerant of fences, surrounding prose,
  *  or a bare ops array. Returns null only if no JSON tool payload is found. */
@@ -91,16 +117,15 @@ function parseCanvasReply(text: string): { say?: string; ops: CanvasOp[] } | nul
     const candidates: string[] = [];
     const fence = text.match(/```(?:json)?\s*\n?([\s\S]*?)```/i);
     if (fence) candidates.push(fence[1]!);
-    const obj = text.match(/\{[\s\S]*"ops"[\s\S]*\}/); // object containing "ops", even unfenced
+    const obj = text.match(/\{[\s\S]*\}/); // any JSON object, even unfenced
     if (obj) candidates.push(obj[0]);
     const arr = text.match(/\[[\s\S]*\]/); // a bare ops array
     if (arr) candidates.push(arr[0]);
     candidates.push(text.trim());
     for (const c of candidates) {
         try {
-            const o = JSON.parse(c.trim()) as { say?: unknown; ops?: unknown } | unknown[];
-            if (Array.isArray(o)) return { ops: o as CanvasOp[] };
-            if (o && typeof o === "object" && "ops" in o) return { say: typeof o.say === "string" ? o.say : undefined, ops: Array.isArray(o.ops) ? (o.ops as CanvasOp[]) : [] };
+            const coerced = coerceReply(JSON.parse(c.trim()));
+            if (coerced) return coerced;
         } catch {
             /* try next candidate */
         }
