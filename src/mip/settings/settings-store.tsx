@@ -46,10 +46,20 @@ function normalizeWidgetDefaults(stored: Record<string, unknown> | undefined): R
         const v = stored?.[t] as { name?: unknown; config?: unknown; w?: unknown; h?: unknown } | undefined;
         if (v && typeof v === "object" && v.config && typeof v.config === "object") {
             // Merge stored config OVER the current defaults so new default keys
-            // (e.g. diagram `source`, button `url`) appear while user edits persist.
+            // (e.g. chart `legendPosition`, content `alignment`, diagram `source`)
+            // appear while user edits persist. The nested `settings` is merged a
+            // level deeper so newly-added setting keys aren't lost.
+            const def = DEFAULT_WIDGET_CONFIGS[t].config;
+            const stored = v.config as Record<string, unknown>;
+            const defS = def.settings as Record<string, unknown> | undefined;
+            const storedS = stored.settings as Record<string, unknown> | undefined;
             out[t] = {
                 name: typeof v.name === "string" ? v.name : DEFAULT_WIDGET_CONFIGS[t].name,
-                config: { ...DEFAULT_WIDGET_CONFIGS[t].config, ...(v.config as Record<string, unknown>) },
+                config: {
+                    ...def,
+                    ...stored,
+                    ...(defS || storedS ? { settings: { ...defS, ...storedS } } : {}),
+                },
             };
         } else if (v && typeof v === "object" && (typeof v.w === "number" || typeof v.h === "number")) {
             out[t] = {
