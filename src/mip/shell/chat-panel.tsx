@@ -26,7 +26,7 @@ type ChatMode = "sidebar" | "chat" | "compact";
 
 interface Message {
     id: string;
-    role: "user" | "assistant" | "tool" | "skills";
+    role: "user" | "assistant" | "tool" | "skills" | "status";
     text: string;
     /** Collapsible body for tool/skills entries (result JSON, skill contents). */
     detail?: string;
@@ -136,6 +136,9 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         });
     const [draft, setDraft] = useState("");
     const [thinking, setThinking] = useState(false);
+    // Context-aware starter suggestions, generated per page on first open.
+    const [suggestions, setSuggestions] = useState<Record<string, string[]>>({});
+    const suggestingRef = useRef<Set<string>>(new Set());
     const [recording, setRecording] = useState(false);
     const [transcribing, setTranscribing] = useState(false);
     const listRef = useRef<HTMLDivElement>(null);
@@ -189,6 +192,40 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             jsonMode,
             signal,
         });
+
+    // On first open of a page (with a model), ask the model for a few short,
+    // context-aware starter suggestions based on this dashboard's content.
+    useEffect(() => {
+        const pid = activePage.id;
+        if (!open || !conn) return;
+        if (suggestions[pid] || suggestingRef.current.has(pid)) return;
+        if ((sessions[pid]?.length ?? 0) > 1) return; // only when fresh (just the intro)
+        suggestingRef.current.add(pid);
+        const widgetList = activePage.widgets.map((w) => `${w.type}${w.title ? ` (${w.title})` : ""}`).join(", ") || "none yet";
+        const ctxText = [
+            `${activePage.kind === "canvas" ? "Freeform AI canvas" : "Dashboard"} titled "${activePage.title}".`,
+            activePage.description ? `Description: ${activePage.description}.` : "",
+            activePage.kind === "canvas" ? "" : `Widgets present: ${widgetList}.`,
+            activePage.systemPrompt ? `Context: ${activePage.systemPrompt}` : "",
+        ]
+            .filter(Boolean)
+            .join(" ");
+        const sys =
+            'Suggest what the user might ask an AI assistant about THIS surface. Reply with ONLY a JSON array of 3–4 short, specific, imperative prompts (≤6 words each), e.g. ["Add a revenue trend chart","Summarize this month\'s metrics"]. No prose.';
+        void (async () => {
+            const res = await brain([{ role: "user", content: ctxText }], sys, true);
+            let arr: string[] = [];
+            try {
+                const m = (res.content ?? "").match(/\[[\s\S]*\]/);
+                if (m) arr = (JSON.parse(m[0]) as unknown[]).filter((x): x is string => typeof x === "string" && !!x.trim()).slice(0, 4);
+            } catch {
+                /* keep empty — fall back to nothing */
+            }
+            suggestingRef.current.delete(pid);
+            setSuggestions((s) => ({ ...s, [pid]: arr }));
+        })();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, conn, activePage.id]);
 
     // The connections this dashboard's agent may use as tools. Undefined list ⇒
     // all connections; otherwise only the dashboard-allowed subset.
@@ -296,7 +333,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             onTool: ({ op, result }) => pushTool(op, result),
             signal: controller.signal,
         });
-        if (controller.signal.aborted) pushAssistant("_Stopped._");
+        if (controller.signal.aborted) setMessages((prev) => [...prev, { id: `st-${Date.now()}`, role: "status", text: "Stopped" }]);
         abortRef.current = null;
         setThinking(false);
     };
@@ -346,7 +383,10 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
 
     if (!open) return null;
 
-    const showSuggestions = !conn && messages.length <= 1;
+    // Chips: model-generated, context-aware suggestions when connected; the
+    // static demo list otherwise. Shown only on a fresh conversation.
+    const chips = conn ? (suggestions[activePage.id] ?? []) : SUGGESTIONS;
+    const showSuggestions = messages.length <= 1 && chips.length > 0;
     const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
 
     // ---- Header (shared by sidebar + chat) ----
@@ -377,6 +417,13 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                     );
                 if (msg.role === "tool" || msg.role === "skills")
                     return <CollapsibleEntry key={msg.id} kind={msg.role} title={msg.text} detail={msg.detail} ok={msg.ok} />;
+                if (msg.role === "status")
+                    return (
+                        <div key={msg.id} className="flex items-center gap-1.5 pl-[34px] text-xs text-tertiary">
+                            <span className="size-2.5 rounded-[2px] border-2 border-current" />
+                            {msg.text}
+                        </div>
+                    );
                 return (
                     <div key={msg.id} className="flex gap-2.5">
                         <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-utility-brand-50">
@@ -401,7 +448,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
 
             {showSuggestions ? (
                 <div className="flex flex-col gap-2 pt-1">
-                    {SUGGESTIONS.map((s) => (
+                    {chips.map((s) => (
                         <button
                             key={s}
                             onClick={() => void sendText(s)}
