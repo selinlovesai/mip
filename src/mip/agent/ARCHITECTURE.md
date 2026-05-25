@@ -126,10 +126,13 @@ finish() → say step-limit note
 - **Balanced-brace parse** → skips stray prose braces; never truncates nested objects; never dumps raw JSON to chat.
 - **Prose nudge** → recovers a narrated reply once.
 - **Op validation** → a malformed op (missing `url`/`query`/`sourceId`/`type`/`id`) returns a typed error and is **not** applied; the model self-corrects.
-- **Mutation guard** → catches "I added a widget" with no mutating op — **suppressed when the user asked a question** ("did you…?").
+- **Mutation guard** → catches "I added a widget" with no mutating op — fires **only when the user asked for a change** (add/edit/remove…), so questions and "confirm you deleted it" don't trip it.
+- **Failure circuit-breaker** → halts after N consecutive all-failed rounds (`maxFailStreak`, default 2) and reports the error — no burning 8 rounds on repeated 404s/validation errors.
+- **Endpoint guidance** → a failed `callApi` returns a `hint` + `didYouMean`/`resourceAreas`, steering the model back to real listed endpoints instead of guessing paths.
 - **No blank output / graceful finish** → assistant text is emitted only when non-blank; if a turn ends saying nothing, the **last tool error** (or a neutral note) is surfaced instead of an empty bubble.
 - **Structured truncation** → tool results shrink field-wise (clip strings, cap arrays) keeping VALID JSON.
 - **Abort** → Stop sets the signal; the loop bails AND the in-flight `fetch`/`testEndpoint`/model call is cancelled.
+- **Canvas isolation** → the iframe runs `allow-scripts` WITHOUT `allow-same-origin` (opaque origin, no host access); the parent bridge ignores any postMessage whose `source` isn't our iframe.
 
 ---
 
@@ -223,6 +226,10 @@ runs the full type build.
 - **Research is soft** — the agent can still reflexively search or invent figures;
   prompt-guided only. A sourcing convention (each data widget records its source)
   would make it auditable.
+- **Cross-turn data memory** — tool results aren't persisted across turns; the
+  agent is told to keep key figures in its `say`. A small rolling tool-result
+  cache (last 2–3) injected into history would make follow-ups ("what was that
+  number?") answerable without re-running the tool.
 - **Canvas agent** shares the loop but its surface ops differ; deferred to a
   dedicated pass.
 - **Token budget** — `always` skills + essential tool docs ship every turn; the

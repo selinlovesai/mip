@@ -8,6 +8,7 @@ import { describe, it, expect } from "vitest";
 import { parseAgentReply, coerceReply, claimsAction } from "./reply";
 import { resolveSkills } from "./config";
 import { dispatch, isMutating, catalogFor, toolIndexFor } from "./tools";
+import { runAgent } from "./agent";
 import type { Skill } from "./skills/types";
 import type { ToolContext } from "./types";
 
@@ -147,6 +148,28 @@ describe("dispatch + validation", () => {
         expect(patched.id).toBe("w1");
         expect(patched.patch?.title).toBe("new");
         expect(patched.patch?.layout?.w).toBe(6);
+    });
+});
+
+describe("runAgent safeguards", () => {
+    it("halts after consecutive all-failed rounds instead of burning all rounds", async () => {
+        let calls = 0;
+        const said: string[] = [];
+        await runAgent({
+            initial: [{ role: "user", content: "fetch stuff" }],
+            surface: "dashboard",
+            system: "sys",
+            jsonMode: true,
+            maxFailStreak: 2,
+            brain: async () => {
+                calls++;
+                return { ok: true, content: '{"say":"trying","ops":[{"kind":"fetch","url":"https://x"}]}' };
+            },
+            ctx: ctx({ fetchPage: async () => ({ ok: false, error: "boom" }) }),
+            say: (t) => said.push(t),
+        });
+        expect(calls).toBeLessThanOrEqual(2); // bailed early, not 8 rounds
+        expect(said.join(" ")).toMatch(/repeated tool errors/);
     });
 });
 

@@ -68,6 +68,9 @@ export function CanvasSurface({ html, pageId }: { html: string; pageId: string }
 
     useEffect(() => {
         const onMessage = (ev: MessageEvent) => {
+            // Only trust messages from OUR sandboxed iframe — ignore any other
+            // window/frame/extension that posts a look-alike __mipCanvas message.
+            if (ev.source !== iframeRef.current?.contentWindow) return;
             const m = ev.data as { __mipCanvas?: boolean; type?: string; id?: string; ok?: boolean; result?: unknown; error?: string; html?: string };
             if (!m || !m.__mipCanvas) return;
             if (m.type === "snapshot") {

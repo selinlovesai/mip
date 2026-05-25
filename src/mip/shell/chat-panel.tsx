@@ -362,8 +362,9 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             );
         };
         const jsonMode = (conn.aiProvider ?? "openai") !== "anthropic";
-        // Treat "did you…?", "what…", "?" etc. as questions → relax the act-nudge.
-        const userAskedQuestion = /\?\s*$/.test(trimmed) || /^(who|what|when|where|why|how|did|do|does|is|are|was|were|can|could|should|would|will)\b/i.test(trimmed);
+        // Only fire the "you didn't act" nudge when the user actually asked for a
+        // CHANGE — so questions and "confirm you deleted it" don't trip it.
+        const userRequestedChange = /\b(add|create|build|make|insert|put|update|change|edit|modif|move|resize|rename|remove|delete|clear|bind|generate|render|draw|plot|chart|graph|show|display|visuali[sz]e|set up)\b/i.test(trimmed);
 
         const pushTool = (op: Record<string, unknown>, result: Record<string, unknown>) =>
             setMessages((prev) => [
@@ -381,7 +382,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             brain,
             ctx: toolContext(pageId, controller.signal, active.map((s) => ({ name: s.name, id: s.id, content: s.content }))),
             say: pushAssistant,
-            userAskedQuestion,
+            userRequestedChange,
             onTool: ({ op, result }) => pushTool(op, result),
             signal: controller.signal,
         });

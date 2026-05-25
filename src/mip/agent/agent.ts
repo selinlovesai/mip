@@ -31,8 +31,12 @@ export interface RunAgentOptions {
     onTool?: (entry: { op: AgentOp; result: OpResult; mutating: boolean }) => void;
     /** Abort the whole loop (Stop button) — cancels the model call and halts. */
     signal?: AbortSignal;
-    /** True when the user's message is a question — relaxes the "you didn't act" nudge. */
-    userAskedQuestion?: boolean;
+    /** True only when the user actually asked for a CHANGE (add/edit/remove/…).
+     *  The "you didn't act" nudge fires only then — so confirming/answering about
+     *  past actions ("did you delete it?", "confirm the chart is gone") won't trip it. */
+    userRequestedChange?: boolean;
+    /** Halt after this many consecutive all-failed rounds (cost/latency safeguard). */
+    maxFailStreak?: number;
     /** Max tool rounds before giving up. */
     maxRounds?: number;
 }
@@ -54,14 +58,16 @@ function summarizeResult(value: unknown, depth = 0): unknown {
 }
 
 export async function runAgent(opts: RunAgentOptions): Promise<void> {
-    const { initial, surface, system, jsonMode, brain, ctx, say, signal, userAskedQuestion } = opts;
+    const { initial, surface, system, jsonMode, brain, ctx, say, signal, userRequestedChange } = opts;
     const buildSystem = typeof system === "function" ? system : () => system;
     const maxRounds = opts.maxRounds ?? 8;
+    const maxFailStreak = opts.maxFailStreak ?? 2;
 
     let msgs = initial.slice();
     let nudged = false; // recovered a non-JSON / refusal reply
     let actNudged = false; // recovered a false "I did it" claim
     let mutated = false; // did any mutating op run this turn?
+    let failStreak = 0; // consecutive rounds where every op failed
     let said = false; // emitted any non-blank assistant text?
     let lastError: string | undefined; // last tool error, for a useful fallback
     /** Show assistant text only when non-blank (no empty bubbles). */
@@ -106,7 +112,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
         if (!parsed.ops.length) {
             // Model ended the turn. If it CLAIMS a change but nothing mutating ran,
             // it only read data — make it actually act.
-            if (claimsAction(parsed.say) && !mutated && !actNudged && !userAskedQuestion) {
+            if (claimsAction(parsed.say) && !mutated && !actNudged && userRequestedChange) {
                 actNudged = true;
                 msgs = [
                     ...msgs,
@@ -129,6 +135,15 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
             if (res && res.ok === false && typeof res.error === "string") lastError = res.error;
             opts.onTool?.({ op, result: res, mutating: mut });
             results.push(res);
+        }
+        // Cost/latency safeguard: bail after N consecutive rounds where nothing
+        // succeeded (e.g. repeated 404s / validation errors), instead of burning
+        // all rounds self-correcting in vain.
+        const anyOk = results.some((r) => (r as OpResult)?.ok !== false);
+        failStreak = anyOk ? 0 : failStreak + 1;
+        if (failStreak >= maxFailStreak) {
+            finish(`I hit repeated tool errors and stopped${lastError ? ` — ${lastError}` : ""}. Check the connection/parameters or rephrase.`);
+            return;
         }
         msgs = [
             ...msgs,
