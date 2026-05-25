@@ -14,7 +14,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, Code02, Database01, Dataflow03, Expand01, GraduationHat01, Loading02, Microphone01, LayoutRight, MessageChatCircle, Minimize01, Send01, Stars01, StopCircle, Tool02, X } from "@untitledui/icons";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { TextArea } from "@/components/base/textarea/textarea";
-import { chat, chatStream, fetchPage, testEndpoint, transcribe } from "@/mip/api";
+import { chat, chatStream, dbAvailable, dbList, dbPut, fetchPage, testEndpoint, transcribe } from "@/mip/api";
 import { canvasBridge } from "./canvas-bridge";
 import { markdownToHtml } from "@/mip/adapters/untitled/markdown";
 import { useSettings, type Connection } from "@/mip/settings/settings-store";
@@ -148,21 +148,46 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
     const [mode, setMode] = useState<ChatMode>("sidebar");
     // Conversations are scoped per page (dashboard/canvas) — switching the active
     // page swaps to that page's own session.
+    // Seed from localStorage (offline/fast), then hydrate from the backend when reachable.
     const [sessions, setSessions] = useState<Record<string, Message[]>>(loadSessions);
 
-    // Persist sessions across refresh (debounced; strips transient streaming bubbles).
+    // Hydrate from the backend `conversations` collection (one row per page id).
+    // Backend wins over the localStorage seed for pages it has.
     useEffect(() => {
+        let cancelled = false;
+        void (async () => {
+            if (!(await dbAvailable())) return; // stay on the localStorage seed
+            const records = await dbList<Message[]>("conversations");
+            if (cancelled || !records.length) return;
+            setSessions((prev) => {
+                const next = { ...prev };
+                for (const r of records) if (Array.isArray(r.data)) next[r.id] = r.data;
+                return next;
+            });
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    // Persist across refresh (debounced; strips transient streaming bubbles).
+    // localStorage is the always-on cache; the active page's transcript is also
+    // pushed to the backend (no-op when the DB is down).
+    useEffect(() => {
+        const pid = activePage.id;
         const t = window.setTimeout(() => {
+            const clean: Record<string, Message[]> = {};
+            for (const [k, v] of Object.entries(sessions)) clean[k] = v.filter((m) => !m.id.startsWith("stream-"));
             try {
-                const clean: Record<string, Message[]> = {};
-                for (const [k, v] of Object.entries(sessions)) clean[k] = v.filter((m) => !m.id.startsWith("stream-"));
                 localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(clean));
             } catch {
                 /* quota / private mode — non-fatal */
             }
-        }, 300);
+            if (clean[pid]) void dbPut("conversations", pid, clean[pid]);
+        }, 400);
         return () => window.clearTimeout(t);
-    }, [sessions]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sessions, activePage.id]);
     const pageId = activePage.id;
     const messages = sessions[pageId] ?? [introMessage];
     const setMessages = (updater: Message[] | ((prev: Message[]) => Message[])) =>
