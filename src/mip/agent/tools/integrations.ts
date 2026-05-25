@@ -94,4 +94,24 @@ const callApiTool: Tool = {
     },
 };
 
-export const integrationTools: Tool[] = [fetchTool, searchTool, callApiTool];
+const findEndpointsTool: Tool = {
+    name: "findEndpoints",
+    doc: "findEndpoints { sourceId, query } — search a SAVED connection's own endpoints by keyword (e.g. 'analytics', 'links', 'blog'); returns matching {method, path}. Use this to pick a REAL path on a big API instead of guessing or scrolling listConnections.",
+    surfaces: ["dashboard", "canvas"],
+    mutating: false,
+    validate: (op) => (op.sourceId != null && String(op.sourceId).trim() ? null : "findEndpoints needs a `sourceId` (from listConnections)."),
+    run: async (op: AgentOp, ctx: ToolContext): Promise<OpResult> => {
+        const src = ctx.resolveConnection(op.sourceId);
+        if (!src) return { kind: "findEndpoints", ok: false, error: `No connection matching "${String(op.sourceId)}".` };
+        const tokens = String(op.query ?? "")
+            .toLowerCase()
+            .split(/[\s/,_-]+/)
+            .filter((t) => t.length >= 2);
+        const eps = src.endpoints ?? [];
+        const hit = (p: string, m: string) => tokens.length === 0 || tokens.some((t) => p.toLowerCase().includes(t) || m.toLowerCase() === t);
+        const endpoints = [...new Set(eps.filter((e) => hit(e.path, e.method)).map((e) => `${e.method} ${e.path}`))].slice(0, 40);
+        return { kind: "findEndpoints", ok: true, query: op.query, count: endpoints.length, endpoints };
+    },
+};
+
+export const integrationTools: Tool[] = [fetchTool, searchTool, callApiTool, findEndpointsTool];

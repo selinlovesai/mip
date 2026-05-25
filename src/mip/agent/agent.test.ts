@@ -115,6 +115,16 @@ describe("dispatch + validation", () => {
         expect(r.ok).toBe(false);
         expect(String(r.error)).toMatch(/injectConnection/);
     });
+    it("findEndpoints searches a connection's own endpoints by keyword", async () => {
+        const conn = { id: "c1", name: "X", type: "rest", baseUrl: "https://x", endpoints: [
+            { method: "GET", path: "/api/v2/analytics/overview" },
+            { method: "GET", path: "/api/v2/analytics/top-pages" },
+            { method: "GET", path: "/api/v2/blog" },
+        ] };
+        const r = await dispatch({ kind: "findEndpoints", sourceId: "c1", query: "analytics" }, "dashboard", ctx({ resolveConnection: () => conn as never }));
+        expect(r.ok).toBe(true);
+        expect(r.endpoints).toEqual(["GET /api/v2/analytics/overview", "GET /api/v2/analytics/top-pages"]);
+    });
     it("callApi failure guides back to real endpoints (no path guessing)", async () => {
         const conn = { id: "c1", name: "X", type: "rest", baseUrl: "https://x", endpoints: [{ method: "GET", path: "/api/v2/internal-links/pages" }, { method: "GET", path: "/api/v2/feed" }] };
         const r = await dispatch({ kind: "callApi", sourceId: "c1", path: "/submissions" }, "dashboard", ctx({

@@ -60,7 +60,7 @@ function summarizeResult(value: unknown, depth = 0): unknown {
 export async function runAgent(opts: RunAgentOptions): Promise<void> {
     const { initial, surface, system, jsonMode, brain, ctx, say, signal, userRequestedChange } = opts;
     const buildSystem = typeof system === "function" ? system : () => system;
-    const maxRounds = opts.maxRounds ?? 8;
+    const maxRounds = opts.maxRounds ?? 12;
     const maxFailStreak = opts.maxFailStreak ?? 2;
 
     let msgs = initial.slice();

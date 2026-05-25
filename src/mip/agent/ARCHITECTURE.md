@@ -158,7 +158,7 @@ ToolContext = {
 ```
 
 Tool inventory:
-- **integrations** (read): `fetch` · `search` · `callApi`.
+- **integrations** (read): `fetch` · `search` · `callApi` · `findEndpoints` (keyword-search a connection's own endpoints, so the agent picks a real path instead of guessing/web-searching).
 - **injection** (mutate): `injectJson` (inline) · `injectConnection` (live bind) · `addWidget` (alias).
 - **core**: `listConnections`/`listWidgets` (read) · `removeWidget`/`updateWidget` (mutate; edit/move/resize) · `loadSkill`/`get`/`setContext` · `describeTool` · canvas DOM ops.
 
