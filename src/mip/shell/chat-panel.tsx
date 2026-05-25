@@ -172,8 +172,10 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
     }, [messages, open, mode, thinking]);
 
-    const pushAssistant = (text: string) =>
+    const pushAssistant = (text: string) => {
+        if (!text || !text.trim()) return; // never render an empty bubble
         setMessages((prev) => [...prev, { id: `a-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "assistant", text }]);
+    };
 
     const tavily = connections.find((c) => /tavily/i.test(c.baseUrl ?? ""));
 

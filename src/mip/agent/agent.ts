@@ -62,6 +62,20 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
     let nudged = false; // recovered a non-JSON / refusal reply
     let actNudged = false; // recovered a false "I did it" claim
     let mutated = false; // did any mutating op run this turn?
+    let said = false; // emitted any non-blank assistant text?
+    let lastError: string | undefined; // last tool error, for a useful fallback
+    /** Show assistant text only when non-blank (no empty bubbles). */
+    const emit = (t?: string) => {
+        if (t && t.trim()) {
+            said = true;
+            say(t);
+        }
+    };
+    /** End the turn — if nothing was said, surface the last error or a neutral note. */
+    const finish = (lastSay?: string) => {
+        emit(lastSay);
+        if (!said) say(lastError ? `I couldn't complete that — ${lastError}` : "I don't have anything to add.");
+    };
 
     for (let round = 0; round < maxRounds; round++) {
         if (signal?.aborted) return;
@@ -85,7 +99,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
                 ];
                 continue;
             }
-            say(text);
+            finish(text);
             return;
         }
 
@@ -101,17 +115,18 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
                 ];
                 continue;
             }
-            if (parsed.say) say(parsed.say);
+            finish(parsed.say);
             return;
         }
 
-        if (parsed.say) say(parsed.say);
+        emit(parsed.say);
         const results: unknown[] = [];
         for (const op of parsed.ops as AgentOp[]) {
             if (signal?.aborted) return;
             const mut = isMutating(String(op.kind), surface);
             if (mut) mutated = true;
             const res = await dispatch(op, surface, ctx);
+            if (res && res.ok === false && typeof res.error === "string") lastError = res.error;
             opts.onTool?.({ op, result: res, mutating: mut });
             results.push(res);
         }
