@@ -1,9 +1,9 @@
 # MIP Agent Architecture
 
-The in-app assistant: an LLM driving a **typed tool loop** over two surfaces (a
-widget **dashboard** and a sandboxed **canvas**). This doc is the modular
-reference — what's connected to what, exactly what data the model sees, and the
-reliability guards that keep it honest.
+The in-app assistant: an LLM driving a **typed, validated tool loop** over two
+surfaces — a widget **dashboard** and a sandboxed **canvas**. This is the
+canonical reference: the layers, the module map, exactly what the model sees each
+turn, the reliability guards, and how to extend it.
 
 ---
 
@@ -18,10 +18,10 @@ reliability guards that keep it honest.
             │            AGENT LOOP             │   agent.ts · runAgent()
             │  brain → parse → dispatch → feed  │
             └───┬───────────────────────┬───────┘
-       composes │ prompt          uses  │ registry (validate → run)
+       composes │ prompt (per round)    │ registry (validate → run)
         ┌───────▼────────┐      ┌────────▼─────────┐
         │     SKILLS     │      │      TOOLS       │
-        │ always | catalog│     │ doc·validate·run │
+        │ always|catalog │      │ doc·validate·run │
         │  (prompt.ts)   │      │  + on-demand idx │
         └────────────────┘      └────────┬─────────┘
                                   acts on │ ToolContext (the only door to the app)
@@ -36,13 +36,13 @@ reliability guards that keep it honest.
 |---|---|---|
 | **Brain** | `chat-panel.tsx brain()` → `api.ts chat()` → `server/main.py /api/chat` | One completion: provider/model, JSON mode, abort signal. |
 | **Agent loop** | `agent.ts runAgent()` | Drive the turn: call brain, parse, validate+run ops, feed back, guard, stop. |
-| **Reply parser** | `reply.ts` | Tolerantly turn model text into `{say, ops[]}`. |
+| **Reply parser** | `reply.ts` | Balanced-brace extraction → `{say, ops[]}`; tolerant of prose/fences/shapes. |
 | **Skills** | `skills/*` + `prompt.ts` | Knowledge: `always` (inline) or `onDemand` (catalog + `loadSkill`). |
 | **Tools** | `tools/*` | Registry: `{name, doc, summary, catalog, mutating, validate, run}`. |
-| **Surfaces** | store / canvas bridge / connections / api | The real things tools read or mutate. |
+| **Surfaces** | store · canvas bridge · connections · api | The real things tools read or mutate. |
 
 Public API: `agent/index.ts`. UI glue (build `ToolContext`, render transcript,
-JSON/API toggle) lives in `shell/chat-panel.tsx`.
+JSON/API toggle, suggestions) lives in `shell/chat-panel.tsx`.
 
 ---
 
@@ -52,15 +52,15 @@ JSON/API toggle) lives in `shell/chat-panel.tsx`.
 agent/
   index.ts        public barrel
   types.ts        AgentOp · OpResult · AgentReply · ApiMsg · Surface · Tool · ToolContext
-  agent.ts        runAgent() — loop + Brain type + RunAgentOptions
-  reply.ts        parseAgentReply / coerceReply / claimsAction
+  agent.ts        runAgent() — the loop + Brain type + RunAgentOptions
+  reply.ts        parseAgentReply (balanced-brace) · coerceReply · claimsAction
   prompt.ts       buildSystemPrompt() · describeDashboard()
   config.ts       PageAgentConfig + resolveSkills()
-  agent.test.ts   unit tests (parser · resolveSkills · dispatch/validation · catalog split)
+  agent.test.ts   vitest unit tests (parser · skills · dispatch/validation · guards)
   tools/
     index.ts      ALL_TOOLS · toolsFor · catalogFor · toolIndexFor · isMutating · dispatch · describeTool
     integrations.ts  fetch · search(Tavily) · callApi(saved connection)
-    injection.ts     injectJson · injectConnection · addWidget(alias)
+    injection.ts     injectJson · injectConnection · addWidget(alias)   (+ BINDABLE_TYPES)
     core.ts          listConnections · listWidgets · removeWidget · updateWidget · loadSkill · get/setContext · canvas DOM ops
   skills/
     index.ts · types.ts (Skill · SkillMode · SkillSurface)
@@ -75,29 +75,29 @@ that runs ops cannot drift.
 
 ## 3. What the model receives each turn
 
-Two inputs to `chat()`:
+Two inputs to `chat()`.
 
-### A. `system` — `buildSystemPrompt(surface, …)`
+### A. `system` — `buildSystemPrompt(surface, …)`, re-built EVERY round
 ```
-1 Context          page.systemPrompt + global assistant prompt   (user-authored)
-2 This dashboard   TITLE · description · current widgets          (describeDashboard — live facts)
+1 Context          page.systemPrompt + global assistant prompt        (user-authored, first)
+2 This dashboard   TITLE · description · widgets as "id · type · title"  (describeDashboard — LIVE)
 3 Role line        "you are the dashboard assistant" / canvas
 4 Skills (always)  resolved skill blocks injected inline
-5 Skill catalog    on-demand skills: name — description  (→ loadSkill)
-6 Tools (always)   full docs for essential tools
-7 More tools       compact index of on-demand tools     (→ describeTool)
-8 Protocol         {say,ops} contract + worked examples
-9 Directive        JSON/API injection mode (appended in chat-panel)
+5 Skill catalog    on-demand skills: name — description                 (→ loadSkill)
+6 Tools (always)   full docs for essential tools (fetch/search/callApi/inject/list)
+7 More tools       compact index of on-demand tools                    (→ describeTool)
+8 Protocol         {say, ops} contract + worked examples
+9 Directive        JSON/API injection mode (composer toggle)
 ```
+Because it's recomputed each round from **live** page state, a widget added in
+round 1 (with its real id) is visible in round 3 — no stale "no widgets" telling
+the model to re-add things.
 
-### B. `messages` — the conversation
+### B. `messages`
 - Prior **user/assistant** turns only (tool/skills/status rows are UI-only, filtered out).
 - Current message, augmented with the readable text of any URLs it contained.
-- Each round appends `assistant(rawReply)` + `user("Tool results: …")`.
-
-> §2 (dashboard facts) closed the old "hallucinated title" bug — the model no
-> longer guesses the page; it's told. The same facts feed the suggestion
-> generator, so they can't disagree.
+- Each round appends `assistant(rawReply)` + `user("Tool results: …")` (results
+  shrunk field-wise, see §4).
 
 ---
 
@@ -105,63 +105,70 @@ Two inputs to `chat()`:
 
 ```
 for round in 0..8:
-  signal.aborted? ───────────────────────────► return            (Stop button)
-  reply = brain(messages, system, jsonMode, signal)
-  parsed = parseAgentReply(reply)              (reply.ts — tolerant)
-  ├ no JSON?  → nudge once "reply ONLY {say,ops}" else show; return
-  ├ ops==[] ? → claims action but nothing mutated? → nudge "emit the op"; else show; return
+  signal.aborted? ─────────────────► return                       (Stop button)
+  reply = brain(messages, buildSystem(), jsonMode, signal)         ← system rebuilt per round
+  parsed = parseAgentReply(reply)                                  (balanced-brace, tolerant)
+  ├ no JSON?   → nudge once "reply ONLY {say,ops}"; else finish(text); return
+  ├ ops==[] ?  → claims action & nothing mutated & NOT a question? → nudge; else finish(say); return
   └ ops:
-      show say
+      emit(say)                                  (non-blank only)
       for op in ops:
           mutated |= isMutating(op.kind)
-          result  = dispatch(op, surface, ctx)  ── validate(op) → run(op,ctx)
-          onTool(op,result)                      ── collapsible transcript row
-      messages += assistant(reply) + user("Tool results: …")
-say("step limit reached")
+          result  = dispatch(op, surface, ctx)   ── validate(op) → run(op,ctx)
+          lastError = result.error (if failed)
+          onTool(op,result)                       ── collapsible transcript row
+      messages += assistant(reply) + user("Tool results: " + summarizeResult(results))
+finish() → say step-limit note
 ```
 
-Reliability guards (all live):
+### Reliability guards (all live)
 - **JSON mode** (OpenAI-compatible) → no prose refusals.
-- **Tolerant parse** → never dumps raw JSON to chat.
+- **Balanced-brace parse** → skips stray prose braces; never truncates nested objects; never dumps raw JSON to chat.
 - **Prose nudge** → recovers a narrated reply once.
-- **Mutation guard** → catches "I added a widget" with no mutating op.
-- **Op validation** → a malformed op returns a typed error and is *not* applied; the model self-corrects.
-- **Abort signal** → Stop halts mid-flight (cancels the in-flight model call).
+- **Op validation** → a malformed op (missing `url`/`query`/`sourceId`/`type`/`id`) returns a typed error and is **not** applied; the model self-corrects.
+- **Mutation guard** → catches "I added a widget" with no mutating op — **suppressed when the user asked a question** ("did you…?").
+- **No blank output / graceful finish** → assistant text is emitted only when non-blank; if a turn ends saying nothing, the **last tool error** (or a neutral note) is surfaced instead of an empty bubble.
+- **Structured truncation** → tool results shrink field-wise (clip strings, cap arrays) keeping VALID JSON.
+- **Abort** → Stop sets the signal; the loop bails AND the in-flight `fetch`/`testEndpoint`/model call is cancelled.
 
 ---
 
 ## 5. Tools registry + ToolContext
 
-`dispatch(op, surface, ctx)`: look up by `op.kind` → check surface → `validate(op)`
-→ `run(op, ctx)`. Everything a tool needs from the app arrives via **`ToolContext`**
-(rebuilt each send), keeping tools React/store-free and unit-testable:
+`dispatch(op, surface, ctx)`: resolve by `op.kind` → check surface → `validate(op)`
+→ `run(op, ctx)`. Everything a tool needs arrives via **`ToolContext`**, rebuilt
+each send and **pinned to one `pageId`** (captured at send), so a dashboard switch
+mid-run can't cross-write:
 
 ```
 ToolContext = {
-  fetchPage · testEndpoint                         web / proxy
-  connections · resolveConnection · tavily         saved APIs (dashboard-allowed subset)
-  canvasSend                                       sandboxed iframe bridge
-  listWidgets · getWidget · addWidget · updateWidget · removeWidget · widgetSize   store
-  getContext · setContext                          page system-prompt note
-  getSkill                                         on-demand skill lookup (loadSkill)
-  apiCalls[]                                       turn scratch (strict-REST guard)
-  injectMode                                       JSON/API toggle (enforced)
+  fetchPage · testEndpoint              web / proxy (carry the AbortSignal)
+  connections · resolveConnection · tavily   saved APIs (dashboard-allowed subset)
+  canvasSend                            sandboxed iframe bridge
+  listWidgets · getWidget · addWidget · updateWidget · removeWidget · widgetSize
+                                        store — reads via LIVE getPage(pageId), writes target pageId
+  getContext · setContext               page system-prompt note
+  getSkill                              on-demand skill lookup (loadSkill)
+  apiCalls[]                            turn scratch (strict-REST guard)
+  injectMode                            JSON/API toggle (enforced)
 }
 ```
 
 Tool inventory:
 - **integrations** (read): `fetch` · `search` · `callApi`.
 - **injection** (mutate): `injectJson` (inline) · `injectConnection` (live bind) · `addWidget` (alias).
-- **core**: `listConnections`/`listWidgets` (read) · `removeWidget`/`updateWidget` (mutate, edit/move/resize) · `loadSkill`/`get`/`setContext` · `describeTool` · canvas DOM ops.
+- **core**: `listConnections`/`listWidgets` (read) · `removeWidget`/`updateWidget` (mutate; edit/move/resize) · `loadSkill`/`get`/`setContext` · `describeTool` · canvas DOM ops.
 
-**On-demand tool catalog:** tools flagged `catalog:true` (editing, context, loadSkill)
-are shown as a compact one-liner index; the agent expands one with
-`describeTool { name }` before use. Essentials (fetch/search/callApi/inject/list)
-keep full docs inline — lean prompt, full discoverability.
+**On-demand tool catalog:** tools flagged `catalog:true` (editing, context,
+loadSkill) appear as a one-line index; the agent expands one with
+`describeTool { name }` before use. Essentials keep full docs inline — lean
+prompt, full discoverability.
 
-**Injection enforcement:** `injectMode` is honored in `injectJson.run` — `api`
-hard-refuses (→ use `injectConnection`), `json` relaxes the post-`callApi`
-strict-REST guard, `auto` keeps the default (API data → bind).
+**Injection enforcement** (data widgets only — `BINDABLE_TYPES`: kpi, progress,
+charts, table, list, detail):
+- `injectMode === "api"` → `injectJson` hard-refused for data widgets (→ `injectConnection`).
+- a `callApi` happened this turn → `injectJson` refused for data widgets (snapshotting live data is wrong); relaxed under `json` mode.
+- static/utility widgets (header, markdown, card, CTA, image…) are **always** allowed via `injectJson`.
 
 ---
 
@@ -175,64 +182,49 @@ strict-REST guard, `auto` keeps the default (API data → bind).
 | Context | `page.systemPrompt` (Dashboard Settings → Agent) |
 | Injection mode | composer JSON/API toggle → `ctx.injectMode` |
 
+Configured in **Settings** (global assistant, Skills library, Widgets defaults)
+and **Dashboard Settings → Agent** (per-page model/skills/connections/context).
+
 ---
 
 ## 7. End-to-end: "show the latest posts from the Boudoir API" (API mode)
 
 ```
 chat-panel.sendText
-  ├ system = context + THIS dashboard facts + skills(+catalog) + tools(+index) + protocol + "API mode" directive
-  ├ ToolContext (allowed connections, store actions, apiCalls=[], injectMode="api")
+  ├ pageId = activePage.id                                    (pin for the run)
+  ├ system = () => context + LIVE dashboard facts + skills(+catalog) + tools(+index) + protocol + "API mode"
+  ├ ToolContext(pageId, signal, activeSkills)                 (live getPage, page-targeted writes)
   └ runAgent:
       r1  {ops:[listConnections]}                 → ids + endpoints
       r2  {ops:[callApi sourceId,path]}            → JSON shape (apiCalls += …)
       r3  {ops:[injectConnection …map…]}           → bound widget, first-fit placement
-          (if it tried injectJson → validate/guard refuses → "use injectConnection")
-      r4  {ops:[]}                                 → done
-   each op → collapsible transcript row
+          (tries injectJson? → validate/guard refuses → "use injectConnection")
+      r4  {ops:[]}                                 → finish(say)
+   each op → collapsible transcript row; failures surface a typed error
 ```
 
 ---
 
 ## 8. Tests
 
-`npm test` (vitest) covers the pure core in `agent.test.ts`:
-parser shapes (fenced/bare/alt-key/single-op/no-dump/prose), `claimsAction`,
-`resolveSkills` (builtins on, disable/enable, surface filter), and `dispatch`
-(unknown op, cross-surface block, validation, API-mode refusal, mutation flags,
-catalog split). Run `npm run typecheck` for the full type build.
+`npm test` (vitest, `agent.test.ts`) covers the pure core: parser shapes
+(fenced / balanced / alt-key / single-op / no-dump / prose / stray-brace),
+`claimsAction`, `resolveSkills` (builtins on, disable/enable, surface filter), and
+`dispatch` (unknown op, cross-surface block, validation, API-mode refusal, static
+exemption, `updateWidget` merge, mutation flags, catalog split). `npm run typecheck`
+runs the full type build.
 
 ---
 
-## 9. Hardening (from code review)
-
-- **Live facts each round** — the `system` prompt is a thunk re-evaluated every
-  round from live page state, so widgets added mid-turn aren't stale (no more
-  duplicate/overlapping widgets).
-- **Widget IDs in facts** — `describeDashboard` lists `id · type · title`, so the
-  agent can edit/remove without a `listWidgets` round.
-- **Page-pinned, race-safe** — the run captures `pageId`; reads use live `getPage`
-  and writes target that page, so switching dashboards mid-run can't cross-write.
-- **Structured truncation** — tool results are shrunk field-wise (clip long
-  strings, cap arrays) keeping VALID JSON, instead of a raw `.slice(4000)`.
-- **Balanced-brace parsing** — `parseAgentReply` scans balanced `{…}`/`[…]`
-  regions (skips stray prose braces; never truncates nested objects).
-- **Question-aware nudge** — the "you didn't act" nudge is suppressed when the
-  user asked a question ("did you…?").
-- **Static-widget exemption** — API-mode / strict-REST guards apply only to
-  data-bearing widgets; headers/text/CTAs stay free as injectJson.
-- **Abort propagation** — `fetch`/`testEndpoint` receive the AbortSignal, so Stop
-  cancels the in-flight network call, not just the loop.
-
-## 10. Known gaps / next
+## 9. Known gaps / next
 
 - **Secrets not persisted** (by design) — model lists / callApi / search degrade
   after reload until keys are re-entered. Needs encrypted-at-rest storage (backend).
-- **Research is soft** — the agent *can* still invent figures; only prompt-guided.
-  A sourcing convention (every data widget records where numbers came from) would
-  make it auditable.
-- **Canvas agent** shares the loop but its surface ops differ; deferred for a
+- **Research is soft** — the agent can still reflexively search or invent figures;
+  prompt-guided only. A sourcing convention (each data widget records its source)
+  would make it auditable.
+- **Canvas agent** shares the loop but its surface ops differ; deferred to a
   dedicated pass.
-- **Token budget** — `always` skills + essential tool docs still ship every turn;
-  the on-demand catalog mechanism could extend further if needed.
+- **Token budget** — `always` skills + essential tool docs ship every turn; the
+  on-demand catalog could extend further if needed.
 ```
