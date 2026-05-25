@@ -52,6 +52,7 @@ const CANVAS_SYSTEM = [
     "Web tools (run outside the canvas, results returned to you):",
     "fetch { url }                          — fetch a web page's readable text (returns {title, text})",
     "search { query }                       — web search via the connected Tavily app (returns results: title/url/content)",
+    "callApi { sourceId, path?, method?, params?, body? } — call a SAVED connection's endpoint with its baseUrl + auth (returns {status, data}); use for named/authed APIs instead of guessing a URL with fetch",
     "Freedom: injected HTML may use any CSS/JS and load external libraries via CDN (fonts, Tailwind Play CDN, chart libraries…).",
     "Design system: tokens are available as CSS vars on :root — --color-brand-600, --color-bg-primary, --color-text-primary, --color-text-secondary, --color-border-secondary, --radius-lg, --shadow-md, --font-body. Use them when asked to match the app.",
     "Workflow: when the user asks to base the canvas on real content (a site, page, or search), CALL search/fetch FIRST and build from the returned content — never invent it.",
@@ -66,7 +67,8 @@ const DASHBOARD_SYSTEM = [
     "Tools (op `kind` + args):",
     "fetch { url }                          — read a web page's readable text (returns {title, text})",
     "search { query }                       — web search via the connected Tavily app (returns results: title/url/content)",
-    "listConnections {}                     — list saved data sources/APIs as [{id, name, type, baseUrl, endpoints:[{method,path}]}]. Use this to FIND an API before binding a widget to it.",
+    "listConnections {}                     — list saved data sources/APIs as [{id, name, type, baseUrl, endpoints:[{method,path}]}]. Use this to FIND an API before calling or binding it.",
+    "callApi { sourceId, path?, method?, params?, body? } — call a SAVED connection's endpoint using its baseUrl + auth (returns {status, data}). Use this for any named/saved API (e.g. 'the Boudoir API') — do NOT guess a public URL with `fetch` for those.",
     "listWidgets {}                         — list the current widgets on this page as [{id, type, title}]",
     "addWidget { type, title?, settings?, data?, w?, h? } — add a widget. Common types & their settings:",
     "    kpi        settings:{ value, delta?, deltaLabel?, unit?, valueFormat? }",
@@ -80,7 +82,7 @@ const DASHBOARD_SYSTEM = [
     "    · `map` is JSONPath ($.a.b[0].c) from the response: charts → { series:\"$.path.to.array\" } (+ settings.labelKey / settings.valueKey for the fields); kpi → { value:\"$.x\", delta:\"$.y\" }.",
     "    · set refreshMs (e.g. 10000) to poll. A bound widget fetches live and ignores static settings once data loads.",
     "removeWidget { id }                    — remove a widget by id (use listWidgets first)",
-    "Workflow: to build a widget from an API, call listConnections FIRST to find the right sourceId + endpoint, then addWidget with a `data` binding. For one-off numbers from the open web, fetch/search and put the RETURNED values into settings. Never invent figures or connection ids.",
+    "Workflow: when the user names a SAVED api/connection, call listConnections FIRST, then callApi to read it (inspect the shape) and/or addWidget with a `data` binding to it (sourceId + the same path) for live data — never `fetch` a guessed URL for a saved API. For one-off numbers from the open web, use fetch/search and put the RETURNED values into settings. Never invent figures or connection ids.",
     "When the request is just a question (no dashboard change), answer it in `say` with ops:[]. Markdown is supported in `say`.",
     'Protocol: EVERY reply is ONE JSON object with EXACTLY two keys: "say" (string) and "ops" (array). Put EVERY action inside the "ops" array as {"kind":"…", …}. Do NOT invent other top-level keys, and do NOT return data/widgets at the top level — only {"say", "ops"}.',
     'You receive each op\'s result and may continue. When the dashboard matches the request (or you\'ve answered a question), reply with {"say":"…","ops":[]} and STOP. Describing an action in prose does NOTHING — only ops change the dashboard.',
@@ -249,6 +251,26 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                 ...(r.ok && body?.results ? { results: body.results.map((x) => ({ title: x.title, url: x.url, content: (x.content ?? "").slice(0, 400) })) } : {}),
                 ...(r.ok ? {} : { error: typeof r.error === "string" ? r.error : `status ${r.status ?? "?"}` }),
             };
+        }
+        // Call a SAVED connection's endpoint (with its baseUrl + auth) through the
+        // backend proxy — for authed APIs that anonymous `fetch` can't reach.
+        if (kind === "callApi") {
+            const src = getConnection(String(op.sourceId ?? ""));
+            if (!src) return { kind, ok: false, error: `No connection with id "${String(op.sourceId)}". Call listConnections for valid ids.` };
+            const path = typeof op.path === "string" ? op.path : (src.endpoints?.[0]?.path ?? "/");
+            const base = (src.baseUrl ?? "").replace(/\/$/, "");
+            let url = /^https?:\/\//.test(path) ? path : base + (path.startsWith("/") ? path : `/${path}`);
+            const params = op.params as Record<string, unknown> | undefined;
+            if (params && Object.keys(params).length) {
+                const qs = new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)]));
+                url += (url.includes("?") ? "&" : "?") + qs.toString();
+            }
+            const headers: Record<string, string> = {};
+            for (const h of src.headers ?? []) if (h.key) headers[h.key] = h.value;
+            if (src.auth?.type === "bearer" && src.auth.token) headers["Authorization"] = `Bearer ${src.auth.token}`;
+            else if (src.auth?.type === "apiKeyHeader" && src.auth.keyName) headers[src.auth.keyName] = src.auth.keyValue ?? "";
+            const r = await testEndpoint({ method: typeof op.method === "string" ? op.method : "GET", url, headers, body: op.body });
+            return { kind, ok: r.ok, status: r.status, ...(r.ok ? { data: JSON.stringify(r.body).slice(0, 4000) } : { error: typeof r.error === "string" ? r.error : `status ${r.status ?? "?"}` }) };
         }
         return null;
     };
