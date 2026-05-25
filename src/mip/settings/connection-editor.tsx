@@ -5,7 +5,7 @@
  */
 
 import { useMemo, useState } from "react";
-import { Plus, Trash01, X } from "@untitledui/icons";
+import { Check, Plus, Trash01, X } from "@untitledui/icons";
 import { Button } from "@/components/base/buttons/button";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { CloseButton } from "@/components/base/buttons/close-button";
@@ -111,6 +111,7 @@ export function ConnectionEditor({ id, onClose }: { id: string; onClose: () => v
     const [importMsg, setImportMsg] = useState<string | null>(null);
     const [test, setTest] = useState<TestState | null>(null);
     const [showPreview, setShowPreview] = useState(false);
+    const [saved, setSaved] = useState(false);
 
     const patch = (p: Partial<Connection>) => setDraft((d) => ({ ...d, ...p }));
     const patchAuth = (p: Partial<NonNullable<Connection["auth"]>>) =>
@@ -224,6 +225,10 @@ export function ConnectionEditor({ id, onClose }: { id: string; onClose: () => v
     const save = () => {
         const { id: _id, ...rest } = draft;
         updateConnection(id, rest);
+        // The store persists to localStorage on change; surface a confirmation so
+        // the action isn't silent.
+        setSaved(true);
+        window.setTimeout(() => setSaved(false), 2500);
     };
 
     const handleTest = async () => {
@@ -537,6 +542,12 @@ export function ConnectionEditor({ id, onClose }: { id: string; onClose: () => v
                 <Button color="primary" size="md" onClick={save}>
                     Save connection
                 </Button>
+                {saved && (
+                    <span className="flex items-center gap-1 text-sm text-success-primary">
+                        <Check className="size-4" />
+                        Saved
+                    </span>
+                )}
                 <Button color="secondary" size="md" onClick={handleTest}>
                     Test selected endpoint
                 </Button>
