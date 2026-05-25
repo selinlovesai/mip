@@ -38,6 +38,71 @@ export async function chat(args: {
     }
 }
 
+/** Streaming chat: POSTs to /api/chat/stream and calls `onDelta` with the
+ *  accumulated text as SSE chunks arrive. Resolves with the final content.
+ *  Falls back to a clear error on abort/transport failure. */
+export async function chatStream(
+    args: {
+        provider: string;
+        baseUrl: string;
+        apiKey?: string;
+        model: string;
+        messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
+        system?: string;
+        jsonMode?: boolean;
+        signal?: AbortSignal;
+    },
+    onDelta: (accumulated: string) => void,
+): Promise<ChatResult> {
+    const { signal, ...payload } = args;
+    try {
+        const res = await fetch(`${BASE}/api/chat/stream`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(payload),
+            signal,
+        });
+        if (!res.ok || !res.body) return { ok: false, status: res.status, error: `Stream failed (${res.status}).` };
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+        let content = "";
+        let streamError: string | undefined;
+        for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            const events = buf.split("\n\n");
+            buf = events.pop() ?? ""; // keep the trailing partial event
+            for (const ev of events) {
+                const line = ev.split("\n").find((l) => l.startsWith("data:"));
+                if (!line) continue;
+                const data = line.slice(5).trim();
+                if (data === "[DONE]") continue;
+                let piece: unknown;
+                try {
+                    piece = JSON.parse(data);
+                } catch {
+                    continue;
+                }
+                if (piece && typeof piece === "object" && "__error" in piece) {
+                    streamError = String((piece as { __error: unknown }).__error);
+                    continue;
+                }
+                if (typeof piece === "string") {
+                    content += piece;
+                    onDelta(content);
+                }
+            }
+        }
+        if (streamError && !content) return { ok: false, error: streamError };
+        return { ok: true, content };
+    } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return { ok: false, error: "Stopped." };
+        return { ok: false, error: err instanceof Error ? err.message : "Backend unreachable." };
+    }
+}
+
 export interface TestResult {
     ok: boolean;
     status?: number;

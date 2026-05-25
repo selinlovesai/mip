@@ -34,7 +34,7 @@ turn, the reliability guards, and how to extend it.
 
 | Layer | Module | Responsibility |
 |---|---|---|
-| **Brain** | `chat-panel.tsx brain()` → `api.ts chat()` → `server/main.py /api/chat` | One completion: provider/model, JSON mode, abort signal. |
+| **Brain** | `chat-panel.tsx brain()` → `api.ts chat()`/`chatStream()` → `server/main.py /api/chat` `+ /api/chat/stream` (SSE) | One completion. Streams token deltas; JSON mode; abort signal. |
 | **Agent loop** | `agent.ts runAgent()` | Drive the turn: call brain, parse, validate+run ops, feed back, guard, stop. |
 | **Reply parser** | `reply.ts` | Balanced-brace extraction → `{say, ops[]}`; tolerant of prose/fences/shapes. |
 | **Skills** | `skills/*` + `prompt.ts` | Knowledge: `always` (inline) or `onDemand` (catalog + `loadSkill`). |
@@ -133,6 +133,7 @@ finish() → say step-limit note
 - **Structured truncation** → tool results shrink field-wise (clip strings, cap arrays) keeping VALID JSON.
 - **Abort** → Stop sets the signal; the loop bails AND the in-flight `fetch`/`testEndpoint`/model call is cancelled.
 - **Canvas isolation** → the iframe runs `allow-scripts` WITHOUT `allow-same-origin` (opaque origin, no host access); the parent bridge ignores any postMessage whose `source` isn't our iframe.
+- **Streaming** → replies stream over SSE (`/api/chat/stream`); `runAgent` extracts the partial `say` (`extractPartialSay`) each chunk and fills a live bubble that's finalized into a committed message (or cleared if the round emits no text). Stop aborts the stream.
 
 ---
 

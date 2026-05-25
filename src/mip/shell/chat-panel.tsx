@@ -14,7 +14,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, Code02, Database01, Dataflow03, Expand01, GraduationHat01, Loading02, Microphone01, LayoutRight, MessageChatCircle, Minimize01, Send01, Stars01, StopCircle, Tool02, X } from "@untitledui/icons";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { TextArea } from "@/components/base/textarea/textarea";
-import { chat, fetchPage, testEndpoint, transcribe } from "@/mip/api";
+import { chat, chatStream, fetchPage, testEndpoint, transcribe } from "@/mip/api";
 import { canvasBridge } from "./canvas-bridge";
 import { markdownToHtml } from "@/mip/adapters/untitled/markdown";
 import { useSettings, type Connection } from "@/mip/settings/settings-store";
@@ -172,8 +172,36 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
     }, [messages, open, mode, thinking]);
 
+    // The live streaming bubble (one at a time): onStream fills it token-by-token,
+    // pushAssistant finalizes it into a committed message, onStreamClear drops it.
+    const streamRef = useRef<string | null>(null);
+    const onStream = (partial: string) => {
+        if (!streamRef.current) {
+            if (!partial) return; // don't create an empty preview
+            const id = `stream-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+            streamRef.current = id;
+            setMessages((prev) => [...prev, { id, role: "assistant", text: partial }]);
+        } else {
+            const id = streamRef.current;
+            setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, text: partial } : m)));
+        }
+    };
+    const onStreamClear = () => {
+        const id = streamRef.current;
+        if (!id) return;
+        streamRef.current = null;
+        setMessages((prev) => prev.filter((m) => m.id !== id));
+    };
+
     const pushAssistant = (text: string) => {
         if (!text || !text.trim()) return; // never render an empty bubble
+        const id = streamRef.current;
+        if (id) {
+            // Finalize the streaming preview into this committed message.
+            streamRef.current = null;
+            setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, text } : m)));
+            return;
+        }
         setMessages((prev) => [...prev, { id: `a-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "assistant", text }]);
     };
 
@@ -194,8 +222,8 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
 
     // The Brain — one chat completion. JSON mode (OpenAI-compatible only) forces an
     // object reply so the model can't refuse with prose.
-    const brain: Brain = (msgs, system, jsonMode, signal) =>
-        chat({
+    const brain: Brain = (msgs, system, jsonMode, signal, onDelta) => {
+        const args = {
             provider: conn!.aiProvider ?? "openai",
             baseUrl: conn!.baseUrl ?? "",
             apiKey: conn!.auth?.token ?? conn!.auth?.keyValue,
@@ -204,7 +232,9 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             system,
             jsonMode,
             signal,
-        });
+        };
+        return onDelta ? chatStream(args, onDelta) : chat(args);
+    };
 
     // On first open of a page (with a model), ask the model for a few short,
     // context-aware starter suggestions based on this dashboard's content.
@@ -384,6 +414,8 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             say: pushAssistant,
             userRequestedChange,
             onTool: ({ op, result }) => pushTool(op, result),
+            onStream,
+            onStreamClear,
             signal: controller.signal,
         });
         if (controller.signal.aborted) setMessages((prev) => [...prev, { id: `st-${Date.now()}`, role: "status", text: "Stopped" }]);
@@ -490,7 +522,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                 );
             })}
 
-            {thinking ? (
+            {thinking && !messages.some((m) => m.id.startsWith("stream-")) ? (
                 <div className="flex gap-2.5">
                     <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-utility-brand-50">
                         <SparkleIcon className="size-3.5 text-utility-brand-700" />

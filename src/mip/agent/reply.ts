@@ -78,6 +78,18 @@ export function parseAgentReply(text: string): AgentReply | null {
     return null;
 }
 
+/** Pull the (possibly incomplete) `say` value out of a streaming JSON reply, so
+ *  the message can be shown token-by-token before the full object arrives. */
+export function extractPartialSay(text: string): string {
+    const m = text.match(/"say"\s*:\s*"((?:\\.|[^"\\])*)/);
+    if (!m) return "";
+    try {
+        return JSON.parse(`"${m[1]}"`) as string; // complete + valid escapes
+    } catch {
+        return m[1]!.replace(/\\n/g, "\n").replace(/\\t/g, "\t").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+    }
+}
+
 /** Heuristic: does `say` claim a surface-changing action? Used by the agent loop
  *  to catch "I added a widget" when no mutating op actually ran. */
 export function claimsAction(say?: string): boolean {

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { parseAgentReply, coerceReply, claimsAction } from "./reply";
+import { parseAgentReply, coerceReply, claimsAction, extractPartialSay } from "./reply";
 import { resolveSkills } from "./config";
 import { dispatch, isMutating, catalogFor, toolIndexFor } from "./tools";
 import { runAgent } from "./agent";
@@ -39,6 +39,18 @@ describe("parseAgentReply", () => {
     it("ignores a stray brace in prose before the real object", () => {
         const r = parseAgentReply('I use {curly} braces. {"say":"x","ops":[]}');
         expect(r).toEqual({ say: "x", ops: [] });
+    });
+});
+
+describe("extractPartialSay (streaming)", () => {
+    it("reads an incomplete say as the JSON streams in", () => {
+        expect(extractPartialSay('{"say":"Adding a char')).toBe("Adding a char");
+    });
+    it("reads a complete say with escapes", () => {
+        expect(extractPartialSay('{"say":"Line 1\\nLine 2","ops":[]}')).toBe("Line 1\nLine 2");
+    });
+    it("returns empty before say appears", () => {
+        expect(extractPartialSay('{"op')).toBe("");
     });
 });
 

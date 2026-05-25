@@ -10,11 +10,12 @@
 
 import type { ChatResult } from "../api";
 import { dispatch, isMutating } from "./tools";
-import { parseAgentReply, claimsAction } from "./reply";
+import { parseAgentReply, claimsAction, extractPartialSay } from "./reply";
 import type { AgentOp, ApiMsg, OpResult, Surface, ToolContext } from "./types";
 
-/** The Brain: a single chat completion call (cancellable via signal). */
-export type Brain = (messages: ApiMsg[], system?: string, jsonMode?: boolean, signal?: AbortSignal) => Promise<ChatResult>;
+/** The Brain: a single chat completion. `onDelta` (when given) receives the
+ *  accumulated raw content as it streams. Cancellable via signal. */
+export type Brain = (messages: ApiMsg[], system?: string, jsonMode?: boolean, signal?: AbortSignal, onDelta?: (accumulated: string) => void) => Promise<ChatResult>;
 
 export interface RunAgentOptions {
     initial: ApiMsg[];
@@ -29,6 +30,10 @@ export interface RunAgentOptions {
     say: (text: string) => void;
     /** Report each tool call + its result (for the transcript's tool entries). */
     onTool?: (entry: { op: AgentOp; result: OpResult; mutating: boolean }) => void;
+    /** Live partial `say` as the reply streams (for the streaming bubble). */
+    onStream?: (partialSay: string) => void;
+    /** Drop the in-progress streaming bubble (round produced no committed text). */
+    onStreamClear?: () => void;
     /** Abort the whole loop (Stop button) — cancels the model call and halts. */
     signal?: AbortSignal;
     /** True only when the user actually asked for a CHANGE (add/edit/remove/…).
@@ -79,15 +84,22 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
     };
     /** End the turn — if nothing was said, surface the last error or a neutral note. */
     const finish = (lastSay?: string) => {
-        emit(lastSay);
+        if (lastSay && lastSay.trim()) emit(lastSay);
+        else opts.onStreamClear?.();
         if (!said) say(lastError ? `I couldn't complete that — ${lastError}` : "I don't have anything to add.");
     };
 
+    const onDelta = opts.onStream ? (acc: string) => opts.onStream!(extractPartialSay(acc)) : undefined;
+
     for (let round = 0; round < maxRounds; round++) {
         if (signal?.aborted) return;
-        const result = await brain(msgs, buildSystem(), jsonMode, signal);
-        if (signal?.aborted) return; // stopped while the model was responding
+        const result = await brain(msgs, buildSystem(), jsonMode, signal, onDelta);
+        if (signal?.aborted) {
+            opts.onStreamClear?.();
+            return; // stopped while the model was responding
+        }
         if (!result.ok) {
+            opts.onStreamClear?.();
             say(`**Couldn't reach the model.**\n\n${typeof result.error === "string" ? result.error : "Request failed."}`);
             return;
         }
@@ -98,6 +110,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
             // Pure prose / refusal — nudge once to emit tools.
             if (!nudged) {
                 nudged = true;
+                opts.onStreamClear?.();
                 msgs = [
                     ...msgs,
                     { role: "assistant", content: text },
@@ -114,6 +127,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
             // it only read data — make it actually act.
             if (claimsAction(parsed.say) && !mutated && !actNudged && userRequestedChange) {
                 actNudged = true;
+                opts.onStreamClear?.();
                 msgs = [
                     ...msgs,
                     { role: "assistant", content: text },
@@ -125,7 +139,8 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
             return;
         }
 
-        emit(parsed.say);
+        if (parsed.say && parsed.say.trim()) emit(parsed.say);
+        else opts.onStreamClear?.();
         const results: unknown[] = [];
         for (const op of parsed.ops as AgentOp[]) {
             if (signal?.aborted) return;

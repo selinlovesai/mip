@@ -22,10 +22,13 @@ import os
 import re
 import tempfile
 
+import json
+
 import httpx
 from fastapi import Body, FastAPI, File, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 import db
@@ -125,6 +128,75 @@ async def chat(req: ChatRequest) -> dict[str, Any]:
             return {"ok": True, "content": content, "raw": data}
     except Exception as exc:  # noqa: BLE001 - surface the error to the client
         return {"ok": False, "error": str(exc)}
+
+
+@app.post("/api/chat/stream")
+async def chat_stream(req: ChatRequest) -> StreamingResponse:
+    """Stream a completion as Server-Sent Events. Each event is `data: <text-delta>`
+    (the delta JSON-encoded); the stream ends with `data: [DONE]`. Works for
+    OpenAI-compatible providers and Anthropic."""
+
+    async def gen():
+        try:
+            async with httpx.AsyncClient(timeout=120) as client:
+                if req.provider == "anthropic":
+                    url = req.baseUrl.rstrip("/") + "/v1/messages"
+                    headers = {"x-api-key": req.apiKey or "", "anthropic-version": "2023-06-01", "content-type": "application/json"}
+                    payload: dict[str, Any] = {"model": req.model, "max_tokens": 1024, "stream": True, "messages": [m.model_dump() for m in req.messages]}
+                    if req.system:
+                        payload["system"] = req.system
+                    async with client.stream("POST", url, headers=headers, json=payload) as resp:
+                        if resp.status_code >= 400:
+                            body = (await resp.aread()).decode("utf-8", "ignore")
+                            yield f"data: {json.dumps({'__error': body})}\n\n"
+                            return
+                        async for line in resp.aiter_lines():
+                            if not line.startswith("data:"):
+                                continue
+                            chunk = line[5:].strip()
+                            try:
+                                evt = json.loads(chunk)
+                            except Exception:
+                                continue
+                            if evt.get("type") == "content_block_delta":
+                                t = evt.get("delta", {}).get("text", "")
+                                if t:
+                                    yield f"data: {json.dumps(t)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+
+                # OpenAI-compatible
+                url = _normalize_openai_url(req.baseUrl)
+                headers = {"content-type": "application/json"}
+                if req.apiKey:
+                    headers["authorization"] = f"Bearer {req.apiKey}"
+                msgs = ([{"role": "system", "content": req.system}] if req.system else []) + [m.model_dump() for m in req.messages]
+                body: dict[str, Any] = {"model": req.model, "messages": msgs, "temperature": req.temperature, "stream": True}
+                if req.jsonMode:
+                    body["response_format"] = {"type": "json_object"}
+                async with client.stream("POST", url, headers=headers, json=body) as resp:
+                    if resp.status_code >= 400:
+                        err = (await resp.aread()).decode("utf-8", "ignore")
+                        yield f"data: {json.dumps({'__error': err})}\n\n"
+                        return
+                    async for line in resp.aiter_lines():
+                        if not line.startswith("data:"):
+                            continue
+                        chunk = line[5:].strip()
+                        if chunk == "[DONE]":
+                            break
+                        try:
+                            evt = json.loads(chunk)
+                        except Exception:
+                            continue
+                        delta = evt.get("choices", [{}])[0].get("delta", {}).get("content")
+                        if delta:
+                            yield f"data: {json.dumps(delta)}\n\n"
+                yield "data: [DONE]\n\n"
+        except Exception as exc:  # noqa: BLE001
+            yield f"data: {json.dumps({'__error': str(exc)})}\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 # ---------------------------------------------------------------------------
