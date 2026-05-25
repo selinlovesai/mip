@@ -8,10 +8,32 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AuthMethod } from "./apps-catalog";
 import { NATIVE_SKILLS, type Skill } from "@/mip/agent/skills";
-import { DEFAULT_WIDGET_SIZES, type WidgetType } from "@/mip/schema";
+import { DEFAULT_WIDGET_SIZES, WIDGET_TYPES, type WidgetType } from "@/mip/schema";
+import { WIDGET_CATALOG } from "@/mip/shell/widget-catalog";
 
 export type { Skill } from "@/mip/agent/skills";
-export type WidgetSize = { w: number; h: number };
+
+/** Per-type widget default: a display name + a free-form JSON config that holds
+ *  the default grid size (w, h) and any seed settings/fields. */
+export interface WidgetTypeConfig {
+    name: string;
+    config: Record<string, unknown>;
+}
+
+const CATALOG_BY_TYPE = new Map(WIDGET_CATALOG.map((c) => [c.type, c]));
+const prettyType = (t: string) => t.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
+
+/** Seed per-type config from the catalog (label + example settings) + default size. */
+export const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, WidgetTypeConfig> = Object.fromEntries(
+    WIDGET_TYPES.map((t) => {
+        const cat = CATALOG_BY_TYPE.get(t);
+        const size = DEFAULT_WIDGET_SIZES[t];
+        const config: Record<string, unknown> = { w: size.w, h: size.h };
+        if (cat?.settings) config.settings = cat.settings;
+        if (cat?.fields) config.fields = cat.fields;
+        return [t, { name: cat?.label ?? prettyType(t), config }];
+    }),
+) as Record<WidgetType, WidgetTypeConfig>;
 
 export type DataSourceType = "mock" | "rest" | "json" | "csv";
 
@@ -86,7 +108,7 @@ interface SettingsState {
     /** Whether the editable sample skills have been seeded (once). */
     skillsSeeded?: boolean;
     /** Default grid size per widget type (customizable in Settings → Widgets). */
-    widgetDefaults: Record<WidgetType, WidgetSize>;
+    widgetDefaults: Record<WidgetType, WidgetTypeConfig>;
     /** User acknowledged the risks of the freeform AI canvas (arbitrary code). */
     canvasConsented?: boolean;
 }
@@ -160,7 +182,7 @@ const DEFAULT_STATE: SettingsState = {
     profile: { name: "Super Admin", email: "superadmin@protocol.dev" },
     skills: [...NATIVE_SKILLS, ...SAMPLE_SKILLS],
     skillsSeeded: true,
-    widgetDefaults: DEFAULT_WIDGET_SIZES,
+    widgetDefaults: DEFAULT_WIDGET_CONFIGS,
 };
 
 function load(): SettingsState {
@@ -173,7 +195,7 @@ function load(): SettingsState {
                 ...parsed,
                 skills: mergeSkills(parsed.skills, parsed.skillsSeeded),
                 skillsSeeded: true,
-                widgetDefaults: { ...DEFAULT_WIDGET_SIZES, ...(parsed.widgetDefaults ?? {}) },
+                widgetDefaults: { ...DEFAULT_WIDGET_CONFIGS, ...(parsed.widgetDefaults ?? {}) },
             };
         }
     } catch {
@@ -204,8 +226,8 @@ interface SettingsValue {
     updateSkill: (id: string, patch: Partial<Skill>) => void;
     removeSkill: (id: string) => void;
     /** Default grid size per widget type. */
-    widgetDefaults: Record<WidgetType, WidgetSize>;
-    setWidgetDefault: (type: WidgetType, size: WidgetSize) => void;
+    widgetDefaults: Record<WidgetType, WidgetTypeConfig>;
+    setWidgetDefault: (type: WidgetType, cfg: WidgetTypeConfig) => void;
     resetWidgetDefaults: () => void;
     profile: UserProfile;
     setProfile: (patch: Partial<UserProfile>) => void;
@@ -277,12 +299,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, skills: s.skills.filter((sk) => sk.id !== id || sk.builtin) }));
     }, []);
 
-    const setWidgetDefault = useCallback((type: WidgetType, size: WidgetSize) => {
-        setState((s) => ({ ...s, widgetDefaults: { ...s.widgetDefaults, [type]: size } }));
+    const setWidgetDefault = useCallback((type: WidgetType, cfg: WidgetTypeConfig) => {
+        setState((s) => ({ ...s, widgetDefaults: { ...s.widgetDefaults, [type]: cfg } }));
     }, []);
 
     const resetWidgetDefaults = useCallback(() => {
-        setState((s) => ({ ...s, widgetDefaults: DEFAULT_WIDGET_SIZES }));
+        setState((s) => ({ ...s, widgetDefaults: DEFAULT_WIDGET_CONFIGS }));
     }, []);
 
     const setProfile = useCallback((patch: Partial<UserProfile>) => {

@@ -31,9 +31,20 @@ export function WidgetPicker({ open, onClose }: { open: boolean; onClose: () => 
     }, [query]);
 
     const pick = (entry: CatalogEntry) => {
-        // Use the user's customized default size for this type (Settings → Widgets).
-        const size = widgetDefaults[entry.type] ?? { w: entry.w, h: entry.h };
-        addWidget(makeWidget({ ...entry, w: size.w, h: size.h }));
+        // Use the user's customized default config for this type (Settings → Widgets):
+        // name + JSON config holding w/h and optional seed settings/fields.
+        const def = widgetDefaults[entry.type];
+        const c = (def?.config ?? {}) as { w?: number; h?: number; settings?: Record<string, unknown>; fields?: CatalogEntry["fields"] };
+        addWidget(
+            makeWidget({
+                ...entry,
+                label: def?.name ?? entry.label,
+                w: typeof c.w === "number" ? c.w : entry.w,
+                h: typeof c.h === "number" ? c.h : entry.h,
+                ...(c.settings ? { settings: c.settings } : {}),
+                ...(c.fields ? { fields: c.fields } : {}),
+            }),
+        );
         onClose();
     };
 

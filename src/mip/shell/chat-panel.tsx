@@ -118,6 +118,15 @@ function CollapsibleEntry({ kind, title, detail, ok }: { kind: "tool" | "skills"
     );
 }
 
+/** The assistant avatar glyph (a sparkles mark). */
+function SparkleIcon({ className }: { className?: string }) {
+    return (
+        <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={className}>
+            <path d="m6.5 13 .784 1.569c.266.53.399.796.576 1.026a3 3 0 0 0 .545.545c.23.177.495.31 1.026.575L11 17.5l-1.569.785c-.53.265-.796.398-1.026.575a3 3 0 0 0-.545.545c-.177.23-.31.495-.576 1.026L6.5 22l-.784-1.569c-.266-.53-.399-.796-.576-1.026a3 3 0 0 0-.545-.545c-.23-.177-.495-.31-1.026-.575L2 17.5l1.569-.785c.53-.265.796-.398 1.026-.575a3 3 0 0 0 .545-.545c.177-.23.31-.495.576-1.026L6.5 13ZM15 2l1.179 3.064c.282.734.423 1.1.642 1.409a3 3 0 0 0 .706.706c.309.22.675.36 1.409.642L22 9l-3.064 1.179c-.734.282-1.1.423-1.409.642a3 3 0 0 0-.706.706c-.22.309-.36.675-.642 1.409L15 16l-1.179-3.064c-.282-.734-.423-1.1-.642-1.409a3 3 0 0 0-.706-.706c-.309-.22-.675-.36-1.409-.642L8 9l3.064-1.179c.734-.282 1.1-.423 1.409-.642a3 3 0 0 0 .706-.706c.22-.309.36-.675.642-1.409L15 2Z" />
+        </svg>
+    );
+}
+
 const introMessage: Message = { id: "intro", role: "assistant", text: INTRO };
 
 export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -247,7 +256,10 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         listWidgets: () => activePage.widgets.map((w) => ({ id: w.id, type: w.type, title: w.title })),
         addWidget,
         removeWidget,
-        widgetSize: (type) => widgetDefaults[type as keyof typeof widgetDefaults] ?? { w: 6, h: 6 },
+        widgetSize: (type) => {
+            const c = (widgetDefaults[type as keyof typeof widgetDefaults]?.config ?? {}) as { w?: number; h?: number };
+            return { w: typeof c.w === "number" ? c.w : 6, h: typeof c.h === "number" ? c.h : 6 };
+        },
         getContext: () => activePage.systemPrompt ?? "",
         setContext: (val) => updatePageSettings(activePage.id, { systemPrompt: val }),
         apiCalls: [],
@@ -412,8 +424,8 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             {messages.map((msg) => {
                 if (msg.role === "user")
                     return (
-                        <div key={msg.id} className="flex justify-end">
-                            <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-brand-solid px-3.5 py-2.5 text-xs leading-4 text-white">{msg.text}</div>
+                        <div key={msg.id} className="flex">
+                            <div className="w-full whitespace-pre-wrap rounded-2xl rounded-br-sm bg-brand-solid px-3.5 py-2.5 text-xs leading-4 text-white">{msg.text}</div>
                         </div>
                     );
                 if (msg.role === "tool" || msg.role === "skills")
@@ -428,10 +440,10 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                 return (
                     <div key={msg.id} className="flex gap-2.5">
                         <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-utility-brand-50">
-                            <Stars01 className="size-3.5 text-utility-brand-700" />
+                            <SparkleIcon className="size-3.5 text-utility-brand-700" />
                         </span>
                         <div
-                            className="prose prose-sm dark:prose-invert max-w-[85%] rounded-2xl rounded-tl-sm bg-secondary px-3.5 py-2.5 text-xs text-secondary prose-headings:text-primary prose-strong:text-primary prose-a:text-brand-secondary prose-p:text-xs prose-p:leading-4 prose-p:my-1.5 prose-li:text-xs prose-li:leading-4 prose-li:my-0.5 prose-ul:my-1.5 prose-ol:my-1.5"
+                            className="prose prose-sm dark:prose-invert min-w-0 flex-1 rounded-2xl rounded-tl-sm bg-secondary px-3.5 py-2.5 text-xs text-secondary prose-headings:text-primary prose-strong:text-primary prose-a:text-brand-secondary prose-p:text-xs prose-p:leading-4 prose-p:my-1.5 prose-li:text-xs prose-li:leading-4 prose-li:my-0.5 prose-ul:my-1.5 prose-ol:my-1.5"
                             dangerouslySetInnerHTML={{ __html: markdownToHtml(msg.text) }}
                         />
                     </div>
@@ -441,7 +453,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             {thinking ? (
                 <div className="flex gap-2.5">
                     <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-utility-brand-50">
-                        <Stars01 className="size-3.5 text-utility-brand-700" />
+                        <SparkleIcon className="size-3.5 text-utility-brand-700" />
                     </span>
                     <div className="rounded-2xl rounded-tl-sm bg-secondary px-3.5 py-2.5 text-xs text-tertiary">thinking…</div>
                 </div>
