@@ -63,6 +63,9 @@ export const ChartLegendContent = ({ reversed, payload, align, layout, className
                             "block size-2 rounded-full bg-current ring-[0.5px] ring-black/10 ring-inset",
                             (entry.payload as { className?: string })?.className,
                         )}
+                        // Series with an inline fill (e.g. pie slices) expose it as
+                        // `entry.color`; `bg-current` then renders that exact color.
+                        style={(entry as { color?: string }).color ? { color: (entry as { color?: string }).color } : undefined}
                     />
                     {entry.value}
                 </li>
