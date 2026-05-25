@@ -108,7 +108,9 @@ function coerceReply(o: unknown): { say?: string; ops: CanvasOp[] } | null {
     }
     // A say-only object (model answered with no actions) — valid, no ops.
     if (say !== undefined) return { say, ops: [] };
-    return null;
+    // Any other JSON object (e.g. the model echoing raw data after it already
+    // acted) — treat as a terminal no-op so we never dump raw JSON into the chat.
+    return { ops: [] };
 }
 
 /** Parse an agent reply into {say, ops} — tolerant of fences, surrounding prose,
@@ -350,7 +352,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             msgs = [
                 ...msgs,
                 { role: "assistant", content: text },
-                { role: "user", content: "Tool results:\n```json\n" + JSON.stringify(results).slice(0, 4000) + `\n\`\`\`\nIf the ${opts.surface} already matches the request, reply with {"say":"<summary>","ops":[]}. Otherwise continue — do not re-add anything already present.` },
+                { role: "user", content: "Tool results:\n```json\n" + JSON.stringify(results).slice(0, 4000) + `\n\`\`\`\nIf the ${opts.surface} already matches the request, you are DONE: reply with EXACTLY {"say":"<one-line summary>","ops":[]} and nothing else — do NOT repeat the data or emit any other keys. Otherwise continue with more ops — do not re-add anything already present.` },
             ];
         }
         pushAssistant(`Reached the ${opts.surface} step limit.`);
