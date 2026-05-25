@@ -212,6 +212,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         removeWidget,
         getContext: () => activePage.systemPrompt ?? "",
         setContext: (val) => updatePageSettings(activePage.id, { systemPrompt: val }),
+        apiCalls: [],
     });
 
     const sendText = async (text: string) => {

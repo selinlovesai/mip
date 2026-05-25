@@ -15,5 +15,6 @@ export const INJECTION_SKILL = [
     "      list   → { items:\"$.path.to.array\" }    (+ settings.primaryKey / settings.secondaryKey)",
     "      kpi    → { value:\"$.x\", delta:\"$.y\" }",
     "  · refreshMs (e.g. 10000) polls; omit for fetch-once. A bound widget ignores static settings once data loads.",
-    "Rule of thumb: if the user names an API or asks for live data, prefer injectConnection. Only use injectJson for values that don't have a live source.",
+    "STRICT RULE: if the data comes from an API or saved connection (anything you reach with callApi, or any request to use an API), you MUST use injectConnection so the widget reads it LIVE. NEVER copy callApi/API results into injectJson — a snapshot is wrong and will be rejected. injectJson is ONLY for values with no live source (hand-given numbers, ad-hoc web facts).",
+    "So the correct flow for an API is: listConnections → callApi (to learn the response shape) → injectConnection (bind sourceId + the SAME path + a map derived from the shape you saw). Do not addWidget/injectJson with the rows you fetched.",
 ].join("\n");

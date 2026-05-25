@@ -65,6 +65,7 @@ const callApiTool: Tool = {
         if (src.auth?.type === "bearer" && src.auth.token) headers["Authorization"] = `Bearer ${src.auth.token}`;
         else if (src.auth?.type === "apiKeyHeader" && src.auth.keyName) headers[src.auth.keyName] = src.auth.keyValue ?? "";
         const r = await ctx.testEndpoint({ method: typeof op.method === "string" ? op.method : "GET", url, headers, body: op.body });
+        if (r.ok) ctx.apiCalls.push({ sourceId: src.id, path });
         return { kind: "callApi", ok: r.ok, status: r.status, ...(r.ok ? { data: JSON.stringify(r.body).slice(0, 4000) } : { error: typeof r.error === "string" ? r.error : `status ${r.status ?? "?"}` }) };
     },
 };

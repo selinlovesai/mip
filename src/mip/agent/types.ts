@@ -72,6 +72,10 @@ export interface ToolContext {
     // The page's "AI assistant context (system prompt)" — read + update.
     getContext: () => string;
     setContext: (text: string) => void;
+
+    // Turn-scoped scratch: saved-API calls made this turn. callApi appends here;
+    // injectJson reads it to refuse snapshotting live API data (use injectConnection).
+    apiCalls: { sourceId: string; path?: string }[];
 }
 
 /** A single capability the agent can invoke. */

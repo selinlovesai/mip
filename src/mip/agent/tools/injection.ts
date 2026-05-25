@@ -60,6 +60,16 @@ const injectJson: Tool = {
     surfaces: ["dashboard"],
     mutating: true,
     run: async (op: AgentOp, ctx: ToolContext): Promise<OpResult> => {
+        // Strict REST: if a saved API was called this turn, the data must be bound
+        // live — refuse to snapshot it into static settings.
+        const api = ctx.apiCalls[ctx.apiCalls.length - 1];
+        if (api) {
+            return {
+                kind: op.kind,
+                ok: false,
+                error: `This data came from a saved API (sourceId "${api.sourceId}"${api.path ? `, path "${api.path}"` : ""}). Do NOT snapshot API data with injectJson — use injectConnection so the widget reads it live, e.g. {"kind":"injectConnection","type":"${String(op.type)}","sourceId":"${api.sourceId}","request":{"method":"GET","path":"${api.path ?? "/"}"},"map":{…}}.`,
+            };
+        }
         const widget = buildWidget(op);
         if ("error" in widget) return { kind: op.kind, ok: false, error: widget.error };
         ctx.addWidget(widget);
