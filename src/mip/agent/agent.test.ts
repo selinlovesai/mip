@@ -114,6 +114,16 @@ describe("dispatch + validation", () => {
         expect(r.ok).toBe(false);
         expect(String(r.error)).toMatch(/injectConnection/);
     });
+    it("callApi failure guides back to real endpoints (no path guessing)", async () => {
+        const conn = { id: "c1", name: "X", type: "rest", baseUrl: "https://x", endpoints: [{ method: "GET", path: "/api/v2/internal-links/pages" }, { method: "GET", path: "/api/v2/feed" }] };
+        const r = await dispatch({ kind: "callApi", sourceId: "c1", path: "/submissions" }, "dashboard", ctx({
+            resolveConnection: () => conn as never,
+            testEndpoint: async () => ({ ok: false, status: 404, error: "status 404" }),
+        }));
+        expect(r.ok).toBe(false);
+        expect(r.hint).toBeTruthy();
+        expect(r.resourceAreas ?? r.didYouMean).toBeTruthy();
+    });
     it("allows injectJson in auto mode", async () => {
         const added: unknown[] = [];
         const r = await dispatch({ kind: "injectJson", type: "kpi", settings: { value: 1 } }, "dashboard", ctx({ addWidget: (w) => added.push(w) }));

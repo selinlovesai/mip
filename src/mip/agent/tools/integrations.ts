@@ -68,8 +68,29 @@ const callApiTool: Tool = {
         if (src.auth?.type === "bearer" && src.auth.token) headers["Authorization"] = `Bearer ${src.auth.token}`;
         else if (src.auth?.type === "apiKeyHeader" && src.auth.keyName) headers[src.auth.keyName] = src.auth.keyValue ?? "";
         const r = await ctx.testEndpoint({ method: typeof op.method === "string" ? op.method : "GET", url, headers, body: op.body });
-        if (r.ok) ctx.apiCalls.push({ sourceId: src.id, path });
-        return { kind: "callApi", ok: r.ok, status: r.status, ...(r.ok ? { data: JSON.stringify(r.body).slice(0, 4000) } : { error: typeof r.error === "string" ? r.error : `status ${r.status ?? "?"}` }) };
+        if (r.ok) {
+            ctx.apiCalls.push({ sourceId: src.id, path });
+            return { kind: "callApi", ok: true, status: r.status, data: JSON.stringify(r.body).slice(0, 4000) };
+        }
+        // Guide the model back to REAL endpoints instead of guessing more paths.
+        const eps = src.endpoints ?? [];
+        const reqMethod = (typeof op.method === "string" ? op.method : "GET").toUpperCase();
+        const known = eps.map((e) => `${e.method.toUpperCase()} ${e.path}`);
+        const isKnown = known.includes(`${reqMethod} ${path}`);
+        // Endpoints sharing a word with the attempted path, then the GET resource map.
+        const tokens = path.split(/[/\-_]/).filter((t) => t.length >= 4).map((t) => t.toLowerCase());
+        const matched = [...new Set(eps.filter((e) => tokens.some((t) => e.path.toLowerCase().includes(t))).map((e) => `${e.method} ${e.path}`))].slice(0, 15);
+        const resourceAreas = [...new Set(eps.filter((e) => e.method.toUpperCase() === "GET").map((e) => e.path.split("/").slice(0, 4).join("/")))].slice(0, 30);
+        return {
+            kind: "callApi",
+            ok: false,
+            status: r.status,
+            error: typeof r.error === "string" ? r.error : `status ${r.status ?? "?"}`,
+            hint: isKnown
+                ? "That endpoint exists but errored — check auth/params (replace :placeholders with real ids)."
+                : "That path is NOT a real endpoint — do NOT keep guessing. Pick a path from this connection's listed endpoints (see listConnections) that matches the task, and replace :placeholders.",
+            ...(matched.length ? { didYouMean: matched } : { resourceAreas }),
+        };
     },
 };
 
