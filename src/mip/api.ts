@@ -46,15 +46,18 @@ export interface TestResult {
     error?: unknown;
 }
 
-export async function testEndpoint(args: { method: string; url: string; headers?: Record<string, string>; body?: unknown }): Promise<TestResult> {
+export async function testEndpoint(args: { method: string; url: string; headers?: Record<string, string>; body?: unknown; signal?: AbortSignal }): Promise<TestResult> {
+    const { signal, ...payload } = args;
     try {
         const res = await fetch(`${BASE}/api/test-endpoint`, {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify(args),
+            body: JSON.stringify(payload),
+            signal,
         });
         return (await res.json()) as TestResult;
     } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return { ok: false, error: "Stopped." };
         return { ok: false, error: err instanceof Error ? err.message : "Backend unreachable. Is the server running on " + BASE + "?" };
     }
 }
@@ -167,15 +170,17 @@ export interface FetchPageResult {
     error?: unknown;
 }
 
-export async function fetchPage(url: string, maxChars = 8000): Promise<FetchPageResult> {
+export async function fetchPage(url: string, maxChars = 8000, signal?: AbortSignal): Promise<FetchPageResult> {
     try {
         const res = await fetch(`${BASE}/api/fetch`, {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ url, maxChars }),
+            signal,
         });
         return (await res.json()) as FetchPageResult;
     } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return { ok: false, error: "Stopped." };
         return { ok: false, error: err instanceof Error ? err.message : `Backend unreachable at ${BASE}.` };
     }
 }

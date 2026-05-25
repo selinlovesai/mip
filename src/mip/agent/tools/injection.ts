@@ -15,6 +15,11 @@ import type { MipWidget } from "../../schema";
 import { WIDGET_CATALOG, makeWidget } from "../../shell/widget-catalog";
 import type { Tool, ToolContext, AgentOp, OpResult } from "../types";
 
+/** Widget types that carry data and therefore SHOULD bind to a connection when
+ *  one is in play. Everything else (headers, text, CTAs, images…) is static and
+ *  may always be added with injectJson, even in API mode. */
+const BINDABLE_TYPES = new Set(["kpi", "progress", "lineChart", "barChart", "areaChart", "pieChart", "donutChart", "table", "list", "detail"]);
+
 /** Build a MipWidget from an op's {type,title,settings,w,h}. Size comes from the
  *  op if given, else the user's configured default for the type (Settings →
  *  Widgets); other defaults (example settings) come from the catalog. */
@@ -64,17 +69,21 @@ const injectJson: Tool = {
     mutating: true,
     validate: (op) => (typeof op.type === "string" && op.type ? null : "injectJson needs a widget `type`."),
     run: async (op: AgentOp, ctx: ToolContext): Promise<OpResult> => {
-        // Hard enforcement of the composer's API toggle.
-        if (ctx.injectMode === "api") {
+        // Only DATA-bearing widgets need to bind to a connection. Static/utility
+        // widgets (headers, text, CTAs, images…) are always fine as injectJson —
+        // exempt them from the API-mode and strict-REST guards.
+        const bindable = BINDABLE_TYPES.has(String(op.type));
+        // Hard enforcement of the composer's API toggle (data widgets only).
+        if (ctx.injectMode === "api" && bindable) {
             return {
                 kind: op.kind,
                 ok: false,
-                error: "API injection mode is selected — do NOT use injectJson. Bind the widget with injectConnection to a saved connection (listConnections → callApi → injectConnection). If no connection fits, ask the user to add one in Settings → Apps.",
+                error: "API injection mode is selected — do NOT use injectJson for data widgets. Bind with injectConnection to a saved connection (listConnections → callApi → injectConnection). If no connection fits, ask the user to add one in Settings → Apps.",
             };
         }
-        // Strict REST: if a saved API was called this turn, the data must be bound
-        // live — refuse to snapshot it. Relaxed when the user forced JSON mode.
-        const api = ctx.injectMode === "json" ? undefined : ctx.apiCalls[ctx.apiCalls.length - 1];
+        // Strict REST: if a saved API was called this turn, a DATA widget must be
+        // bound live — refuse to snapshot it. Relaxed when the user forced JSON mode.
+        const api = ctx.injectMode === "json" || !bindable ? undefined : ctx.apiCalls[ctx.apiCalls.length - 1];
         if (api) {
             return {
                 kind: op.kind,

@@ -5,7 +5,7 @@
  * (pages -> widgets, each widget carrying its own grid `layout`).
  */
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Layout } from "react-grid-layout/core";
 import type { MipWidget, MipWidgetLayout } from "@/mip/schema";
 import type { PageAgentConfig } from "@/mip/agent/config";
@@ -120,10 +120,12 @@ interface StoreValue {
     updatePageSettings: (id: string, patch: Partial<DashboardPage>) => void;
     deletePage: (id: string) => void;
     duplicatePage: (id: string) => void;
-    addWidget: (widget: MipWidget) => void;
-    updateWidget: (widgetId: string, patch: Partial<MipWidget>) => void;
-    removeWidget: (widgetId: string) => void;
+    addWidget: (widget: MipWidget, pageId?: string) => void;
+    updateWidget: (widgetId: string, patch: Partial<MipWidget>, pageId?: string) => void;
+    removeWidget: (widgetId: string, pageId?: string) => void;
     applyLayout: (layout: Layout) => void;
+    /** Live read of a page by id (not a stale render closure). */
+    getPage: (id: string) => DashboardPage | undefined;
 }
 
 const DashboardContext = createContext<StoreValue | null>(null);
@@ -132,6 +134,13 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     const [state, setState] = useState<DashboardState>(load);
     const [editMode, setEditMode] = useState(false);
     const [viewMode, setViewMode] = useState<"layout" | "feed">("layout");
+
+    // Always-current snapshot, so async callers (the agent loop) can read live
+    // page state instead of a stale render closure.
+    const stateRef = useRef(state);
+    stateRef.current = state;
+    /** Live read of any page by id (not the captured render value). */
+    const getPage = useCallback((id: string) => stateRef.current.pages.find((p) => p.id === id), []);
 
     useEffect(() => {
         try {
@@ -148,6 +157,18 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     const updateActivePage = useCallback(
         (mutate: (page: DashboardPage) => DashboardPage) => {
             setState((s) => ({ ...s, pages: s.pages.map((page) => (page.id === s.activePageId ? mutate(page) : page)) }));
+        },
+        [],
+    );
+
+    /** Mutate a SPECIFIC page (falls back to the active page). Lets async callers
+     *  pin their target page so switching dashboards mid-run can't cross-write. */
+    const updatePageById = useCallback(
+        (pageId: string | undefined, mutate: (page: DashboardPage) => DashboardPage) => {
+            setState((s) => {
+                const target = pageId ?? s.activePageId;
+                return { ...s, pages: s.pages.map((page) => (page.id === target ? mutate(page) : page)) };
+            });
         },
         [],
     );
@@ -226,25 +247,25 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const addWidget = useCallback(
-        (widget: MipWidget) => {
-            updateActivePage((page) => {
+        (widget: MipWidget, pageId?: string) => {
+            updatePageById(pageId, (page) => {
                 const { x, y } = findGridSlot(page.widgets, widget.layout.w, widget.layout.h, page.cols);
                 const w = Math.min(widget.layout.w, page.cols);
                 return { ...page, widgets: [...page.widgets, { ...widget, layout: { ...widget.layout, w, x, y } }] };
             });
         },
-        [updateActivePage],
+        [updatePageById],
     );
 
     const updateWidget = useCallback(
-        (widgetId: string, patch: Partial<MipWidget>) =>
-            updateActivePage((page) => ({ ...page, widgets: page.widgets.map((w) => (w.id === widgetId ? { ...w, ...patch } : w)) })),
-        [updateActivePage],
+        (widgetId: string, patch: Partial<MipWidget>, pageId?: string) =>
+            updatePageById(pageId, (page) => ({ ...page, widgets: page.widgets.map((w) => (w.id === widgetId ? { ...w, ...patch } : w)) })),
+        [updatePageById],
     );
 
     const removeWidget = useCallback(
-        (widgetId: string) => updateActivePage((page) => ({ ...page, widgets: page.widgets.filter((w) => w.id !== widgetId) })),
-        [updateActivePage],
+        (widgetId: string, pageId?: string) => updatePageById(pageId, (page) => ({ ...page, widgets: page.widgets.filter((w) => w.id !== widgetId) })),
+        [updatePageById],
     );
 
     const applyLayout = useCallback(
@@ -264,8 +285,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     );
 
     const value = useMemo<StoreValue>(
-        () => ({ state, activePage, editMode, setEditMode, viewMode, setViewMode, setActivePage, addPage, addCanvas, setCanvasHtml, importTemplate, renamePage, renamePageId, isPageIdAvailable, updatePageSettings, deletePage, duplicatePage, addWidget, updateWidget, removeWidget, applyLayout }),
-        [state, activePage, editMode, viewMode, setActivePage, addPage, addCanvas, setCanvasHtml, importTemplate, renamePage, renamePageId, isPageIdAvailable, updatePageSettings, deletePage, duplicatePage, addWidget, updateWidget, removeWidget, applyLayout],
+        () => ({ state, activePage, editMode, setEditMode, viewMode, setViewMode, setActivePage, addPage, addCanvas, setCanvasHtml, importTemplate, renamePage, renamePageId, isPageIdAvailable, updatePageSettings, deletePage, duplicatePage, addWidget, updateWidget, removeWidget, applyLayout, getPage }),
+        [state, activePage, editMode, viewMode, setActivePage, addPage, addCanvas, setCanvasHtml, importTemplate, renamePage, renamePageId, isPageIdAvailable, updatePageSettings, deletePage, duplicatePage, addWidget, updateWidget, removeWidget, applyLayout, getPage],
     );
 
     return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>;

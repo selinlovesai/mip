@@ -19,17 +19,18 @@ export interface DashboardFacts {
     title?: string;
     description?: string;
     kind?: string;
-    widgets?: { type: string; title?: string }[];
+    widgets?: { id: string; type: string; title?: string }[];
 }
 
-/** Render the "this dashboard" block so the agent never invents the title/widgets. */
+/** Render the "this dashboard" block so the agent never invents the title/widgets.
+ *  Widget IDs are included so the agent can edit/remove without a listWidgets round. */
 export function describeDashboard(d: DashboardFacts): string {
-    const widgets = (d.widgets ?? []).map((w) => `${w.type}${w.title ? ` (“${w.title}”)` : ""}`).join(", ") || "none yet";
+    const widgets = (d.widgets ?? []).map((w) => `${w.id} · ${w.type}${w.title ? ` (“${w.title}”)` : ""}`);
     return [
         `## This ${d.kind === "canvas" ? "canvas" : "dashboard"} (live facts — trust these, do NOT invent)`,
         `Title: ${d.title ?? "(untitled)"}`,
         ...(d.description ? [`Description: ${d.description}`] : []),
-        d.kind === "canvas" ? "" : `Current widgets: ${widgets}`,
+        d.kind === "canvas" ? "" : widgets.length ? `Current widgets (id · type · title):\n${widgets.map((w) => `  - ${w}`).join("\n")}` : "Current widgets: none yet",
     ]
         .filter(Boolean)
         .join("\n");

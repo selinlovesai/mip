@@ -31,6 +31,14 @@ describe("parseAgentReply", () => {
     it("returns null for non-JSON prose", () => {
         expect(parseAgentReply("I cannot do that.")).toBeNull();
     });
+    it("balanced-matches a nested object amid prose (no greedy over-capture)", () => {
+        const r = parseAgentReply('Sure! {"say":"hi","ops":[{"kind":"injectJson","settings":{"a":{"b":1}}}]} — done.');
+        expect(r?.ops?.[0]).toMatchObject({ kind: "injectJson" });
+    });
+    it("ignores a stray brace in prose before the real object", () => {
+        const r = parseAgentReply('I use {curly} braces. {"say":"x","ops":[]}');
+        expect(r).toEqual({ say: "x", ops: [] });
+    });
 });
 
 describe("coerceReply / claimsAction", () => {
@@ -111,6 +119,24 @@ describe("dispatch + validation", () => {
         const r = await dispatch({ kind: "injectJson", type: "kpi", settings: { value: 1 } }, "dashboard", ctx({ addWidget: (w) => added.push(w) }));
         expect(r.ok).toBe(true);
         expect(added).toHaveLength(1);
+    });
+    it("allows a STATIC widget via injectJson even under api mode", async () => {
+        const added: unknown[] = [];
+        const r = await dispatch({ kind: "injectJson", type: "markdown", settings: { content: "hi" } }, "dashboard", ctx({ injectMode: "api", addWidget: (w) => added.push(w) }));
+        expect(r.ok).toBe(true);
+        expect(added).toHaveLength(1);
+    });
+    it("updateWidget merges settings and patches layout", async () => {
+        let patched: { id?: string; patch?: { title?: string; layout?: { w?: number } } } = {};
+        const cur = { id: "w1", type: "kpi", title: "old", layout: { x: 0, y: 0, w: 3, h: 2 }, settings: { value: 1 } };
+        const r = await dispatch({ kind: "updateWidget", id: "w1", title: "new", w: 6, settings: { delta: 2 } }, "dashboard", ctx({
+            getWidget: () => cur as never,
+            updateWidget: (id, patch) => (patched = { id, patch: patch as never }),
+        }));
+        expect(r.ok).toBe(true);
+        expect(patched.id).toBe("w1");
+        expect(patched.patch?.title).toBe("new");
+        expect(patched.patch?.layout?.w).toBe(6);
     });
 });
 

@@ -19,7 +19,9 @@ export type Brain = (messages: ApiMsg[], system?: string, jsonMode?: boolean, si
 export interface RunAgentOptions {
     initial: ApiMsg[];
     surface: Surface;
-    system: string;
+    /** The system prompt, or a thunk re-evaluated EACH round so live facts
+     *  (e.g. widgets just added) stay current across multi-round turns. */
+    system: string | (() => string);
     jsonMode: boolean;
     brain: Brain;
     ctx: ToolContext;
@@ -29,12 +31,31 @@ export interface RunAgentOptions {
     onTool?: (entry: { op: AgentOp; result: OpResult; mutating: boolean }) => void;
     /** Abort the whole loop (Stop button) — cancels the model call and halts. */
     signal?: AbortSignal;
+    /** True when the user's message is a question — relaxes the "you didn't act" nudge. */
+    userAskedQuestion?: boolean;
     /** Max tool rounds before giving up. */
     maxRounds?: number;
 }
 
+/** Shrink a tool result for the feed-back message: clip long strings and cap
+ *  array lengths, keeping VALID JSON (the old raw `.slice(4000)` corrupted it). */
+function summarizeResult(value: unknown, depth = 0): unknown {
+    if (typeof value === "string") return value.length > 1500 ? value.slice(0, 1500) + `…(+${value.length - 1500} chars)` : value;
+    if (Array.isArray(value)) {
+        const capped = value.slice(0, 20).map((v) => summarizeResult(v, depth + 1));
+        if (value.length > 20) capped.push(`…(+${value.length - 20} more)`);
+        return capped;
+    }
+    if (value && typeof value === "object") {
+        if (depth > 4) return "…";
+        return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, summarizeResult(v, depth + 1)]));
+    }
+    return value;
+}
+
 export async function runAgent(opts: RunAgentOptions): Promise<void> {
-    const { initial, surface, system, jsonMode, brain, ctx, say, signal } = opts;
+    const { initial, surface, system, jsonMode, brain, ctx, say, signal, userAskedQuestion } = opts;
+    const buildSystem = typeof system === "function" ? system : () => system;
     const maxRounds = opts.maxRounds ?? 8;
 
     let msgs = initial.slice();
@@ -44,7 +65,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
 
     for (let round = 0; round < maxRounds; round++) {
         if (signal?.aborted) return;
-        const result = await brain(msgs, system, jsonMode, signal);
+        const result = await brain(msgs, buildSystem(), jsonMode, signal);
         if (signal?.aborted) return; // stopped while the model was responding
         if (!result.ok) {
             say(`**Couldn't reach the model.**\n\n${typeof result.error === "string" ? result.error : "Request failed."}`);
@@ -71,7 +92,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
         if (!parsed.ops.length) {
             // Model ended the turn. If it CLAIMS a change but nothing mutating ran,
             // it only read data — make it actually act.
-            if (claimsAction(parsed.say) && !mutated && !actNudged) {
+            if (claimsAction(parsed.say) && !mutated && !actNudged && !userAskedQuestion) {
                 actNudged = true;
                 msgs = [
                     ...msgs,
@@ -101,7 +122,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
                 role: "user",
                 content:
                     "Tool results:\n```json\n" +
-                    JSON.stringify(results).slice(0, 4000) +
+                    JSON.stringify(summarizeResult(results)) +
                     `\n\`\`\`\nIf the ${surface} already matches the request, you are DONE: reply with EXACTLY {"say":"<one-line summary>","ops":[]} and nothing else — do NOT repeat the data or emit other keys. Otherwise continue with more ops — do not re-add anything already present.`,
             },
         ];

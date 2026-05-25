@@ -204,7 +204,27 @@ catalog split). Run `npm run typecheck` for the full type build.
 
 ---
 
-## 9. Known gaps / next
+## 9. Hardening (from code review)
+
+- **Live facts each round** — the `system` prompt is a thunk re-evaluated every
+  round from live page state, so widgets added mid-turn aren't stale (no more
+  duplicate/overlapping widgets).
+- **Widget IDs in facts** — `describeDashboard` lists `id · type · title`, so the
+  agent can edit/remove without a `listWidgets` round.
+- **Page-pinned, race-safe** — the run captures `pageId`; reads use live `getPage`
+  and writes target that page, so switching dashboards mid-run can't cross-write.
+- **Structured truncation** — tool results are shrunk field-wise (clip long
+  strings, cap arrays) keeping VALID JSON, instead of a raw `.slice(4000)`.
+- **Balanced-brace parsing** — `parseAgentReply` scans balanced `{…}`/`[…]`
+  regions (skips stray prose braces; never truncates nested objects).
+- **Question-aware nudge** — the "you didn't act" nudge is suppressed when the
+  user asked a question ("did you…?").
+- **Static-widget exemption** — API-mode / strict-REST guards apply only to
+  data-bearing widgets; headers/text/CTAs stay free as injectJson.
+- **Abort propagation** — `fetch`/`testEndpoint` receive the AbortSignal, so Stop
+  cancels the in-flight network call, not just the loop.
+
+## 10. Known gaps / next
 
 - **Secrets not persisted** (by design) — model lists / callApi / search degrade
   after reload until keys are re-entered. Needs encrypted-at-rest storage (backend).

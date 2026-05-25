@@ -130,7 +130,7 @@ function SparkleIcon({ className }: { className?: string }) {
 const introMessage: Message = { id: "intro", role: "assistant", text: INTRO };
 
 export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
-    const { activePage, addWidget, removeWidget, updateWidget, updatePageSettings } = useDashboard();
+    const { activePage, addWidget, removeWidget, updateWidget, updatePageSettings, getPage } = useDashboard();
     const { assistant, aiConnections, connections, getConnection, skills, widgetDefaults } = useSettings();
     const [mode, setMode] = useState<ChatMode>("sidebar");
     // Conversations are scoped per page (dashboard/canvas) — switching the active
@@ -243,37 +243,41 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
     const allowedIds = activePage.agent?.callableConnectionIds;
     const allowedConnections = allowedIds ? connections.filter((c) => allowedIds.includes(c.id)) : connections;
 
-    // Everything the tools need from the live app, rebuilt per send. Tools only
-    // ever see the dashboard-allowed connections. `activeSkills` lets loadSkill
-    // fetch an on-demand skill's content.
-    const toolContext = (activeSkills: { name: string; id: string; content: string }[]): ToolContext => ({
-        fetchPage,
-        testEndpoint,
-        connections: allowedConnections,
-        resolveConnection: (ref) => {
-            const c = resolveConnection(ref);
-            return c && allowedConnections.some((a) => a.id === c.id) ? c : undefined;
-        },
-        tavily: allowedConnections.some((c) => c.id === tavily?.id) ? tavily : undefined,
-        canvasSend: (op) => canvasBridge.send(op),
-        listWidgets: () => activePage.widgets.map((w) => ({ id: w.id, type: w.type, title: w.title })),
-        addWidget,
-        removeWidget,
-        getWidget: (id) => activePage.widgets.find((w) => w.id === id),
-        updateWidget,
-        widgetSize: (type) => {
-            const c = (widgetDefaults[type as keyof typeof widgetDefaults]?.config ?? {}) as { w?: number; h?: number };
-            return { w: typeof c.w === "number" ? c.w : 6, h: typeof c.h === "number" ? c.h : 6 };
-        },
-        getContext: () => activePage.systemPrompt ?? "",
-        setContext: (val) => updatePageSettings(activePage.id, { systemPrompt: val }),
-        apiCalls: [],
-        injectMode,
-        getSkill: (ref) => {
-            const r = ref.trim().toLowerCase();
-            return activeSkills.find((s) => s.id.toLowerCase() === r || s.name.toLowerCase() === r);
-        },
-    });
+    // Everything the tools need from the live app. Pinned to a specific `pageId`
+    // (captured at send) and reading LIVE page state via getPage, so switching
+    // dashboards mid-run can't cross-write. `signal` cancels in-flight network
+    // tools; `activeSkills` powers loadSkill.
+    const toolContext = (pageId: string, signal: AbortSignal, activeSkills: { name: string; id: string; content: string }[]): ToolContext => {
+        const livePage = () => getPage(pageId);
+        return {
+            fetchPage: (url, max) => fetchPage(url, max, signal),
+            testEndpoint: (args) => testEndpoint({ ...args, signal }),
+            connections: allowedConnections,
+            resolveConnection: (ref) => {
+                const c = resolveConnection(ref);
+                return c && allowedConnections.some((a) => a.id === c.id) ? c : undefined;
+            },
+            tavily: allowedConnections.some((c) => c.id === tavily?.id) ? tavily : undefined,
+            canvasSend: (op) => canvasBridge.send(op),
+            listWidgets: () => (livePage()?.widgets ?? []).map((w) => ({ id: w.id, type: w.type, title: w.title })),
+            addWidget: (w) => addWidget(w, pageId),
+            removeWidget: (id) => removeWidget(id, pageId),
+            getWidget: (id) => livePage()?.widgets.find((w) => w.id === id),
+            updateWidget: (id, patch) => updateWidget(id, patch, pageId),
+            widgetSize: (type) => {
+                const c = (widgetDefaults[type as keyof typeof widgetDefaults]?.config ?? {}) as { w?: number; h?: number };
+                return { w: typeof c.w === "number" ? c.w : 6, h: typeof c.h === "number" ? c.h : 6 };
+            },
+            getContext: () => livePage()?.systemPrompt ?? "",
+            setContext: (val) => updatePageSettings(pageId, { systemPrompt: val }),
+            apiCalls: [],
+            injectMode,
+            getSkill: (ref) => {
+                const r = ref.trim().toLowerCase();
+                return activeSkills.find((s) => s.id.toLowerCase() === r || s.name.toLowerCase() === r);
+            },
+        };
+    };
 
     const sendText = async (text: string) => {
         const trimmed = text.trim();
@@ -341,14 +345,23 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                 },
             ]);
         }
-        const system =
-            buildSystemPrompt(surface, {
-                pageContext: activePage.systemPrompt,
-                assistantContext: assistant.systemPrompt,
-                skills: active,
-                dashboard: { title: activePage.title, description: activePage.description, kind: activePage.kind, widgets: activePage.widgets.map((w) => ({ type: w.type, title: w.title })) },
-            }) + injectionDirective;
+        // Pin the page for the whole run; rebuild the prompt EACH round from live
+        // state so just-added widgets (with ids) aren't stale across rounds.
+        const pageId = activePage.id;
+        const system = () => {
+            const page = getPage(pageId) ?? activePage;
+            return (
+                buildSystemPrompt(surface, {
+                    pageContext: page.systemPrompt,
+                    assistantContext: assistant.systemPrompt,
+                    skills: active,
+                    dashboard: { title: page.title, description: page.description, kind: page.kind, widgets: page.widgets.map((w) => ({ id: w.id, type: w.type, title: w.title })) },
+                }) + injectionDirective
+            );
+        };
         const jsonMode = (conn.aiProvider ?? "openai") !== "anthropic";
+        // Treat "did you…?", "what…", "?" etc. as questions → relax the act-nudge.
+        const userAskedQuestion = /\?\s*$/.test(trimmed) || /^(who|what|when|where|why|how|did|do|does|is|are|was|were|can|could|should|would|will)\b/i.test(trimmed);
 
         const pushTool = (op: Record<string, unknown>, result: Record<string, unknown>) =>
             setMessages((prev) => [
@@ -364,8 +377,9 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             system,
             jsonMode,
             brain,
-            ctx: toolContext(active.map((s) => ({ name: s.name, id: s.id, content: s.content }))),
+            ctx: toolContext(pageId, controller.signal, active.map((s) => ({ name: s.name, id: s.id, content: s.content }))),
             say: pushAssistant,
+            userAskedQuestion,
             onTool: ({ op, result }) => pushTool(op, result),
             signal: controller.signal,
         });

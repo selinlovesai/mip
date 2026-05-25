@@ -30,17 +30,43 @@ export function coerceReply(o: unknown): AgentReply | null {
     return { ops: [] };
 }
 
+/** All top-level BALANCED {...} (or [...]) regions, respecting strings/escapes.
+ *  Beats a greedy regex (over-captures trailing prose) and a lazy one (truncates
+ *  nested objects at the first "}"); returning ALL of them lets the caller skip a
+ *  stray `{curly}` in prose and find the real payload. */
+function allBalanced(text: string, open: "{" | "[", close: "}" | "]"): string[] {
+    const out: string[] = [];
+    let depth = 0;
+    let start = -1;
+    let inStr = false;
+    let esc = false;
+    for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (inStr) {
+            if (esc) esc = false;
+            else if (ch === "\\") esc = true;
+            else if (ch === '"') inStr = false;
+            continue;
+        }
+        if (ch === '"') inStr = true;
+        else if (ch === open) {
+            if (depth === 0) start = i;
+            depth++;
+        } else if (ch === close && depth > 0 && --depth === 0) {
+            out.push(text.slice(start, i + 1));
+        }
+    }
+    return out;
+}
+
 /** Parse an agent reply — tolerant of fences, surrounding prose, or a bare array.
  *  Returns null only when nothing parses as JSON (genuine prose). */
 export function parseAgentReply(text: string): AgentReply | null {
     const candidates: string[] = [];
     const fence = text.match(/```(?:json)?\s*\n?([\s\S]*?)```/i);
     if (fence) candidates.push(fence[1]!);
-    const obj = text.match(/\{[\s\S]*\}/); // any JSON object, even unfenced
-    if (obj) candidates.push(obj[0]);
-    const arr = text.match(/\[[\s\S]*\]/); // a bare ops array
-    if (arr) candidates.push(arr[0]);
-    candidates.push(text.trim());
+    // Objects first (our schema is an object), then arrays, then the whole text.
+    candidates.push(...allBalanced(text, "{", "}"), ...allBalanced(text, "[", "]"), text.trim());
     for (const c of candidates) {
         try {
             const coerced = coerceReply(JSON.parse(c.trim()));
