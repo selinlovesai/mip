@@ -30,6 +30,10 @@ function readContent<T extends Record<string, unknown>>(widget: MipWidget, defau
 
 const surface = "flex h-full flex-col rounded-xl bg-primary p-6 ring-1 ring-secondary";
 
+/** Coerce to an array — tolerates the agent omitting or null-ing a collection,
+ *  so the block renders empty instead of crashing on `.map`. */
+const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+
 function Prose({ text }: { text: string }) {
     return <div className="prose prose-sm dark:prose-invert max-w-none text-tertiary" dangerouslySetInnerHTML={{ __html: markdownToHtml(text) }} />;
 }
@@ -102,7 +106,7 @@ export function PricingWidget({ widget }: WidgetRenderProps) {
             {heading ? <h3 className="text-xl font-semibold text-primary">{heading}</h3> : null}
             {c.subheading ? <p className="mt-1 text-sm text-tertiary">{c.subheading}</p> : null}
             <div className="mt-5 grid flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {c.tiers.map((tier, i) => (
+                {arr<PricingTier>(c.tiers).map((tier, i) => (
                     <div key={i} className={cx("flex flex-col gap-4 rounded-xl p-5 ring-1", tier.highlighted ? "bg-secondary ring-brand" : "ring-secondary")}>
                         <div>
                             <div className="flex items-center gap-2">
@@ -120,7 +124,7 @@ export function PricingWidget({ widget }: WidgetRenderProps) {
                             {tier.description ? <p className="mt-1 text-sm text-tertiary">{tier.description}</p> : null}
                         </div>
                         <ul className="flex flex-col gap-2 text-sm text-secondary">
-                            {tier.features.map((f, j) => (
+                            {arr<string>(tier.features).map((f, j) => (
                                 <li key={j} className="flex items-center gap-2">
                                     <Check className="size-4 shrink-0 text-brand-secondary" />
                                     {f}
@@ -160,7 +164,7 @@ export function TestimonialWidget({ widget }: WidgetRenderProps) {
     const c = readContent(widget, {} as { quote?: string; author?: string; role?: string; avatarUrl?: string; rating?: number });
     const quote = c.quote ?? "“An amazing product that transformed our workflow.”";
     const author = c.author ?? "Jane Doe";
-    const rating = c.rating ?? 5;
+    const rating = typeof c.rating === "number" ? c.rating : Number(c.rating) || 5;
     return (
         <div className={cx(surface, "gap-4")}>
             {rating > 0 ? <RatingStars rating={rating} aria-label={`${rating} out of 5 stars`} /> : null}
@@ -191,7 +195,7 @@ export function FeatureGridWidget({ widget }: WidgetRenderProps) {
             {heading ? <h3 className="text-xl font-semibold text-primary">{heading}</h3> : null}
             {c.subheading ? <p className="mt-1 text-sm text-tertiary">{c.subheading}</p> : null}
             <div className={cx("mt-5 grid flex-1 gap-5", cols === 2 ? "sm:grid-cols-2" : cols === 4 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-2 lg:grid-cols-3")}>
-                {c.features.map((f, i) => (
+                {arr<FeatureItem>(c.features).map((f, i) => (
                     <div key={i} className="flex flex-col gap-2">
                         {f.icon ? <span className="flex size-10 items-center justify-center rounded-lg bg-utility-brand-50 text-lg">{f.icon}</span> : null}
                         <h4 className="text-sm font-semibold text-primary">{f.title}</h4>
@@ -217,12 +221,12 @@ export function StatsGridWidget({ widget }: WidgetRenderProps) {
         <div className={surface}>
             {heading ? <h3 className="text-xl font-semibold text-primary">{heading}</h3> : null}
             <div className={cx("mt-5 grid flex-1 gap-5", cols === 2 ? "grid-cols-2" : cols === 4 ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-3")}>
-                {c.stats.map((s, i) => (
+                {arr<StatItem>(c.stats).map((s, i) => (
                     <div key={i} className="flex flex-col gap-1">
                         <div className="flex items-baseline gap-2">
                             <span className="text-display-sm font-semibold text-primary">{s.value}</span>
                             {s.delta ? (
-                                <Badge type="pill-color" color={s.delta.startsWith("-") ? "error" : "success"} size="sm">
+                                <Badge type="pill-color" color={String(s.delta).startsWith("-") ? "error" : "success"} size="sm">
                                     {s.delta}
                                 </Badge>
                             ) : null}
@@ -248,7 +252,7 @@ export function FaqWidget({ widget }: WidgetRenderProps) {
         <div className={surface}>
             {heading ? <h3 className="text-xl font-semibold text-primary">{heading}</h3> : null}
             <div className="mt-4 flex flex-col divide-y divide-border-secondary">
-                {c.items.map((item, i) => (
+                {arr<FaqItem>(c.items).map((item, i) => (
                     <div key={i}>
                         <button type="button" onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i} className="flex w-full items-center justify-between gap-3 py-3 text-left text-sm font-medium text-secondary">
                             <span>{item.question}</span>

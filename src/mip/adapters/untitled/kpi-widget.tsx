@@ -30,12 +30,16 @@ export function KpiWidget({ widget, dataState }: WidgetRenderProps) {
 
     const displayValue = formatValue(rawValue, valueFormat);
 
+    // Delta may arrive as a number (5.2) OR a string ("+5.2%", "-3%"). Show it in
+    // either case — parse a leading number for the trend arrow, fall back to the
+    // sign in the string.
     const rawDelta = mapped("delta") ?? settings.delta;
-    const deltaNum = typeof rawDelta === "number" ? rawDelta : Number(rawDelta);
-    const hasDelta = rawDelta != null && rawDelta !== "" && Number.isFinite(deltaNum);
-    const deltaIsUp = hasDelta && deltaNum > 0;
-    const deltaIsDown = hasDelta && deltaNum < 0;
-    const deltaDisplay = typeof rawDelta === "string" ? rawDelta : hasDelta ? `${formatNumber(Math.abs(deltaNum))}%` : "";
+    const deltaStr = rawDelta == null ? "" : String(rawDelta).trim();
+    const deltaNum = typeof rawDelta === "number" ? rawDelta : parseFloat(deltaStr.replace(/[^0-9.+-]/g, ""));
+    const hasDelta = deltaStr !== "";
+    const deltaIsUp = Number.isFinite(deltaNum) ? deltaNum > 0 : /^\+/.test(deltaStr);
+    const deltaIsDown = Number.isFinite(deltaNum) ? deltaNum < 0 : /^-/.test(deltaStr);
+    const deltaDisplay = typeof rawDelta === "string" ? rawDelta : Number.isFinite(deltaNum) ? `${formatNumber(Math.abs(deltaNum))}%` : deltaStr;
     const deltaLabel = typeof settings.deltaLabel === "string" ? settings.deltaLabel : "vs. last period";
 
     return (
