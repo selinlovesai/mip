@@ -460,7 +460,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
 
     // ---- Message list (shared by sidebar + chat) ----
     const messageList = (
-        <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto p-4">
+        <div ref={listRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
             {messages.map((msg) => {
                 if (msg.role === "user")
                     return (
