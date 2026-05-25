@@ -125,6 +125,26 @@ describe("dispatch + validation", () => {
         expect(r.ok).toBe(true);
         expect(r.endpoints).toEqual(["GET /api/v2/analytics/overview", "GET /api/v2/analytics/top-pages"]);
     });
+    it("callApi structurally blocks unknown paths (no network) but allows placeholder matches", async () => {
+        const conn = { id: "c1", name: "X", type: "rest", baseUrl: "https://x", endpoints: [{ method: "GET", path: "/api/v2/projects/:project_id" }] };
+        // Known path with a real id → passes the guard and hits the network.
+        let calledOk = false;
+        const ok = await dispatch({ kind: "callApi", sourceId: "c1", path: "/api/v2/projects/123" }, "dashboard", ctx({
+            resolveConnection: () => conn as never,
+            testEndpoint: async () => { calledOk = true; return { ok: true, body: {} }; },
+        }));
+        expect(calledOk).toBe(true);
+        expect(ok.ok).toBe(true);
+        // Unknown path → rejected BEFORE any network call.
+        let calledBad = false;
+        const bad = await dispatch({ kind: "callApi", sourceId: "c1", path: "/nope" }, "dashboard", ctx({
+            resolveConnection: () => conn as never,
+            testEndpoint: async () => { calledBad = true; return { ok: true, body: {} }; },
+        }));
+        expect(calledBad).toBe(false);
+        expect(bad.ok).toBe(false);
+        expect(String(bad.error)).toMatch(/not an endpoint/);
+    });
     it("callApi failure guides back to real endpoints (no path guessing)", async () => {
         const conn = { id: "c1", name: "X", type: "rest", baseUrl: "https://x", endpoints: [{ method: "GET", path: "/api/v2/internal-links/pages" }, { method: "GET", path: "/api/v2/feed" }] };
         const r = await dispatch({ kind: "callApi", sourceId: "c1", path: "/submissions" }, "dashboard", ctx({

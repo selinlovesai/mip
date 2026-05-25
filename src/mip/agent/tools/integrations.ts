@@ -9,6 +9,26 @@
 
 import type { Tool, ToolContext, AgentOp, OpResult } from "../types";
 
+type Endpoint = { method: string; path: string };
+
+/** Does `actual` match an endpoint `template`? Template segments that start with
+ *  ":" or are pure example ids (digits) act as wildcards, so /x/123 matches both
+ *  /x/:id and /x/1. Query strings are ignored. */
+function pathMatchesTemplate(template: string, actual: string): boolean {
+    const t = template.split("?")[0].split("/").filter(Boolean);
+    const a = actual.split("?")[0].split("/").filter(Boolean);
+    if (t.length !== a.length) return false;
+    return t.every((seg, i) => seg.startsWith(":") || /^\d+$/.test(seg) || seg === a[i]);
+}
+
+/** Suggestions for a missed path: keyword-matched endpoints, else the GET resource map. */
+function endpointSuggestions(eps: Endpoint[], path: string): { didYouMean: string[] } | { resourceAreas: string[] } {
+    const tokens = path.split(/[/\-_]/).filter((t) => t.length >= 4).map((t) => t.toLowerCase());
+    const matched = [...new Set(eps.filter((e) => tokens.some((t) => e.path.toLowerCase().includes(t))).map((e) => `${e.method} ${e.path}`))].slice(0, 15);
+    if (matched.length) return { didYouMean: matched };
+    return { resourceAreas: [...new Set(eps.filter((e) => e.method.toUpperCase() === "GET").map((e) => e.path.split("/").slice(0, 4).join("/")))].slice(0, 30) };
+}
+
 const fetchTool: Tool = {
     name: "fetch",
     doc: "fetch { url }                          — read a web page's readable text (returns {title, text})",
@@ -56,6 +76,23 @@ const callApiTool: Tool = {
         const src = ctx.resolveConnection(op.sourceId);
         if (!src) return { kind: "callApi", ok: false, error: `No connection matching "${String(op.sourceId)}". Call listConnections and use one of the returned ids.` };
         const path = typeof op.path === "string" ? op.path : (src.endpoints?.[0]?.path ?? "/");
+        const method = (typeof op.method === "string" ? op.method : "GET").toUpperCase();
+        const eps = src.endpoints ?? [];
+        const cleanPath = path.split("?")[0];
+
+        // STRUCTURAL GUARD: when the connection enumerates endpoints, reject any
+        // path that isn't one of them (placeholder/numeric-aware) BEFORE hitting
+        // the network — guessing is impossible, not just discouraged.
+        if (eps.length && !/^https?:\/\//.test(path) && !eps.some((e) => e.method.toUpperCase() === method && pathMatchesTemplate(e.path, cleanPath))) {
+            return {
+                kind: "callApi",
+                ok: false,
+                error: `"${method} ${cleanPath}" is not an endpoint of "${src.name}". Do NOT guess paths.`,
+                hint: "Use findEndpoints { sourceId, query } to get a real path, then call exactly that (replace :placeholders).",
+                ...endpointSuggestions(eps, cleanPath),
+            };
+        }
+
         const base = (src.baseUrl ?? "").replace(/\/$/, "");
         let url = /^https?:\/\//.test(path) ? path : base + (path.startsWith("/") ? path : `/${path}`);
         const params = op.params as Record<string, unknown> | undefined;
@@ -67,29 +104,19 @@ const callApiTool: Tool = {
         for (const h of src.headers ?? []) if (h.key) headers[h.key] = h.value;
         if (src.auth?.type === "bearer" && src.auth.token) headers["Authorization"] = `Bearer ${src.auth.token}`;
         else if (src.auth?.type === "apiKeyHeader" && src.auth.keyName) headers[src.auth.keyName] = src.auth.keyValue ?? "";
-        const r = await ctx.testEndpoint({ method: typeof op.method === "string" ? op.method : "GET", url, headers, body: op.body });
+        const r = await ctx.testEndpoint({ method, url, headers, body: op.body });
         if (r.ok) {
             ctx.apiCalls.push({ sourceId: src.id, path });
             return { kind: "callApi", ok: true, status: r.status, data: JSON.stringify(r.body).slice(0, 4000) };
         }
-        // Guide the model back to REAL endpoints instead of guessing more paths.
-        const eps = src.endpoints ?? [];
-        const reqMethod = (typeof op.method === "string" ? op.method : "GET").toUpperCase();
-        const known = eps.map((e) => `${e.method.toUpperCase()} ${e.path}`);
-        const isKnown = known.includes(`${reqMethod} ${path}`);
-        // Endpoints sharing a word with the attempted path, then the GET resource map.
-        const tokens = path.split(/[/\-_]/).filter((t) => t.length >= 4).map((t) => t.toLowerCase());
-        const matched = [...new Set(eps.filter((e) => tokens.some((t) => e.path.toLowerCase().includes(t))).map((e) => `${e.method} ${e.path}`))].slice(0, 15);
-        const resourceAreas = [...new Set(eps.filter((e) => e.method.toUpperCase() === "GET").map((e) => e.path.split("/").slice(0, 4).join("/")))].slice(0, 30);
+        // The path is real (passed the guard) but the call errored — almost always
+        // auth or an unfilled :placeholder.
         return {
             kind: "callApi",
             ok: false,
             status: r.status,
             error: typeof r.error === "string" ? r.error : `status ${r.status ?? "?"}`,
-            hint: isKnown
-                ? "That endpoint exists but errored — check auth/params (replace :placeholders with real ids)."
-                : "That path is NOT a real endpoint — do NOT keep guessing. Pick a path from this connection's listed endpoints (see listConnections) that matches the task, and replace :placeholders.",
-            ...(matched.length ? { didYouMean: matched } : { resourceAreas }),
+            hint: "This endpoint exists but errored — check the connection's API key/auth and replace any :placeholders with real ids.",
         };
     },
 };

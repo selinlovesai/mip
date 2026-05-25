@@ -128,7 +128,7 @@ finish() → say step-limit note
 - **Op validation** → a malformed op (missing `url`/`query`/`sourceId`/`type`/`id`) returns a typed error and is **not** applied; the model self-corrects.
 - **Mutation guard** → catches "I added a widget" with no mutating op — fires **only when the user asked for a change** (add/edit/remove…), so questions and "confirm you deleted it" don't trip it.
 - **Failure circuit-breaker** → halts after N consecutive all-failed rounds (`maxFailStreak`, default 2) and reports the error — no burning 8 rounds on repeated 404s/validation errors.
-- **Endpoint guidance** → a failed `callApi` returns a `hint` + `didYouMean`/`resourceAreas`, steering the model back to real listed endpoints instead of guessing paths.
+- **Endpoint guard (structural)** → `callApi` rejects any path that isn't a listed endpoint of the connection (placeholder/numeric-aware) **before the network call** — guessing is impossible, not just discouraged; the error points at `findEndpoints` with `didYouMean`/`resourceAreas`.
 - **No blank output / graceful finish** → assistant text is emitted only when non-blank; if a turn ends saying nothing, the **last tool error** (or a neutral note) is surfaced instead of an empty bubble.
 - **Structured truncation** → tool results shrink field-wise (clip strings, cap arrays) keeping VALID JSON.
 - **Abort** → Stop sets the signal; the loop bails AND the in-flight `fetch`/`testEndpoint`/model call is cancelled.
