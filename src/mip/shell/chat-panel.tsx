@@ -122,7 +122,7 @@ const introMessage: Message = { id: "intro", role: "assistant", text: INTRO };
 
 export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
     const { activePage, addWidget, removeWidget, updatePageSettings } = useDashboard();
-    const { assistant, aiConnections, connections, getConnection, skills } = useSettings();
+    const { assistant, aiConnections, connections, getConnection, skills, widgetDefaults } = useSettings();
     const [mode, setMode] = useState<ChatMode>("sidebar");
     // Conversations are scoped per page (dashboard/canvas) — switching the active
     // page swaps to that page's own session.
@@ -247,6 +247,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         listWidgets: () => activePage.widgets.map((w) => ({ id: w.id, type: w.type, title: w.title })),
         addWidget,
         removeWidget,
+        widgetSize: (type) => widgetDefaults[type as keyof typeof widgetDefaults] ?? { w: 6, h: 6 },
         getContext: () => activePage.systemPrompt ?? "",
         setContext: (val) => updatePageSettings(activePage.id, { systemPrompt: val }),
         apiCalls: [],

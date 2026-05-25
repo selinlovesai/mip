@@ -3,7 +3,9 @@
 import type { MipWidget } from "@/mip/schema";
 import type { DashboardPage } from "./store";
 
-const L = (x: number, y: number, w: number, h: number): MipWidget["layout"] => ({ x, y, w, h });
+// Heights are authored on the legacy 140px-row scale; the grid now uses ~70px
+// rows, so double `h` here to preserve the original visual size.
+const L = (x: number, y: number, w: number, h: number): MipWidget["layout"] => ({ x, y, w, h: h * 2 });
 
 const overviewWidgets: MipWidget[] = [
     { id: "revenue", type: "kpi", title: "Revenue", layout: L(0, 0, 4, 1), settings: { value: 128400, valueFormat: "currency", delta: 12.5, deltaLabel: "vs. last month" } },
@@ -71,7 +73,7 @@ const marketingWidgets: MipWidget[] = [
 
 export function seedPages(): DashboardPage[] {
     return [
-        { id: "overview", title: "Overview", cols: 12, rowHeight: 140, widgets: overviewWidgets },
-        { id: "marketing", title: "Marketing", cols: 12, rowHeight: 140, widgets: marketingWidgets },
+        { id: "overview", title: "Overview", cols: 12, rowHeight: 70, widgets: overviewWidgets },
+        { id: "marketing", title: "Marketing", cols: 12, rowHeight: 70, widgets: marketingWidgets },
     ];
 }

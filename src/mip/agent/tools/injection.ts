@@ -15,16 +15,19 @@ import type { MipWidget } from "../../schema";
 import { WIDGET_CATALOG, makeWidget } from "../../shell/widget-catalog";
 import type { Tool, ToolContext, AgentOp, OpResult } from "../types";
 
-/** Build a MipWidget from an op's {type,title,settings,w,h}, seeded by catalog defaults. */
-function buildWidget(op: AgentOp): MipWidget | { error: string } {
+/** Build a MipWidget from an op's {type,title,settings,w,h}. Size comes from the
+ *  op if given, else the user's configured default for the type (Settings →
+ *  Widgets); other defaults (example settings) come from the catalog. */
+function buildWidget(op: AgentOp, ctx: ToolContext): MipWidget | { error: string } {
     const type = op.type as MipWidget["type"];
     const base = WIDGET_CATALOG.find((c) => c.type === type);
     if (!base) return { error: `Unknown widget type "${String(type)}". Pick one from the documented list.` };
+    const size = ctx.widgetSize(String(type));
     return makeWidget({
         ...base,
         ...(typeof op.title === "string" ? { label: op.title } : {}),
-        ...(typeof op.w === "number" ? { w: op.w } : {}),
-        ...(typeof op.h === "number" ? { h: op.h } : {}),
+        w: typeof op.w === "number" ? op.w : size.w,
+        h: typeof op.h === "number" ? op.h : size.h,
         ...(op.settings && typeof op.settings === "object" ? { settings: { ...base.settings, ...(op.settings as Record<string, unknown>) } } : {}),
     });
 }
@@ -70,7 +73,7 @@ const injectJson: Tool = {
                 error: `This data came from a saved API (sourceId "${api.sourceId}"${api.path ? `, path "${api.path}"` : ""}). Do NOT snapshot API data with injectJson — use injectConnection so the widget reads it live, e.g. {"kind":"injectConnection","type":"${String(op.type)}","sourceId":"${api.sourceId}","request":{"method":"GET","path":"${api.path ?? "/"}"},"map":{…}}.`,
             };
         }
-        const widget = buildWidget(op);
+        const widget = buildWidget(op, ctx);
         if ("error" in widget) return { kind: op.kind, ok: false, error: widget.error };
         ctx.addWidget(widget);
         return { kind: op.kind, ok: true, id: widget.id, type: widget.type, bound: false };
@@ -83,7 +86,7 @@ const injectConnection: Tool = {
     surfaces: ["dashboard"],
     mutating: true,
     run: async (op: AgentOp, ctx: ToolContext): Promise<OpResult> => {
-        const widget = buildWidget(op);
+        const widget = buildWidget(op, ctx);
         if ("error" in widget) return { kind: op.kind, ok: false, error: widget.error };
         const bound = bind(widget, op, ctx);
         if ("error" in bound) return { kind: op.kind, ok: false, error: bound.error };

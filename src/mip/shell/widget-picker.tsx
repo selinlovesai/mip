@@ -10,11 +10,13 @@ import { Dialog, Modal, ModalOverlay } from "@/components/application/modals/mod
 import { CloseButton } from "@/components/base/buttons/close-button";
 import { Input } from "@/components/base/input/input";
 import { useDashboard } from "@/mip/store";
+import { useSettings } from "@/mip/settings/settings-store";
 import { cx } from "@/utils/cx";
 import { WIDGET_CATALOG, makeWidget, type CatalogEntry } from "./widget-catalog";
 
 export function WidgetPicker({ open, onClose }: { open: boolean; onClose: () => void }) {
     const { addWidget } = useDashboard();
+    const { widgetDefaults } = useSettings();
     const [query, setQuery] = useState("");
 
     const groups = useMemo(() => {
@@ -29,7 +31,9 @@ export function WidgetPicker({ open, onClose }: { open: boolean; onClose: () => 
     }, [query]);
 
     const pick = (entry: CatalogEntry) => {
-        addWidget(makeWidget(entry));
+        // Use the user's customized default size for this type (Settings → Widgets).
+        const size = widgetDefaults[entry.type] ?? { w: entry.w, h: entry.h };
+        addWidget(makeWidget({ ...entry, w: size.w, h: size.h }));
         onClose();
     };
 

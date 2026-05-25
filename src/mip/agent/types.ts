@@ -68,6 +68,8 @@ export interface ToolContext {
     listWidgets: () => Array<{ id: string; type: string; title?: string }>;
     addWidget: (widget: MipWidget) => void;
     removeWidget: (id: string) => void;
+    /** The user's default grid size for a widget type (Settings → Widgets). */
+    widgetSize: (type: string) => { w: number; h: number };
 
     // The page's "AI assistant context (system prompt)" — read + update.
     getContext: () => string;

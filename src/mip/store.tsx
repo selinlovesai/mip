@@ -55,10 +55,23 @@ interface DashboardState {
 
 const STORAGE_KEY = "mip-tailwind-dashboard-v3";
 
+/** Halve old 140px-row pages to the new ~70px scale, doubling widget heights so
+ *  they keep their visual size. Idempotent: only pages with rowHeight > 100. */
+function migrateRowHeight(state: DashboardState): DashboardState {
+    return {
+        ...state,
+        pages: state.pages.map((p) =>
+            p.rowHeight > 100
+                ? { ...p, rowHeight: Math.round(p.rowHeight / 2), widgets: p.widgets.map((w) => ({ ...w, layout: { ...w.layout, h: w.layout.h * 2 } })) }
+                : p,
+        ),
+    };
+}
+
 function load(): DashboardState {
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) return JSON.parse(raw) as DashboardState;
+        if (raw) return migrateRowHeight(JSON.parse(raw) as DashboardState);
     } catch {
         /* ignore corrupt state */
     }
@@ -124,17 +137,17 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
     const addPage = useCallback((title: string) => {
         const id = `page-${Date.now()}`;
-        setState((s) => ({ pages: [...s.pages, { id, title, cols: 12, rowHeight: 140, widgets: [] }], activePageId: id }));
+        setState((s) => ({ pages: [...s.pages, { id, title, cols: 12, rowHeight: 70, widgets: [] }], activePageId: id }));
     }, []);
 
     const importTemplate = useCallback((title: string, widgets: MipWidget[]) => {
         const id = `page-${Date.now()}`;
-        setState((s) => ({ pages: [...s.pages, { id, title, cols: 12, rowHeight: 140, widgets }], activePageId: id }));
+        setState((s) => ({ pages: [...s.pages, { id, title, cols: 12, rowHeight: 70, widgets }], activePageId: id }));
     }, []);
 
     const addCanvas = useCallback((title: string) => {
         const id = `canvas-${Date.now()}`;
-        setState((s) => ({ pages: [...s.pages, { id, title: title.trim() || "Canvas", cols: 12, rowHeight: 140, widgets: [], kind: "canvas", html: "" }], activePageId: id }));
+        setState((s) => ({ pages: [...s.pages, { id, title: title.trim() || "Canvas", cols: 12, rowHeight: 70, widgets: [], kind: "canvas", html: "" }], activePageId: id }));
     }, []);
 
     const setCanvasHtml = useCallback((id: string, html: string) => {

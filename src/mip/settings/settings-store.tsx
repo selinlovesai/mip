@@ -8,8 +8,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AuthMethod } from "./apps-catalog";
 import { NATIVE_SKILLS, type Skill } from "@/mip/agent/skills";
+import { DEFAULT_WIDGET_SIZES, type WidgetType } from "@/mip/schema";
 
 export type { Skill } from "@/mip/agent/skills";
+export type WidgetSize = { w: number; h: number };
 
 export type DataSourceType = "mock" | "rest" | "json" | "csv";
 
@@ -83,6 +85,8 @@ interface SettingsState {
     skills: Skill[];
     /** Whether the editable sample skills have been seeded (once). */
     skillsSeeded?: boolean;
+    /** Default grid size per widget type (customizable in Settings → Widgets). */
+    widgetDefaults: Record<WidgetType, WidgetSize>;
     /** User acknowledged the risks of the freeform AI canvas (arbitrary code). */
     canvasConsented?: boolean;
 }
@@ -156,6 +160,7 @@ const DEFAULT_STATE: SettingsState = {
     profile: { name: "Super Admin", email: "superadmin@protocol.dev" },
     skills: [...NATIVE_SKILLS, ...SAMPLE_SKILLS],
     skillsSeeded: true,
+    widgetDefaults: DEFAULT_WIDGET_SIZES,
 };
 
 function load(): SettingsState {
@@ -163,7 +168,13 @@ function load(): SettingsState {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) {
             const parsed = JSON.parse(raw) as SettingsState;
-            return { ...DEFAULT_STATE, ...parsed, skills: mergeSkills(parsed.skills, parsed.skillsSeeded), skillsSeeded: true };
+            return {
+                ...DEFAULT_STATE,
+                ...parsed,
+                skills: mergeSkills(parsed.skills, parsed.skillsSeeded),
+                skillsSeeded: true,
+                widgetDefaults: { ...DEFAULT_WIDGET_SIZES, ...(parsed.widgetDefaults ?? {}) },
+            };
         }
     } catch {
         /* ignore */
@@ -192,6 +203,10 @@ interface SettingsValue {
     addSkill: (skill: Omit<Skill, "id" | "builtin">) => string;
     updateSkill: (id: string, patch: Partial<Skill>) => void;
     removeSkill: (id: string) => void;
+    /** Default grid size per widget type. */
+    widgetDefaults: Record<WidgetType, WidgetSize>;
+    setWidgetDefault: (type: WidgetType, size: WidgetSize) => void;
+    resetWidgetDefaults: () => void;
     profile: UserProfile;
     setProfile: (patch: Partial<UserProfile>) => void;
     canvasConsented: boolean;
@@ -262,6 +277,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, skills: s.skills.filter((sk) => sk.id !== id || sk.builtin) }));
     }, []);
 
+    const setWidgetDefault = useCallback((type: WidgetType, size: WidgetSize) => {
+        setState((s) => ({ ...s, widgetDefaults: { ...s.widgetDefaults, [type]: size } }));
+    }, []);
+
+    const resetWidgetDefaults = useCallback(() => {
+        setState((s) => ({ ...s, widgetDefaults: DEFAULT_WIDGET_SIZES }));
+    }, []);
+
     const setProfile = useCallback((patch: Partial<UserProfile>) => {
         setState((s) => ({ ...s, profile: { ...s.profile, ...patch } }));
     }, []);
@@ -269,8 +292,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const setCanvasConsented = useCallback((v: boolean) => setState((s) => ({ ...s, canvasConsented: v })), []);
 
     const value = useMemo<SettingsValue>(
-        () => ({ connections: state.connections, apps: state.apps, isAppConnected, connectApp, disconnectApp, addConnection, ensureConnection, updateConnection, removeConnection, getConnection, aiConnections, assistant: state.assistant, setAssistant, skills: state.skills, addSkill, updateSkill, removeSkill, profile: state.profile, setProfile, canvasConsented: !!state.canvasConsented, setCanvasConsented }),
-        [state, isAppConnected, connectApp, disconnectApp, addConnection, ensureConnection, updateConnection, removeConnection, getConnection, aiConnections, setAssistant, addSkill, updateSkill, removeSkill, setProfile, setCanvasConsented],
+        () => ({ connections: state.connections, apps: state.apps, isAppConnected, connectApp, disconnectApp, addConnection, ensureConnection, updateConnection, removeConnection, getConnection, aiConnections, assistant: state.assistant, setAssistant, skills: state.skills, addSkill, updateSkill, removeSkill, widgetDefaults: state.widgetDefaults, setWidgetDefault, resetWidgetDefaults, profile: state.profile, setProfile, canvasConsented: !!state.canvasConsented, setCanvasConsented }),
+        [state, isAppConnected, connectApp, disconnectApp, addConnection, ensureConnection, updateConnection, removeConnection, getConnection, aiConnections, setAssistant, addSkill, updateSkill, removeSkill, setWidgetDefault, resetWidgetDefaults, setProfile, setCanvasConsented],
     );
 
     return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

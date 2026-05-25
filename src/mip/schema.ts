@@ -49,6 +49,44 @@ export const WIDGET_TYPES = [
 ] as const;
 export type WidgetType = (typeof WIDGET_TYPES)[number];
 
+/** Default grid size per widget type, in a 12-column grid with ~70px rows.
+ *  KPIs are small (3×2), charts are square-ish (6×6), tables/sections wide. */
+export const DEFAULT_WIDGET_SIZES: Record<WidgetType, { w: number; h: number }> = {
+    kpi: { w: 3, h: 2 },
+    progress: { w: 3, h: 2 },
+    lineChart: { w: 6, h: 6 },
+    barChart: { w: 6, h: 6 },
+    areaChart: { w: 6, h: 6 },
+    pieChart: { w: 4, h: 6 },
+    donutChart: { w: 4, h: 6 },
+    table: { w: 6, h: 8 },
+    list: { w: 4, h: 6 },
+    detail: { w: 4, h: 4 },
+    markdown: { w: 4, h: 4 },
+    image: { w: 4, h: 6 },
+    flowchart: { w: 6, h: 6 },
+    sequenceDiagram: { w: 6, h: 6 },
+    mindmap: { w: 6, h: 6 },
+    timeline: { w: 6, h: 6 },
+    ganttChart: { w: 8, h: 6 },
+    form: { w: 4, h: 6 },
+    button: { w: 2, h: 2 },
+    pageHeader: { w: 12, h: 2 },
+    card: { w: 3, h: 3 },
+    tabs: { w: 6, h: 6 },
+    modal: { w: 3, h: 2 },
+    drawer: { w: 3, h: 2 },
+    googleMap: { w: 6, h: 6 },
+    contentSection: { w: 12, h: 6 },
+    cta: { w: 12, h: 4 },
+    faq: { w: 8, h: 6 },
+    featureGrid: { w: 8, h: 6 },
+    hero: { w: 12, h: 6 },
+    pricing: { w: 12, h: 8 },
+    statsGrid: { w: 8, h: 4 },
+    testimonial: { w: 4, h: 6 },
+};
+
 export const FIELD_TYPES = ["text", "email", "number", "date", "select", "checkbox", "toggle", "textarea"] as const;
 export type FieldType = (typeof FIELD_TYPES)[number];
 

@@ -6,7 +6,7 @@
  */
 
 import { useState, type ComponentType } from "react";
-import { ArrowLeft, Database01, GraduationHat01, Key01, LayoutAlt01, Palette, Stars01, User01, Users01 } from "@untitledui/icons";
+import { ArrowLeft, Database01, GraduationHat01, Grid01, Key01, LayoutAlt01, Palette, Stars01, User01, Users01 } from "@untitledui/icons";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { cx } from "@/utils/cx";
 import { AccessTab } from "./tabs/access-tab";
@@ -15,10 +15,11 @@ import { ConnectionsTab } from "./tabs/connections-tab";
 import { AppearanceTab } from "./tabs/appearance-tab";
 import { AssistantTab } from "./tabs/assistant-tab";
 import { SkillsTab } from "./tabs/skills-tab";
+import { WidgetsTab } from "./tabs/widgets-tab";
 import { ProfileTab } from "./tabs/profile-tab";
 import { UsersTab } from "./tabs/users-tab";
 
-export type SettingsTabId = "profile" | "appearance" | "connections" | "apps" | "assistant" | "skills" | "access" | "users";
+export type SettingsTabId = "profile" | "appearance" | "connections" | "apps" | "assistant" | "skills" | "widgets" | "access" | "users";
 type TabId = SettingsTabId;
 
 const TABS: Array<{ id: TabId; label: string; icon: ComponentType<{ className?: string }>; content: ComponentType }> = [
@@ -28,6 +29,7 @@ const TABS: Array<{ id: TabId; label: string; icon: ComponentType<{ className?: 
     { id: "apps", label: "Apps", icon: LayoutAlt01, content: AppsTab },
     { id: "assistant", label: "Assistant", icon: Stars01, content: AssistantTab },
     { id: "skills", label: "Skills", icon: GraduationHat01, content: SkillsTab },
+    { id: "widgets", label: "Widgets", icon: Grid01, content: WidgetsTab },
     { id: "access", label: "Access", icon: Key01, content: AccessTab },
     { id: "users", label: "Users", icon: Users01, content: UsersTab },
 ];
