@@ -8,7 +8,7 @@
  * Edits are staged in a local draft and committed via `store.updatePageSettings`.
  */
 
-import { useEffect, useMemo, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { Eye, LayoutAlt01, Plus, Stars01, Trash01, Variable } from "@untitledui/icons";
 import { Dialog, Modal, ModalOverlay } from "@/components/application/modals/modal";
 import { Button } from "@/components/base/buttons/button";
@@ -67,6 +67,11 @@ export function DashboardSettingsModal({ open, onClose }: { open: boolean; onClo
     const [tab, setTab] = useState<TabId>("general");
     const [draft, setDraft] = useState<DashboardPage>(activePage);
     const [idError, setIdError] = useState<string | null>(null);
+    // Keep the scroll position when a control (e.g. a checkbox) takes focus —
+    // react-aria focuses a hidden input, which would otherwise scroll it into
+    // view and make the modal "jump".
+    const bodyRef = useRef<HTMLDivElement>(null);
+    const savedScroll = useRef(0);
 
     // Re-sync the draft whenever the modal (re)opens or the active page changes.
     useEffect(() => {
@@ -194,7 +199,17 @@ export function DashboardSettingsModal({ open, onClose }: { open: boolean; onClo
                             </nav>
 
                             {/* content */}
-                            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+                            <div
+                                ref={bodyRef}
+                                onPointerDownCapture={() => {
+                                    if (bodyRef.current) savedScroll.current = bodyRef.current.scrollTop;
+                                }}
+                                onFocusCapture={() => {
+                                    const el = bodyRef.current;
+                                    if (el) requestAnimationFrame(() => (el.scrollTop = savedScroll.current));
+                                }}
+                                className="min-h-0 flex-1 overflow-y-auto p-5"
+                            >
                                 {tab === "general" ? (
                                     <div className="flex flex-col gap-4">
                                         <h3 className="text-sm font-semibold text-primary">Page Settings</h3>
