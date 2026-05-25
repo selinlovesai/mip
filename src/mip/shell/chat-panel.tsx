@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, Expand01, GraduationHat01, Loading02, Microphone01, LayoutRight, MessageChatCircle, Minimize01, Send01, Stars01, StopCircle, Tool02, X } from "@untitledui/icons";
+import { ChevronRight, Code02, Database01, Dataflow03, Expand01, GraduationHat01, Loading02, Microphone01, LayoutRight, MessageChatCircle, Minimize01, Send01, Stars01, StopCircle, Tool02, X } from "@untitledui/icons";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { TextArea } from "@/components/base/textarea/textarea";
 import { chat, fetchPage, testEndpoint, transcribe } from "@/mip/api";
@@ -145,6 +145,8 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         });
     const [draft, setDraft] = useState("");
     const [thinking, setThinking] = useState(false);
+    // Preferred widget-injection style: auto (agent decides) · json (inline) · api (live REST bind).
+    const [injectMode, setInjectMode] = useState<"auto" | "json" | "api">("auto");
     // Context-aware starter suggestions, generated per page on first open.
     const [suggestions, setSuggestions] = useState<Record<string, string[]>>({});
     const suggestingRef = useRef<Set<string>>(new Set());
@@ -311,6 +313,13 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         // Skills active for THIS dashboard (native on-by-default minus disabled,
         // plus opted-in custom), filtered to the surface. Context is injected at
         // the TOP of the prompt (see buildSystemPrompt).
+        // User-forced injection style (the JSON/API toggle in the composer).
+        const injectionDirective =
+            injectMode === "json"
+                ? "\n\nINJECTION MODE (user-forced): use injectJson with inline settings. Do NOT bind to a connection unless the user explicitly asks."
+                : injectMode === "api"
+                  ? "\n\nINJECTION MODE (user-forced): use injectConnection bound to a saved connection (listConnections → callApi → injectConnection). Do NOT use injectJson; if no suitable connection exists, ask the user to add one."
+                  : "";
         const active = resolveSkills(skills, activePage.agent, surface);
         // Surface which skills are in context as a collapsible transcript entry.
         if (active.length) {
@@ -324,7 +333,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                 },
             ]);
         }
-        const system = buildSystemPrompt(surface, { pageContext: activePage.systemPrompt, assistantContext: assistant.systemPrompt, skills: active.map((s) => s.content) });
+        const system = buildSystemPrompt(surface, { pageContext: activePage.systemPrompt, assistantContext: assistant.systemPrompt, skills: active.map((s) => s.content) }) + injectionDirective;
         const jsonMode = (conn.aiProvider ?? "openai") !== "anthropic";
 
         const pushTool = (op: Record<string, unknown>, result: Record<string, unknown>) =>
@@ -512,6 +521,26 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         }
     };
 
+    // ---- Injection-mode toggle (auto → json → api), shared by every composer.
+    // Steers how the agent adds widgets; only meaningful on dashboard pages. ----
+    const injectMeta = {
+        auto: { Icon: Dataflow03, label: "Data injection: Auto (agent decides)", active: false },
+        json: { Icon: Code02, label: "Data injection: JSON (inline data)", active: true },
+        api: { Icon: Database01, label: "Data injection: API (live connection)", active: true },
+    }[injectMode];
+    const injectToggle =
+        activePage.kind === "canvas" ? null : (
+            <button
+                type="button"
+                aria-label={injectMeta.label}
+                title={injectMeta.label}
+                onClick={() => setInjectMode((m) => (m === "auto" ? "json" : m === "json" ? "api" : "auto"))}
+                className={cx("flex items-center justify-center px-2 py-2.5 transition-colors hover:text-secondary", injectMeta.active ? "text-fg-brand-primary" : "text-tertiary")}
+            >
+                <injectMeta.Icon className="size-4" />
+            </button>
+        );
+
     // ---- Mic (voice input) button, shared by every composer ----
     const micButton = (
         <button
@@ -540,6 +569,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             <div className="px-3 py-2">{modeToolbar}</div>
             <div className="flex items-start border-t border-secondary">
                 <ComposerTextarea value={draft} onChange={setDraft} onKeyDown={onComposerKeyDown} />
+                {injectToggle}
                 {micButton}
                 {thinking ? (
                     <button type="button" aria-label="Stop" onClick={stopAgent} className="flex items-center px-3 py-2.5 text-secondary transition-colors hover:text-primary">
@@ -591,6 +621,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                         className="flex-1"
                         textAreaClassName="max-h-20 resize-none rounded-none border-0 shadow-none ring-0 text-xs leading-4 focus:ring-0"
                     />
+                    {injectToggle}
                     {micButton}
                     {thinking ? (
                         <button type="button" aria-label="Stop" onClick={stopAgent} className="flex items-center px-3 text-secondary transition-colors hover:text-primary">
