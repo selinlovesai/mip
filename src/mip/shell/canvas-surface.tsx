@@ -11,18 +11,42 @@
 
 import { useMemo } from "react";
 import { Stars01 } from "@untitledui/icons";
+import { ALL_COLOR_TOKENS } from "@/mip/design-tokens";
 
-/** Wrap a bare fragment in a minimal HTML document; pass full documents through. */
-function toDocument(html: string): string {
+// Non-color tokens worth exposing to the canvas too.
+const EXTRA_TOKENS = ["--radius-sm", "--radius-md", "--radius-lg", "--radius-xl", "--shadow-xs", "--shadow-sm", "--shadow-md", "--shadow-lg", "--font-body"];
+
+/**
+ * Snapshot the app's design tokens (resolved for the current theme + accent) as
+ * a `:root{…}` <style> so canvas code can use `var(--color-brand-600)` etc. and
+ * look on-brand. Available, never forced — the AI uses them only if it wants.
+ */
+function hostTokenCss(): string {
+    if (typeof window === "undefined") return "";
+    const cs = getComputedStyle(document.documentElement);
+    const names = [...new Set([...ALL_COLOR_TOKENS, ...EXTRA_TOKENS])];
+    const decls = names
+        .map((n) => {
+            const v = cs.getPropertyValue(n).trim();
+            return v ? `${n}:${v};` : "";
+        })
+        .filter(Boolean)
+        .join("");
+    return decls ? `<style id="mip-tokens">:root{${decls}}</style>` : "";
+}
+
+const BASE_STYLE = `<style>:root{color-scheme:light dark}*{box-sizing:border-box}body{margin:0;padding:16px;font-family:var(--font-body,system-ui,-apple-system,Segoe UI,Roboto,sans-serif);line-height:1.5}</style>`;
+
+/** Wrap a fragment in a minimal doc and inject the design tokens into <head>. */
+function toDocument(html: string, tokenCss: string): string {
     const trimmed = html.trim();
-    if (/<html[\s>]/i.test(trimmed)) return trimmed;
-    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>:root{color-scheme:light dark}*{box-sizing:border-box}body{margin:0;padding:16px;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.5}</style>
-</head><body>${trimmed}</body></html>`;
+    if (/<\/head>/i.test(trimmed)) return trimmed.replace(/<\/head>/i, `${tokenCss}</head>`);
+    if (/<html[\s>]/i.test(trimmed)) return trimmed.replace(/(<html[^>]*>)/i, `$1<head>${tokenCss}</head>`);
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${tokenCss}${BASE_STYLE}</head><body>${trimmed}</body></html>`;
 }
 
 export function CanvasSurface({ html }: { html: string }) {
-    const doc = useMemo(() => toDocument(html ?? ""), [html]);
+    const doc = useMemo(() => toDocument(html ?? "", hostTokenCss()), [html]);
 
     if (!html?.trim()) {
         return (

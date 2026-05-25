@@ -39,9 +39,16 @@ function demoRespond(prompt: string, page: string): string {
     return `I'm in demo mode (no AI model connection). On the **${page}** dashboard I can still guide you:\n\n- Add or edit widgets from the **+** toolbar\n- Drag to rearrange in edit mode\n- Open **Settings → Assistant** to pick an AI model connection for live answers\n\n**You said:** "${prompt}"`;
 }
 
-const CANVAS_SYSTEM =
-    "You are rendering into a sandboxed HTML canvas with NO access to the host app. " +
-    "When asked to build, change, or fix something visual, respond with EXACTLY ONE ```html fenced code block containing a COMPLETE, self-contained HTML document — inline <style> and <script> are allowed, no external build tools or imports. Precede it with at most one short sentence.";
+const CANVAS_SYSTEM = [
+    "You are rendering into a sandboxed HTML canvas with NO access to the host app.",
+    "Respond with EXACTLY ONE ```html fenced code block containing a COMPLETE, self-contained HTML document; precede it with at most one short sentence.",
+    "Freedom: you may use any HTML/CSS/JS and load external libraries via CDN (Google Fonts, Tailwind Play CDN, chart libraries, etc.). Inline <style>/<script> are fine.",
+    "Design system: the host app's design tokens are available as CSS variables on :root — e.g. --color-brand-600, --color-bg-primary, --color-bg-secondary, --color-text-primary, --color-text-secondary, --color-border-secondary, --radius-lg, --shadow-md, --font-body. When the user asks to match the app / use the design system / use our components, style with these tokens and these patterns:",
+    '• Button: <button style="background:var(--color-brand-600);color:#fff;border:0;border-radius:var(--radius-md,8px);padding:8px 14px;font:600 14px var(--font-body,system-ui);cursor:pointer">Label</button>',
+    '• Card: <div style="background:var(--color-bg-primary);border:1px solid var(--color-border-secondary);border-radius:var(--radius-xl,12px);box-shadow:var(--shadow-sm);padding:16px;color:var(--color-text-primary)">…</div>',
+    '• Badge: <span style="background:var(--color-bg-secondary);color:var(--color-text-secondary);border-radius:999px;padding:2px 8px;font:600 12px var(--font-body,system-ui)">Label</span>',
+    "Otherwise, build in whatever style the user asks for.",
+].join("\n");
 
 /** Pull the first fenced code block (```html … ``` or ``` … ```) out of a reply. */
 function extractHtmlBlock(text: string): { html?: string; rest: string } {
