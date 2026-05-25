@@ -14,4 +14,6 @@ export const RESEARCH_SKILL = [
     "  · a specific public web page/URL → fetch.",
     "  · an open-ended question about the web → search (Tavily).",
     "Verify shape before mapping: when you'll bind a widget to an API, callApi once to see the real JSON shape, then use the matching JSONPath in `map`.",
+    "Real-world numbers (market share, prices, population, company stats, rankings…): you MUST `search` (or fetch/callApi) for actual figures BEFORE building the widget. Do NOT fabricate values or generic placeholders like 'Market Share A/B/C'.",
+    "If real data is genuinely unavailable (no Tavily/search connection, or the search returns nothing): do NOT silently invent it. Either ask the user for the data/source, OR build with clearly-labelled sample data — append '(sample)' to the widget title AND state plainly in `say` that the figures are placeholder and how to wire a real source.",
 ].join("\n");
