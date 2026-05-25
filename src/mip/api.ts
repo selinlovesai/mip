@@ -20,6 +20,7 @@ export async function chat(args: {
     model: string;
     messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
     system?: string;
+    jsonMode?: boolean;
 }): Promise<ChatResult> {
     try {
         const res = await fetch(`${BASE}/api/chat`, {

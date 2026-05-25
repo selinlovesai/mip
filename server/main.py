@@ -71,6 +71,7 @@ class ChatRequest(BaseModel):
     messages: list[ChatMessage]
     system: str | None = None
     temperature: float = 0.7
+    jsonMode: bool = False          # force a JSON-object response (OpenAI-compatible)
 
 
 def _normalize_openai_url(base: str) -> str:
@@ -113,7 +114,10 @@ async def chat(req: ChatRequest) -> dict[str, Any]:
             if req.apiKey:
                 headers["authorization"] = f"Bearer {req.apiKey}"
             msgs = ([{"role": "system", "content": req.system}] if req.system else []) + [m.model_dump() for m in req.messages]
-            resp = await client.post(url, headers=headers, json={"model": req.model, "messages": msgs, "temperature": req.temperature})
+            body: dict[str, Any] = {"model": req.model, "messages": msgs, "temperature": req.temperature}
+            if req.jsonMode:
+                body["response_format"] = {"type": "json_object"}
+            resp = await client.post(url, headers=headers, json=body)
             data = resp.json()
             if resp.status_code >= 400:
                 return {"ok": False, "status": resp.status_code, "error": data}

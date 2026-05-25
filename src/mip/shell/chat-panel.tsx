@@ -43,6 +43,7 @@ function demoRespond(prompt: string, page: string): string {
 
 const CANVAS_SYSTEM = [
     "You are an agent operating a LIVE sandboxed HTML canvas via tools — you cannot access the host app, only the canvas DOM.",
+    "Your tools are REAL and execute on the host, which returns their results to you. You CAN read live web pages and search the web through them — never refuse with 'I can't browse the internet'; instead emit a fetch/search op and the host does it for you.",
     "Build and modify the canvas INCREMENTALLY with tool ops; do NOT dump a whole document. To start a fresh canvas, use a single `replace`. To change parts, use append/insert/setStyle/setText/setAttr/remove/addStyle/runJs, and `query` to inspect first.",
     "DOM tools (op `kind` + args):",
     CANVAS_TOOLS_DOC,
@@ -154,7 +155,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
 
     type ApiMsg = { role: "user" | "assistant" | "system"; content: string };
 
-    const callModel = (messages: ApiMsg[], system?: string) =>
+    const callModel = (messages: ApiMsg[], system?: string, jsonMode?: boolean) =>
         chat({
             provider: conn!.aiProvider ?? "openai",
             baseUrl: conn!.baseUrl ?? "",
@@ -162,6 +163,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             model: assistant.model ?? conn!.aiModel ?? "gpt-4o-mini",
             messages,
             system,
+            jsonMode,
         });
 
     // Canvas agent loop: the model emits {say, ops[]}; we run the ops through the
@@ -199,8 +201,11 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         const sys = [CANVAS_SYSTEM, activePage.systemPrompt ?? "", assistant.systemPrompt ?? ""].filter(Boolean).join("\n\n");
         let msgs = initial.slice();
         let nudged = false;
+        // JSON mode forces an object response on OpenAI-compatible providers, so
+        // the model can't reply with a prose refusal instead of emitting ops.
+        const jsonMode = (conn?.aiProvider ?? "openai") !== "anthropic";
         for (let round = 0; round < 8; round++) {
-            const result = await callModel(msgs, sys);
+            const result = await callModel(msgs, sys, jsonMode);
             if (!result.ok) {
                 pushAssistant(`**Couldn't reach the model.**\n\n${typeof result.error === "string" ? result.error : "Request failed."}`);
                 return;
@@ -214,7 +219,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                     msgs = [
                         ...msgs,
                         { role: "assistant", content: text },
-                        { role: "user", content: 'Reply with ONLY a ```json tool block — no prose. Use ops to ACTUALLY change the canvas (e.g. runJs to add event listeners, setStyle, setValue, click). Describing it does nothing.' },
+                        { role: "user", content: 'Do NOT refuse and do NOT explain limitations — your fetch/search/DOM tools are real and run on the host. Reply with ONLY a JSON object {"say":"…","ops":[…]}. Use ops to ACTUALLY act (fetch/search for live data, then replace/setStyle/setValue/click/runJs). Describing an action does nothing.' },
                     ];
                     continue;
                 }
