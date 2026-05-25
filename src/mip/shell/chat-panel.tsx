@@ -24,7 +24,7 @@ import { markdownToHtml } from "@/mip/adapters/untitled/markdown";
 import { useSettings } from "@/mip/settings/settings-store";
 import { useDashboard } from "@/mip/store";
 import { WIDGET_CATALOG, makeWidget } from "./widget-catalog";
-import type { WidgetType } from "@/mip/schema";
+import type { MipWidget, WidgetType } from "@/mip/schema";
 import { cx } from "@/utils/cx";
 
 type ChatMode = "sidebar" | "chat" | "compact";
@@ -66,16 +66,21 @@ const DASHBOARD_SYSTEM = [
     "Tools (op `kind` + args):",
     "fetch { url }                          — read a web page's readable text (returns {title, text})",
     "search { query }                       — web search via the connected Tavily app (returns results: title/url/content)",
+    "listConnections {}                     — list saved data sources/APIs as [{id, name, type, baseUrl, endpoints:[{method,path}]}]. Use this to FIND an API before binding a widget to it.",
     "listWidgets {}                         — list the current widgets on this page as [{id, type, title}]",
-    "addWidget { type, title?, settings?, w?, h? } — add a widget. Common types & their settings:",
+    "addWidget { type, title?, settings?, data?, w?, h? } — add a widget. Common types & their settings:",
     "    kpi        settings:{ value, delta?, deltaLabel?, unit?, valueFormat? }",
     "    lineChart|barChart|areaChart|pieChart|donutChart  settings:{ points:[{label,value},…] }",
     "    table      settings:{ columns:[{key,label},…], rows:[{…},…] }",
     "    list       settings:{ primaryKey, secondaryKey?, items:[{…},…] }",
     "    markdown   settings:{ content }   ·   card  settings:{ heading, body }",
     "    progress   settings:{ value, target, label? }",
+    "LIVE REST data: bind a widget to a saved connection with data:{ sourceId:<connection id>, request:{ method, path, params?, headers?, body? }, map?:{…}, refreshMs? }.",
+    "    · the connection supplies baseUrl + auth; `path` is appended to baseUrl (or an absolute URL).",
+    "    · `map` is JSONPath ($.a.b[0].c) from the response: charts → { series:\"$.path.to.array\" } (+ settings.labelKey / settings.valueKey for the fields); kpi → { value:\"$.x\", delta:\"$.y\" }.",
+    "    · set refreshMs (e.g. 10000) to poll. A bound widget fetches live and ignores static settings once data loads.",
     "removeWidget { id }                    — remove a widget by id (use listWidgets first)",
-    "Workflow: for real numbers (prices, stats, a company's metrics) CALL fetch/search FIRST, then build widgets from the RETURNED data — never invent figures.",
+    "Workflow: to build a widget from an API, call listConnections FIRST to find the right sourceId + endpoint, then addWidget with a `data` binding. For one-off numbers from the open web, fetch/search and put the RETURNED values into settings. Never invent figures or connection ids.",
     "When the request is just a question (no dashboard change), answer it in `say` with ops:[]. Markdown is supported in `say`.",
     'Protocol: EVERY reply is ONE JSON object {"say":"<short message>","ops":[ {"kind":"…", …}, … ]} — no prose outside it. You receive each op\'s result and may continue. When the dashboard matches the request (or you\'ve answered), reply with {"say":"…","ops":[]} and STOP. Describing an action in prose does NOTHING — only ops change the dashboard.',
 ].join("\n");
@@ -233,6 +238,19 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         const web = await runWebOp(op);
         if (web) return web;
         const kind = op.kind as string;
+        if (kind === "listConnections") {
+            return {
+                kind,
+                ok: true,
+                connections: connections.map((c) => ({
+                    id: c.id,
+                    name: c.name,
+                    type: c.type,
+                    baseUrl: c.baseUrl,
+                    endpoints: (c.endpoints ?? []).map((e) => ({ method: e.method, path: e.path })),
+                })),
+            };
+        }
         if (kind === "listWidgets") {
             return { kind, ok: true, widgets: activePage.widgets.map((w) => ({ id: w.id, type: w.type, title: w.title })) };
         }
@@ -247,8 +265,16 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                 ...(typeof op.h === "number" ? { h: op.h } : {}),
                 ...(op.settings && typeof op.settings === "object" ? { settings: { ...base.settings, ...(op.settings as Record<string, unknown>) } } : {}),
             });
+            // Optional live REST binding → resolved by useWidgetData against the connection.
+            if (op.data && typeof op.data === "object") {
+                const d = op.data as { sourceId?: unknown };
+                if (typeof d.sourceId === "string" && !connections.some((c) => c.id === d.sourceId)) {
+                    return { kind, ok: false, error: `No connection with id "${d.sourceId}". Call listConnections and use a real id.` };
+                }
+                widget.data = op.data as MipWidget["data"];
+            }
             addWidget(widget);
-            return { kind, ok: true, id: widget.id, type: widget.type };
+            return { kind, ok: true, id: widget.id, type: widget.type, bound: !!widget.data };
         }
         if (kind === "removeWidget" && typeof op.id === "string") {
             removeWidget(op.id);
