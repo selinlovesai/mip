@@ -19,6 +19,7 @@ import time
 from typing import Any
 
 import os
+import re
 import tempfile
 
 import httpx
@@ -155,6 +156,38 @@ async def test_endpoint(req: TestRequest) -> dict[str, Any]:
 @app.get("/api/health")
 async def health() -> dict[str, Any]:
     return {"status": "ok", "db": db.is_enabled()}
+
+
+# ---------------------------------------------------------------------------
+# Page fetch — lets the assistant read a URL's content (CORS-safe, server-side).
+# Returns the page title + a plain-text extraction (HTML stripped), truncated.
+# ---------------------------------------------------------------------------
+
+class FetchRequest(BaseModel):
+    url: str
+    maxChars: int = 8000
+
+
+def _html_to_text(html: str) -> str:
+    # Drop scripts/styles, then strip tags and collapse whitespace.
+    no_blocks = re.sub(r"<(script|style|noscript)[\s\S]*?</\1>", " ", html, flags=re.IGNORECASE)
+    text = re.sub(r"<[^>]+>", " ", no_blocks)
+    text = re.sub(r"&nbsp;", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+@app.post("/api/fetch")
+async def fetch_page(req: FetchRequest) -> dict[str, Any]:
+    try:
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers={"user-agent": "Mozilla/5.0 (compatible; MIP-Tailwind/0.1)"}) as client:
+            resp = await client.get(req.url)
+        html = resp.text
+        title_m = re.search(r"<title[^>]*>(.*?)</title>", html, flags=re.IGNORECASE | re.DOTALL)
+        title = re.sub(r"\s+", " ", title_m.group(1)).strip() if title_m else ""
+        text = _html_to_text(html)[: max(500, req.maxChars)]
+        return {"ok": resp.status_code < 400, "status": resp.status_code, "url": str(resp.url), "title": title, "text": text}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": str(exc)}
 
 
 # ---------------------------------------------------------------------------

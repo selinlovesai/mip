@@ -17,7 +17,7 @@ import { Checkbox } from "@/components/base/checkbox/checkbox";
 import { Input } from "@/components/base/input/input";
 import { Select } from "@/components/base/select/select";
 import { TextArea } from "@/components/base/textarea/textarea";
-import { chat, transcribe } from "@/mip/api";
+import { chat, fetchPage, transcribe } from "@/mip/api";
 import { markdownToHtml } from "@/mip/adapters/untitled/markdown";
 import { useSettings } from "@/mip/settings/settings-store";
 import { useDashboard } from "@/mip/store";
@@ -142,6 +142,20 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         const apiMessages = history
             .filter((m) => m.id !== "intro")
             .map((m) => ({ role: m.role, content: m.text }));
+
+        // Fetch any URLs in the prompt and feed their content to the model.
+        const urls = trimmed.match(/https?:\/\/[^\s)]+/g)?.slice(0, 2) ?? [];
+        if (urls.length) {
+            const pages = await Promise.all(urls.map((u) => fetchPage(u)));
+            const ctx = pages
+                .filter((p) => p.ok && p.text)
+                .map((p) => `\n\n[Fetched content from ${p.url}${p.title ? ` — ${p.title}` : ""}]\n${p.text}`)
+                .join("");
+            if (ctx) {
+                const last = apiMessages[apiMessages.length - 1];
+                if (last) last.content = `${last.content}${ctx}`;
+            }
+        }
 
         const system = [isCanvas ? CANVAS_SYSTEM : "", activePage.systemPrompt ?? "", assistant.systemPrompt ?? ""].filter(Boolean).join("\n\n") || undefined;
 

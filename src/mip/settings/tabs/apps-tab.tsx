@@ -167,6 +167,16 @@ export function AppsTab() {
                                 })),
                             });
                             setAssistant({ connectionId: id, model: active.ai.model });
+                        } else if (active.connection && method === "apiKey" && apiKey?.trim()) {
+                            // Non-AI tool (e.g. Tavily) → a saved REST connection.
+                            const stamp = Date.now();
+                            addConnection({
+                                name: active.name,
+                                type: "rest",
+                                baseUrl: active.connection.baseUrl,
+                                auth: { type: "bearer", token: apiKey.trim() },
+                                endpoints: active.connection.endpoints.map((e, i) => ({ id: `ep-${stamp}-${i}`, ...e })),
+                            });
                         }
                     }
                     setActive(null);
@@ -269,7 +279,9 @@ function ConnectForm({
                 <p className="text-xs text-tertiary">
                     {app.ai && method === "apiKey"
                         ? `Your key is saved to a Connection (${app.ai.baseUrl}) and selected as the assistant's model.`
-                        : "Credentials are used only for this demo session and are not stored."}
+                        : app.connection && method === "apiKey"
+                          ? `Your key is saved to a Connection (${app.connection.baseUrl}) with its endpoints.`
+                          : "Credentials are used only for this demo session and are not stored."}
                 </p>
             </div>
 

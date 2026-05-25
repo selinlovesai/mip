@@ -149,6 +149,32 @@ export interface TranscribeResult {
     error?: unknown;
 }
 
+// ---------------------------------------------------------------------------
+// Page fetch — read a URL's content server-side (CORS-safe). Returns plain text.
+// ---------------------------------------------------------------------------
+
+export interface FetchPageResult {
+    ok: boolean;
+    url?: string;
+    title?: string;
+    text?: string;
+    status?: number;
+    error?: unknown;
+}
+
+export async function fetchPage(url: string, maxChars = 8000): Promise<FetchPageResult> {
+    try {
+        const res = await fetch(`${BASE}/api/fetch`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ url, maxChars }),
+        });
+        return (await res.json()) as FetchPageResult;
+    } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : `Backend unreachable at ${BASE}.` };
+    }
+}
+
 export async function transcribe(blob: Blob): Promise<TranscribeResult> {
     try {
         const form = new FormData();

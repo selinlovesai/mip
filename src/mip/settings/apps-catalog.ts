@@ -27,6 +27,11 @@ export interface AppConnector {
      * you connect with an API key (base URL + provider + model + endpoints).
      */
     ai?: AiDefaults;
+    /**
+     * For non-AI connectable tools (e.g. Tavily): defaults used to create a REST
+     * Connection (base URL + bearer key + endpoints) when connected with a key.
+     */
+    connection?: { baseUrl: string; endpoints: AiEndpointTemplate[] };
 }
 
 /** Endpoint template (no id — ids are assigned when the connection is created).
@@ -76,6 +81,23 @@ export const APP_CATALOG: AppConnector[] = [
     { id: "hugging-face", name: "Hugging Face", category: "AI", auth: ["apiKey", "oauth"], description: "Inference endpoints across thousands of open models.", status: "scheduled", color: "#FFD21E" },
     { id: "elevenlabs", name: "ElevenLabs", category: "AI", auth: ["apiKey"], description: "Lifelike text-to-speech and voice synthesis.", status: "coming_soon", color: "#000000" },
     { id: "replicate", name: "Replicate", category: "AI", auth: ["apiKey", "oauth"], description: "Run and fine-tune open ML models via a hosted API.", status: "scheduled", color: "#000000" },
+    // Search & Web
+    {
+        id: "tavily",
+        name: "Tavily",
+        category: "Search & Web",
+        auth: ["apiKey"],
+        description: "Web search and page extraction API built for AI agents.",
+        status: "active",
+        color: "#1FB8CD",
+        connection: {
+            baseUrl: "https://api.tavily.com",
+            endpoints: [
+                { label: "Search", method: "POST", path: "/search", mapPath: "$.results", description: "Web search.", body: '{"query":"latest AI news","search_depth":"basic","max_results":5}' },
+                { label: "Extract", method: "POST", path: "/extract", mapPath: "$.results", description: "Extract page content from URLs.", body: '{"urls":["https://example.com"]}' },
+            ],
+        },
+    },
     // Google Workspace
     { id: "google-sheets", name: "Google Sheets", category: "Google Workspace", auth: ["oauth"], description: "Read and write spreadsheet data as a live data source.", status: "active", color: "#0F9D58" },
     { id: "google-docs", name: "Google Docs", category: "Google Workspace", auth: ["oauth"], description: "Pull document content and collaborate programmatically.", status: "coming_soon", color: "#4285F4" },
