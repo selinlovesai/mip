@@ -141,6 +141,8 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
     const listRef = useRef<HTMLDivElement>(null);
     const recorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
+    // Aborts the running agent loop (Stop button).
+    const abortRef = useRef<AbortController | null>(null);
 
     // Effective AI connection: the dashboard's own choice, else the global
     // default (Settings → Assistant), else the first AI connection.
@@ -176,7 +178,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
 
     // The Brain — one chat completion. JSON mode (OpenAI-compatible only) forces an
     // object reply so the model can't refuse with prose.
-    const brain: Brain = (msgs, system, jsonMode) =>
+    const brain: Brain = (msgs, system, jsonMode, signal) =>
         chat({
             provider: conn!.aiProvider ?? "openai",
             baseUrl: conn!.baseUrl ?? "",
@@ -185,6 +187,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             messages: msgs,
             system,
             jsonMode,
+            signal,
         });
 
     // The connections this dashboard's agent may use as tools. Undefined list ⇒
@@ -279,6 +282,8 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                 { id: `t-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "tool", text: opSummary(op), detail: JSON.stringify(result, null, 2), ok: result.ok !== false },
             ]);
 
+        const controller = new AbortController();
+        abortRef.current = controller;
         await runAgent({
             initial: apiMessages,
             surface,
@@ -288,9 +293,15 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             ctx: toolContext(),
             say: pushAssistant,
             onTool: ({ op, result }) => pushTool(op, result),
+            signal: controller.signal,
         });
+        if (controller.signal.aborted) pushAssistant("_Stopped._");
+        abortRef.current = null;
         setThinking(false);
     };
+
+    /** Stop button — abort the running agent loop and the in-flight model call. */
+    const stopAgent = () => abortRef.current?.abort();
 
     // --- Voice input: record via MediaRecorder, transcribe with local Whisper ---
     const startRecording = async () => {
@@ -469,15 +480,21 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             <div className="flex items-start border-t border-secondary">
                 <ComposerTextarea value={draft} onChange={setDraft} onKeyDown={onComposerKeyDown} />
                 {micButton}
-                <button
-                    type="button"
-                    aria-label="Send"
-                    disabled={!draft.trim() || thinking}
-                    onClick={() => void sendText(draft)}
-                    className="flex items-center px-3 py-2.5 text-tertiary transition-colors hover:text-secondary disabled:opacity-40"
-                >
-                    <Send01 className="size-4" />
-                </button>
+                {thinking ? (
+                    <button type="button" aria-label="Stop" onClick={stopAgent} className="flex items-center px-3 py-2.5 text-secondary transition-colors hover:text-primary">
+                        <span className="size-3.5 rounded-[3px] border-2 border-current" />
+                    </button>
+                ) : (
+                    <button
+                        type="button"
+                        aria-label="Send"
+                        disabled={!draft.trim()}
+                        onClick={() => void sendText(draft)}
+                        className="flex items-center px-3 py-2.5 text-tertiary transition-colors hover:text-secondary disabled:opacity-40"
+                    >
+                        <Send01 className="size-4" />
+                    </button>
+                )}
             </div>
         </div>
     );
@@ -514,15 +531,21 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                         textAreaClassName="max-h-20 resize-none rounded-none border-0 shadow-none ring-0 text-xs leading-4 focus:ring-0"
                     />
                     {micButton}
-                    <button
-                        type="button"
-                        aria-label="Send"
-                        disabled={!draft.trim() || thinking}
-                        onClick={() => void sendText(draft)}
-                        className="flex items-center px-3 text-tertiary transition-colors hover:text-secondary disabled:opacity-40"
-                    >
-                        <Send01 className="size-4" />
-                    </button>
+                    {thinking ? (
+                        <button type="button" aria-label="Stop" onClick={stopAgent} className="flex items-center px-3 text-secondary transition-colors hover:text-primary">
+                            <span className="size-3.5 rounded-[3px] border-2 border-current" />
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            aria-label="Send"
+                            disabled={!draft.trim()}
+                            onClick={() => void sendText(draft)}
+                            className="flex items-center px-3 text-tertiary transition-colors hover:text-secondary disabled:opacity-40"
+                        >
+                            <Send01 className="size-4" />
+                        </button>
+                    )}
                 </div>
             </div>
         );

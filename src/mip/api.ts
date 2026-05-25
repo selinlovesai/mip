@@ -21,15 +21,19 @@ export async function chat(args: {
     messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
     system?: string;
     jsonMode?: boolean;
+    signal?: AbortSignal;
 }): Promise<ChatResult> {
+    const { signal, ...payload } = args;
     try {
         const res = await fetch(`${BASE}/api/chat`, {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify(args),
+            body: JSON.stringify(payload),
+            signal,
         });
         return (await res.json()) as ChatResult;
     } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return { ok: false, error: "Stopped." };
         return { ok: false, error: err instanceof Error ? err.message : "Backend unreachable. Is the server running on " + BASE + "?" };
     }
 }

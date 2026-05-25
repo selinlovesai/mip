@@ -13,8 +13,8 @@ import { dispatch, isMutating } from "./tools";
 import { parseAgentReply, claimsAction } from "./reply";
 import type { AgentOp, ApiMsg, OpResult, Surface, ToolContext } from "./types";
 
-/** The Brain: a single chat completion call. */
-export type Brain = (messages: ApiMsg[], system?: string, jsonMode?: boolean) => Promise<ChatResult>;
+/** The Brain: a single chat completion call (cancellable via signal). */
+export type Brain = (messages: ApiMsg[], system?: string, jsonMode?: boolean, signal?: AbortSignal) => Promise<ChatResult>;
 
 export interface RunAgentOptions {
     initial: ApiMsg[];
@@ -27,12 +27,14 @@ export interface RunAgentOptions {
     say: (text: string) => void;
     /** Report each tool call + its result (for the transcript's tool entries). */
     onTool?: (entry: { op: AgentOp; result: OpResult; mutating: boolean }) => void;
+    /** Abort the whole loop (Stop button) — cancels the model call and halts. */
+    signal?: AbortSignal;
     /** Max tool rounds before giving up. */
     maxRounds?: number;
 }
 
 export async function runAgent(opts: RunAgentOptions): Promise<void> {
-    const { initial, surface, system, jsonMode, brain, ctx, say } = opts;
+    const { initial, surface, system, jsonMode, brain, ctx, say, signal } = opts;
     const maxRounds = opts.maxRounds ?? 8;
 
     let msgs = initial.slice();
@@ -41,7 +43,9 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
     let mutated = false; // did any mutating op run this turn?
 
     for (let round = 0; round < maxRounds; round++) {
-        const result = await brain(msgs, system, jsonMode);
+        if (signal?.aborted) return;
+        const result = await brain(msgs, system, jsonMode, signal);
+        if (signal?.aborted) return; // stopped while the model was responding
         if (!result.ok) {
             say(`**Couldn't reach the model.**\n\n${typeof result.error === "string" ? result.error : "Request failed."}`);
             return;
@@ -83,6 +87,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
         if (parsed.say) say(parsed.say);
         const results: unknown[] = [];
         for (const op of parsed.ops as AgentOp[]) {
+            if (signal?.aborted) return;
             const mut = isMutating(String(op.kind), surface);
             if (mut) mutated = true;
             const res = await dispatch(op, surface, ctx);
