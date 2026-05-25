@@ -160,7 +160,11 @@ export function AppsTab() {
                                 isAiModel: true,
                                 aiProvider: active.ai.provider,
                                 aiModel: active.ai.model,
-                                endpoints: active.ai.endpoints.map((e, i) => ({ id: `ep-${stamp}-${i}`, ...e })),
+                                endpoints: active.ai.endpoints.map((e, i) => ({
+                                    id: `ep-${stamp}-${i}`,
+                                    ...e,
+                                    body: e.body?.replaceAll("{{model}}", active.ai!.model),
+                                })),
                             });
                             setAssistant({ connectionId: id, model: active.ai.model });
                         }

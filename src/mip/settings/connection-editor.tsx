@@ -232,11 +232,21 @@ export function ConnectionEditor({ id, onClose }: { id: string; onClose: () => v
             setTest({ ok: false, message: "Select an endpoint to test." });
             return;
         }
+        // Send the body as a parsed object so the backend posts real JSON (with
+        // Content-Type), not a JSON-encoded string.
+        let body: unknown = ep.body;
+        if (typeof ep.body === "string" && ep.body.trim()) {
+            try {
+                body = JSON.parse(ep.body);
+            } catch {
+                body = ep.body;
+            }
+        }
         const result = await testEndpoint({
             method: ep.method,
             url: joinUrl(draft.baseUrl, ep.path),
             headers: buildHeaders(draft),
-            body: ep.body,
+            body,
         });
         if (result.ok) {
             setTest({ ok: true, message: `✓ Endpoint test passed.${result.status ? ` (${result.status})` : ""}`, body: result.body });

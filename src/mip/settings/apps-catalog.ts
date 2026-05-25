@@ -29,13 +29,15 @@ export interface AppConnector {
     ai?: AiDefaults;
 }
 
-/** Endpoint template (no id — ids are assigned when the connection is created). */
+/** Endpoint template (no id — ids are assigned when the connection is created).
+ *  `body` may contain `{{model}}`, substituted with the connection's model. */
 export interface AiEndpointTemplate {
     label: string;
     method: string;
     path: string;
     mapPath?: string;
     description?: string;
+    body?: string;
 }
 
 export interface AiDefaults {
@@ -45,18 +47,21 @@ export interface AiDefaults {
     endpoints: AiEndpointTemplate[];
 }
 
+const OPENAI_CHAT_BODY = '{"model":"{{model}}","messages":[{"role":"user","content":"Hello"}]}';
+const ANTHROPIC_BODY = '{"model":"{{model}}","max_tokens":64,"messages":[{"role":"user","content":"Hello"}]}';
+
 // OpenAI-compatible providers (OpenAI, DeepSeek, Mistral, …) — /v1/* paths.
 const OPENAI_ENDPOINTS: AiEndpointTemplate[] = [
-    { label: "Chat completions", method: "POST", path: "/v1/chat/completions", mapPath: "$.choices[0].message.content", description: "OpenAI-compatible chat completion." },
+    { label: "Chat completions", method: "POST", path: "/v1/chat/completions", mapPath: "$.choices[0].message.content", description: "OpenAI-compatible chat completion.", body: OPENAI_CHAT_BODY },
     { label: "Models", method: "GET", path: "/v1/models", mapPath: "$.data", description: "List available models." },
 ];
 // Gemini's OpenAI-compatible surface (base URL already ends in /v1beta/openai).
 const GEMINI_ENDPOINTS: AiEndpointTemplate[] = [
-    { label: "Chat completions", method: "POST", path: "/chat/completions", mapPath: "$.choices[0].message.content", description: "OpenAI-compatible chat completion." },
+    { label: "Chat completions", method: "POST", path: "/chat/completions", mapPath: "$.choices[0].message.content", description: "OpenAI-compatible chat completion.", body: OPENAI_CHAT_BODY },
     { label: "Models", method: "GET", path: "/models", mapPath: "$.data", description: "List available models." },
 ];
 const ANTHROPIC_ENDPOINTS: AiEndpointTemplate[] = [
-    { label: "Messages", method: "POST", path: "/v1/messages", mapPath: "$.content[0].text", description: "Anthropic Messages API." },
+    { label: "Messages", method: "POST", path: "/v1/messages", mapPath: "$.content[0].text", description: "Anthropic Messages API.", body: ANTHROPIC_BODY },
 ];
 
 export const APP_CATALOG: AppConnector[] = [
