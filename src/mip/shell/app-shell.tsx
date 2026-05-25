@@ -25,7 +25,7 @@ import { WidgetPicker } from "./widget-picker";
 /** Main page body — canvas pages render the sandboxed surface, others the grid. */
 function PageBody() {
     const { activePage } = useDashboard();
-    if (activePage.kind === "canvas") return <CanvasSurface html={activePage.html ?? ""} />;
+    if (activePage.kind === "canvas") return <CanvasSurface key={activePage.id} pageId={activePage.id} html={activePage.html ?? ""} />;
     return (
         <div className="h-full overflow-y-auto p-6">
             <DashboardGrid />

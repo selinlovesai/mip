@@ -186,8 +186,9 @@ async def fetch_page(req: FetchRequest) -> dict[str, Any]:
         title = re.sub(r"\s+", " ", title_m.group(1)).strip() if title_m else ""
         text = _html_to_text(html)[: max(500, req.maxChars)]
         return {"ok": resp.status_code < 400, "status": resp.status_code, "url": str(resp.url), "title": title, "text": text}
-    except Exception as exc:  # noqa: BLE001
-        return {"ok": False, "error": str(exc)}
+    except Exception as exc:  # noqa: BLE001 - never return an empty message
+        msg = str(exc).strip() or exc.__class__.__name__
+        return {"ok": False, "error": f"Could not fetch {req.url}: {msg}"}
 
 
 # ---------------------------------------------------------------------------

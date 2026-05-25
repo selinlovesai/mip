@@ -18,6 +18,8 @@ import { Input } from "@/components/base/input/input";
 import { Select } from "@/components/base/select/select";
 import { TextArea } from "@/components/base/textarea/textarea";
 import { chat, fetchPage, transcribe } from "@/mip/api";
+import { canvasBridge } from "./canvas-bridge";
+import { CANVAS_TOOLS_DOC, type CanvasOp } from "./canvas-runtime";
 import { markdownToHtml } from "@/mip/adapters/untitled/markdown";
 import { useSettings } from "@/mip/settings/settings-store";
 import { useDashboard } from "@/mip/store";
@@ -40,26 +42,29 @@ function demoRespond(prompt: string, page: string): string {
 }
 
 const CANVAS_SYSTEM = [
-    "You are rendering into a sandboxed HTML canvas with NO access to the host app.",
-    "Respond with EXACTLY ONE ```html fenced code block containing a COMPLETE, self-contained HTML document; precede it with at most one short sentence.",
-    "Freedom: you may use any HTML/CSS/JS and load external libraries via CDN (Google Fonts, Tailwind Play CDN, chart libraries, etc.). Inline <style>/<script> are fine.",
-    "Design system: the host app's design tokens are available as CSS variables on :root — e.g. --color-brand-600, --color-bg-primary, --color-bg-secondary, --color-text-primary, --color-text-secondary, --color-border-secondary, --radius-lg, --shadow-md, --font-body. When the user asks to match the app / use the design system / use our components, style with these tokens and these patterns:",
-    '• Button: <button style="background:var(--color-brand-600);color:#fff;border:0;border-radius:var(--radius-md,8px);padding:8px 14px;font:600 14px var(--font-body,system-ui);cursor:pointer">Label</button>',
-    '• Card: <div style="background:var(--color-bg-primary);border:1px solid var(--color-border-secondary);border-radius:var(--radius-xl,12px);box-shadow:var(--shadow-sm);padding:16px;color:var(--color-text-primary)">…</div>',
-    '• Badge: <span style="background:var(--color-bg-secondary);color:var(--color-text-secondary);border-radius:999px;padding:2px 8px;font:600 12px var(--font-body,system-ui)">Label</span>',
-    "Otherwise, build in whatever style the user asks for.",
+    "You are an agent operating a LIVE sandboxed HTML canvas via tools — you cannot access the host app, only the canvas DOM.",
+    "Build and modify the canvas INCREMENTALLY with tool ops; do NOT dump a whole document. To start a fresh canvas, use a single `replace`. To change parts, use append/insert/setStyle/setText/setAttr/remove/addStyle/runJs, and `query` to inspect first.",
+    "Tools (op `kind` + args):",
+    CANVAS_TOOLS_DOC,
+    "Freedom: injected HTML may use any CSS/JS and load external libraries via CDN (fonts, Tailwind Play CDN, chart libraries…).",
+    "Design system: tokens are available as CSS vars on :root — --color-brand-600, --color-bg-primary, --color-text-primary, --color-text-secondary, --color-border-secondary, --radius-lg, --shadow-md, --font-body. Use them when asked to match the app.",
+    'Protocol: reply with ONE ```json block: {"say":"<one short line>","ops":[ {"kind":"...", ...}, ... ]}. After the ops run you receive their results and may continue with more ops. When done, reply with {"say":"<summary>","ops":[]}.',
 ].join("\n");
 
-/** Pull the first fenced code block (```html … ``` or ``` … ```) out of a reply. */
-function extractHtmlBlock(text: string): { html?: string; rest: string } {
-    const m = text.match(/```(?:html)?\s*\n([\s\S]*?)```/i);
-    if (!m) return { rest: text };
-    const html = m[1]!.trim();
-    const rest = (text.slice(0, m.index) + text.slice(m.index! + m[0].length)).trim();
-    return { html, rest };
+/** Parse an agent reply into {say, ops}; null if it isn't a tool-call object. */
+function parseCanvasReply(text: string): { say?: string; ops: CanvasOp[] } | null {
+    const m = text.match(/```(?:json)?\s*\n([\s\S]*?)```/i);
+    const raw = (m ? m[1]! : text).trim();
+    try {
+        const o = JSON.parse(raw) as { say?: unknown; ops?: unknown };
+        if (o && typeof o === "object") return { say: typeof o.say === "string" ? o.say : undefined, ops: Array.isArray(o.ops) ? (o.ops as CanvasOp[]) : [] };
+    } catch {
+        /* not a tool-call payload */
+    }
+    return null;
 }
 
-const DEMO_CANVAS_HTML = `<div style="font:600 20px system-ui;display:grid;place-items:center;height:100vh;background:linear-gradient(135deg,#7f56d9,#2e90fa);color:#fff">Hello from your AI canvas 👋<br><small style="font-weight:400;opacity:.85">Connect an AI model in Settings → Assistant to generate real interfaces.</small></div>`;
+const DEMO_CANVAS_HTML = `<div style="font:600 20px system-ui;display:grid;place-items:center;height:100vh;background:linear-gradient(135deg,#7f56d9,#2e90fa);color:#fff">Hello from your AI canvas 👋<br><small style="font-weight:400;opacity:.85">Connect an AI model in Settings → Assistant to build from your prompts.</small></div>`;
 
 /**
  * Borderless composer textarea that auto-grows with its content, pushing the
@@ -92,7 +97,7 @@ function ComposerTextarea({ value, onChange, onKeyDown }: { value: string; onCha
 }
 
 export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
-    const { activePage, setCanvasHtml } = useDashboard();
+    const { activePage } = useDashboard();
     const { assistant, aiConnections, connections, getConnection, setAssistant } = useSettings();
     const [mode, setMode] = useState<ChatMode>("sidebar");
     const [messages, setMessages] = useState<Message[]>([{ id: "intro", role: "assistant", text: INTRO }]);
@@ -117,6 +122,55 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
     }, [messages, open, mode, thinking]);
 
+    const pushAssistant = (text: string) =>
+        setMessages((prev) => [...prev, { id: `a-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "assistant", text }]);
+
+    type ApiMsg = { role: "user" | "assistant" | "system"; content: string };
+
+    const callModel = (messages: ApiMsg[], system?: string) =>
+        chat({
+            provider: conn!.aiProvider ?? "openai",
+            baseUrl: conn!.baseUrl ?? "",
+            apiKey: conn!.auth?.token ?? conn!.auth?.keyValue,
+            model: assistant.model ?? conn!.aiModel ?? "gpt-4o-mini",
+            messages,
+            system,
+        });
+
+    // Canvas agent loop: the model emits {say, ops[]}; we run the ops through the
+    // canvas runtime, feed results back, and iterate (capped) — real tool use,
+    // not whole-document dumps.
+    const runCanvasAgent = async (initial: ApiMsg[]) => {
+        const sys = [CANVAS_SYSTEM, activePage.systemPrompt ?? "", assistant.systemPrompt ?? ""].filter(Boolean).join("\n\n");
+        let msgs = initial.slice();
+        for (let round = 0; round < 8; round++) {
+            const result = await callModel(msgs, sys);
+            if (!result.ok) {
+                pushAssistant(`**Couldn't reach the model.**\n\n${typeof result.error === "string" ? result.error : "Request failed."}`);
+                return;
+            }
+            const text = result.content ?? "";
+            const parsed = parseCanvasReply(text);
+            if (!parsed) {
+                pushAssistant(text);
+                return;
+            }
+            if (parsed.say) pushAssistant(parsed.say);
+            if (!parsed.ops.length) return;
+            const results: unknown[] = [];
+            for (const op of parsed.ops) {
+                const r = await canvasBridge.send(op);
+                results.push({ kind: op.kind, ok: r.ok, ...(r.error ? { error: r.error } : {}), ...(r.result !== undefined ? { result: r.result } : {}) });
+            }
+            msgs = [
+                ...msgs,
+                { role: "assistant", content: text },
+                { role: "user", content: "Tool results:\n```json\n" + JSON.stringify(results).slice(0, 3000) + "\n```\nContinue with more ops, or finish with ops:[]." },
+            ];
+        }
+        pushAssistant("Reached the canvas step limit.");
+    };
+
     const sendText = async (text: string) => {
         const trimmed = text.trim();
         if (!trimmed || thinking) return;
@@ -127,21 +181,19 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         const history = [...messages, userMsg];
         setMessages(history);
 
-        // No connection → local demo responder (canvas gets a sample render).
+        // No connection → demo (canvas renders a sample via the runtime).
         if (!conn) {
             if (isCanvas) {
-                setCanvasHtml(activePage.id, DEMO_CANVAS_HTML);
-                setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: "assistant", text: "Rendered a demo canvas. Connect an AI model in **Settings → Assistant** to generate real interfaces from your prompts." }]);
+                await canvasBridge.send({ kind: "replace", html: DEMO_CANVAS_HTML });
+                pushAssistant("Rendered a demo canvas. Connect an AI model in **Settings → Assistant** to build from your prompts.");
             } else {
-                setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: "assistant", text: demoRespond(trimmed, activePage.title) }]);
+                pushAssistant(demoRespond(trimmed, activePage.title));
             }
             return;
         }
 
         setThinking(true);
-        const apiMessages = history
-            .filter((m) => m.id !== "intro")
-            .map((m) => ({ role: m.role, content: m.text }));
+        const apiMessages: ApiMsg[] = history.filter((m) => m.id !== "intro").map((m) => ({ role: m.role, content: m.text }));
 
         // Fetch any URLs in the prompt and feed their content to the model.
         const urls = trimmed.match(/https?:\/\/[^\s)]+/g)?.slice(0, 2) ?? [];
@@ -157,33 +209,20 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             }
         }
 
-        const system = [isCanvas ? CANVAS_SYSTEM : "", activePage.systemPrompt ?? "", assistant.systemPrompt ?? ""].filter(Boolean).join("\n\n") || undefined;
+        if (isCanvas) {
+            await runCanvasAgent(apiMessages);
+            setThinking(false);
+            return;
+        }
 
-        const result = await chat({
-            provider: conn.aiProvider ?? "openai",
-            baseUrl: conn.baseUrl ?? "",
-            apiKey: conn.auth?.token ?? conn.auth?.keyValue,
-            model: assistant.model ?? conn.aiModel ?? "gpt-4o-mini",
-            messages: apiMessages,
-            system,
-        });
-
+        const system = [activePage.systemPrompt ?? "", assistant.systemPrompt ?? ""].filter(Boolean).join("\n\n") || undefined;
+        const result = await callModel(apiMessages, system);
         setThinking(false);
         const text2 =
             result.ok && result.content
                 ? result.content
                 : `**Couldn't reach the model.**\n\n${typeof result.error === "string" ? result.error : "The request failed. Check the connection's base URL and API key in Settings."}`;
-
-        // On a canvas page, pull the HTML block out of the reply and render it.
-        if (isCanvas && result.ok) {
-            const { html, rest } = extractHtmlBlock(text2);
-            if (html) {
-                setCanvasHtml(activePage.id, html);
-                setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: "assistant", text: rest || "✓ Updated the canvas." }]);
-                return;
-            }
-        }
-        setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: "assistant", text: text2 }]);
+        pushAssistant(text2);
     };
 
     // --- Voice input: record via MediaRecorder, transcribe with local Whisper ---
