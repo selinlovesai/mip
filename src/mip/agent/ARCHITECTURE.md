@@ -176,22 +176,24 @@ with the global default filling gaps:
 
 ## 7. Reliability failures — root cause → fix
 
-### Bug #1 — Agent hallucinated the dashboard title ("Global EV Market" vs "Lingerie Market")
-**Cause:** §3.⚠ — title/description/widgets are never put in the system prompt.
-The model invented a plausible title.
-**Fix:** add a `dashboard` block to `PromptContext` and render a `## This dashboard
-(live facts — do not invent)` section: title, description, current widgets. Feed
-it from chat-panel (`activePage.title/description/kind/widgets`). One source of
-truth shared with the suggestion generator.
+### Bug #1 — Agent hallucinated the dashboard title ("Global EV Market" vs "Lingerie Market") — ✅ FIXED
+**Cause:** §3.⚠ — title/description/widgets were never put in the system prompt.
+**Fix (shipped):** `PromptContext.dashboard` + `describeDashboard()` render a
+`## This dashboard (live facts — do NOT invent)` block (title, description,
+current widgets), fed from chat-panel. `describeDashboard` is exported for reuse.
 
-### Bug #2 — "API" toggle selected but it used `injectJson`
-**Cause:** the toggle only **appended prose** to the prompt ("use injectConnection")
-— there was no hard enforcement, so the model fell back to `injectJson` when no
-matching connection existed.
-**Fix:** thread `injectMode` into `ToolContext`; in `injectJson.run`, **hard-refuse**
-when `injectMode === "api"` (return an error telling it to `injectConnection` or ask
-the user to add a connection). When `injectMode === "json"`, relax the
-post-`callApi` strict-REST guard.
+### Bug #2 — "API" toggle selected but it used `injectJson` — ✅ FIXED
+**Cause:** the toggle only **appended prose**; nothing enforced it.
+**Fix (shipped):** `injectMode` is threaded into `ToolContext`; `injectJson.run`
+**hard-refuses** when `injectMode === "api"` (tells the model to `injectConnection`
+or add a connection), and relaxes the post-`callApi` strict-REST guard when
+`injectMode === "json"`.
+
+### Skill catalog / on-demand skills — ✅ ADDED
+Each skill has a `mode`: **always** (injected every turn) or **onDemand** (only
+name+description listed in a "Skill catalog"; the agent pulls the full text with
+the new `loadSkill { name }` tool). Set per skill in Settings → Skills. Keeps the
+prompt lean and lets the agent self-select relevant context.
 
 ### Bug #3 — Invented data ("Market Share A/B/C")
 **Cause:** research discipline is prompt-only; nothing forces a search for vague

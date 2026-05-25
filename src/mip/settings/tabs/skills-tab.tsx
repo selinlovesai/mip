@@ -13,9 +13,10 @@ import { TextArea } from "@/components/base/textarea/textarea";
 import { Checkbox } from "@/components/base/checkbox/checkbox";
 import { useSettings, type Skill } from "../settings-store";
 
-type Draft = { id?: string; name: string; description: string; content: string; surfaces: ("dashboard" | "canvas")[] };
+type Mode = "always" | "onDemand";
+type Draft = { id?: string; name: string; description: string; content: string; surfaces: ("dashboard" | "canvas")[]; mode: Mode };
 
-const EMPTY: Draft = { name: "", description: "", content: "", surfaces: ["dashboard", "canvas"] };
+const EMPTY: Draft = { name: "", description: "", content: "", surfaces: ["dashboard", "canvas"], mode: "always" };
 
 export function SkillsTab() {
     const { skills, addSkill, updateSkill, removeSkill } = useSettings();
@@ -23,11 +24,11 @@ export function SkillsTab() {
 
     const startNew = () => setDraft({ ...EMPTY });
     const startEdit = (s: Skill) =>
-        setDraft({ id: s.id, name: s.name, description: s.description ?? "", content: s.content, surfaces: s.surfaces ?? ["dashboard", "canvas"] });
+        setDraft({ id: s.id, name: s.name, description: s.description ?? "", content: s.content, surfaces: s.surfaces ?? ["dashboard", "canvas"], mode: s.mode ?? "always" });
 
     const save = () => {
         if (!draft || !draft.name.trim() || !draft.content.trim()) return;
-        const payload = { name: draft.name.trim(), description: draft.description.trim() || undefined, content: draft.content, surfaces: draft.surfaces };
+        const payload = { name: draft.name.trim(), description: draft.description.trim() || undefined, content: draft.content, surfaces: draft.surfaces, mode: draft.mode };
         if (draft.id) updateSkill(draft.id, payload);
         else addSkill(payload);
         setDraft(null);
@@ -72,6 +73,14 @@ export function SkillsTab() {
                             <Checkbox label="Canvas" isSelected={draft.surfaces.includes("canvas")} onChange={(on) => toggleSurface("canvas", on)} />
                         </div>
                     </div>
+                    <div className="flex flex-col gap-2">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-quaternary">Delivery</span>
+                        <div className="flex gap-4">
+                            <Checkbox label="Always (in every prompt)" isSelected={draft.mode === "always"} onChange={(on) => on && setDraft((d) => (d ? { ...d, mode: "always" } : d))} />
+                            <Checkbox label="On-demand (catalog; loaded when needed)" isSelected={draft.mode === "onDemand"} onChange={(on) => on && setDraft((d) => (d ? { ...d, mode: "onDemand" } : d))} />
+                        </div>
+                        <p className="text-xs text-tertiary">On-demand keeps the prompt lean — only the name + description are shown, and the agent pulls the full content with loadSkill when relevant.</p>
+                    </div>
                     <div className="flex gap-2">
                         <Button color="primary" size="md" isDisabled={!draft.name.trim() || !draft.content.trim()} onClick={save}>
                             {draft.id ? "Save changes" : "Add skill"}
@@ -90,6 +99,7 @@ export function SkillsTab() {
                             <div className="flex items-center gap-2">
                                 <span className="truncate text-sm font-medium text-secondary">{s.name}</span>
                                 {s.builtin && <span className="rounded bg-utility-brand-50 px-1.5 py-0.5 text-xs font-medium text-utility-brand-700">Built-in</span>}
+                                {s.mode === "onDemand" && <span className="rounded bg-utility-blue-50 px-1.5 py-0.5 text-xs font-medium text-utility-blue-700">On-demand</span>}
                                 {(s.surfaces ?? ["dashboard", "canvas"]).map((sf) => (
                                     <span key={sf} className="rounded bg-tertiary px-1.5 py-0.5 text-xs text-tertiary">{sf}</span>
                                 ))}

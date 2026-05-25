@@ -63,9 +63,17 @@ const injectJson: Tool = {
     surfaces: ["dashboard"],
     mutating: true,
     run: async (op: AgentOp, ctx: ToolContext): Promise<OpResult> => {
+        // Hard enforcement of the composer's API toggle.
+        if (ctx.injectMode === "api") {
+            return {
+                kind: op.kind,
+                ok: false,
+                error: "API injection mode is selected — do NOT use injectJson. Bind the widget with injectConnection to a saved connection (listConnections → callApi → injectConnection). If no connection fits, ask the user to add one in Settings → Apps.",
+            };
+        }
         // Strict REST: if a saved API was called this turn, the data must be bound
-        // live — refuse to snapshot it into static settings.
-        const api = ctx.apiCalls[ctx.apiCalls.length - 1];
+        // live — refuse to snapshot it. Relaxed when the user forced JSON mode.
+        const api = ctx.injectMode === "json" ? undefined : ctx.apiCalls[ctx.apiCalls.length - 1];
         if (api) {
             return {
                 kind: op.kind,

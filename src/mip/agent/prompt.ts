@@ -11,7 +11,29 @@
 
 import { catalogFor } from "./tools";
 import type { Surface } from "./types";
+import type { Skill } from "./skills/types";
 import { CANVAS_TOOLS_DOC } from "../shell/canvas-runtime";
+
+/** Live facts about the page the agent is operating on. */
+export interface DashboardFacts {
+    title?: string;
+    description?: string;
+    kind?: string;
+    widgets?: { type: string; title?: string }[];
+}
+
+/** Render the "this dashboard" block so the agent never invents the title/widgets. */
+export function describeDashboard(d: DashboardFacts): string {
+    const widgets = (d.widgets ?? []).map((w) => `${w.type}${w.title ? ` (“${w.title}”)` : ""}`).join(", ") || "none yet";
+    return [
+        `## This ${d.kind === "canvas" ? "canvas" : "dashboard"} (live facts — trust these, do NOT invent)`,
+        `Title: ${d.title ?? "(untitled)"}`,
+        ...(d.description ? [`Description: ${d.description}`] : []),
+        d.kind === "canvas" ? "" : `Current widgets: ${widgets}`,
+    ]
+        .filter(Boolean)
+        .join("\n");
+}
 
 const DASHBOARD_PROTOCOL = [
     "## Protocol",
@@ -36,8 +58,10 @@ export interface PromptContext {
     pageContext?: string;
     /** The global assistant system prompt (Settings → Assistant). */
     assistantContext?: string;
-    /** Resolved skill knowledge blocks active for this dashboard + surface. */
-    skills?: string[];
+    /** Resolved skills active for this dashboard + surface (always vs on-demand). */
+    skills?: Skill[];
+    /** Live facts about the current page. */
+    dashboard?: DashboardFacts;
 }
 
 export function buildSystemPrompt(surface: Surface, ctx: PromptContext = {}): string {
@@ -46,13 +70,24 @@ export function buildSystemPrompt(surface: Surface, ctx: PromptContext = {}): st
     const context = [ctx.pageContext?.trim(), ctx.assistantContext?.trim()].filter(Boolean).join("\n\n");
     if (context) sections.push(`## Context (user-authored — follow this first)\n${context}`);
 
+    if (ctx.dashboard) sections.push(describeDashboard(ctx.dashboard));
+
     if (surface === "dashboard") {
         sections.push("You are the dashboard assistant. You manage a LIVE widget dashboard with real tools that run on the host and return results to you.");
     } else {
         sections.push("You are an agent operating a LIVE sandboxed HTML canvas via tools — you can touch only the canvas DOM, not the host app.");
     }
 
-    for (const skill of ctx.skills ?? []) if (skill.trim()) sections.push(skill);
+    // "always" skills go inline; "onDemand" skills are listed as a catalog the
+    // agent can pull from with loadSkill — keeps the prompt lean.
+    const skills = ctx.skills ?? [];
+    for (const s of skills) if ((s.mode ?? "always") === "always" && s.content.trim()) sections.push(s.content);
+    const onDemand = skills.filter((s) => s.mode === "onDemand");
+    if (onDemand.length) {
+        sections.push(
+            ["## Skill catalog (call `loadSkill { name }` to read one when relevant)", ...onDemand.map((s) => `- ${s.name}${s.description ? ` — ${s.description}` : ""}`)].join("\n"),
+        );
+    }
 
     if (surface === "dashboard") {
         sections.push(`## Tools (op \`kind\` + args)\n${catalogFor("dashboard")}`);

@@ -78,6 +78,13 @@ export interface ToolContext {
     // Turn-scoped scratch: saved-API calls made this turn. callApi appends here;
     // injectJson reads it to refuse snapshotting live API data (use injectConnection).
     apiCalls: { sourceId: string; path?: string }[];
+
+    // Composer injection toggle: "auto" | "json" | "api". When "api", injectJson
+    // is hard-refused; when "json", the post-callApi strict-REST guard is relaxed.
+    injectMode?: "auto" | "json" | "api";
+
+    // Look up an on-demand skill's content by name/id (for the loadSkill tool).
+    getSkill: (ref: string) => { name: string; content: string } | undefined;
 }
 
 /** A single capability the agent can invoke. */

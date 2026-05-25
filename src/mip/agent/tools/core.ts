@@ -48,6 +48,18 @@ const removeWidget: Tool = {
     },
 };
 
+const loadSkill: Tool = {
+    name: "loadSkill",
+    doc: "loadSkill { name }                     — read the full content of an on-demand skill listed in the Skill catalog",
+    surfaces: ["dashboard", "canvas"],
+    mutating: false,
+    run: async (op: AgentOp, ctx: ToolContext): Promise<OpResult> => {
+        const s = ctx.getSkill(String(op.name ?? op.id ?? ""));
+        if (!s) return { kind: "loadSkill", ok: false, error: `No skill named "${String(op.name ?? op.id)}" in the catalog.` };
+        return { kind: "loadSkill", ok: true, name: s.name, content: s.content };
+    },
+};
+
 const getContext: Tool = {
     name: "getContext",
     doc: "getContext {}                          — read this page's AI assistant context (the persistent system-prompt note for this dashboard)",
@@ -84,4 +96,4 @@ const canvasDomTools: Tool[] = CANVAS_DOM_KINDS.map((kind) => ({
     },
 }));
 
-export const coreTools: Tool[] = [listConnections, listWidgets, removeWidget, getContext, setContext, ...canvasDomTools];
+export const coreTools: Tool[] = [listConnections, listWidgets, removeWidget, loadSkill, getContext, setContext, ...canvasDomTools];

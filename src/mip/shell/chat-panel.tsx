@@ -244,8 +244,9 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
     const allowedConnections = allowedIds ? connections.filter((c) => allowedIds.includes(c.id)) : connections;
 
     // Everything the tools need from the live app, rebuilt per send. Tools only
-    // ever see the dashboard-allowed connections.
-    const toolContext = (): ToolContext => ({
+    // ever see the dashboard-allowed connections. `activeSkills` lets loadSkill
+    // fetch an on-demand skill's content.
+    const toolContext = (activeSkills: { name: string; id: string; content: string }[]): ToolContext => ({
         fetchPage,
         testEndpoint,
         connections: allowedConnections,
@@ -265,6 +266,11 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         getContext: () => activePage.systemPrompt ?? "",
         setContext: (val) => updatePageSettings(activePage.id, { systemPrompt: val }),
         apiCalls: [],
+        injectMode,
+        getSkill: (ref) => {
+            const r = ref.trim().toLowerCase();
+            return activeSkills.find((s) => s.id.toLowerCase() === r || s.name.toLowerCase() === r);
+        },
     });
 
     const sendText = async (text: string) => {
@@ -328,12 +334,18 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                 {
                     id: `sk-${Date.now()}`,
                     role: "skills",
-                    text: `${active.length} skill${active.length > 1 ? "s" : ""} in context: ${active.map((s) => s.name).join(", ")}`,
-                    detail: active.map((s) => `### ${s.name}\n${s.content}`).join("\n\n"),
+                    text: `${active.length} skill${active.length > 1 ? "s" : ""}: ${active.map((s) => s.name + (s.mode === "onDemand" ? " (on-demand)" : "")).join(", ")}`,
+                    detail: active.map((s) => `### ${s.name}${s.mode === "onDemand" ? " — on-demand (loaded only when the agent calls loadSkill)" : ""}\n${s.content}`).join("\n\n"),
                 },
             ]);
         }
-        const system = buildSystemPrompt(surface, { pageContext: activePage.systemPrompt, assistantContext: assistant.systemPrompt, skills: active.map((s) => s.content) }) + injectionDirective;
+        const system =
+            buildSystemPrompt(surface, {
+                pageContext: activePage.systemPrompt,
+                assistantContext: assistant.systemPrompt,
+                skills: active,
+                dashboard: { title: activePage.title, description: activePage.description, kind: activePage.kind, widgets: activePage.widgets.map((w) => ({ type: w.type, title: w.title })) },
+            }) + injectionDirective;
         const jsonMode = (conn.aiProvider ?? "openai") !== "anthropic";
 
         const pushTool = (op: Record<string, unknown>, result: Record<string, unknown>) =>
@@ -350,7 +362,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             system,
             jsonMode,
             brain,
-            ctx: toolContext(),
+            ctx: toolContext(active.map((s) => ({ name: s.name, id: s.id, content: s.content }))),
             say: pushAssistant,
             onTool: ({ op, result }) => pushTool(op, result),
             signal: controller.signal,

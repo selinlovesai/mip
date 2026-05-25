@@ -17,7 +17,7 @@ export const NATIVE_SKILLS: Skill[] = [
     { id: "native-canvas", name: "Canvas building", description: "How to build the sandboxed HTML canvas incrementally.", content: CANVAS_SKILL, builtin: true, surfaces: ["canvas"] },
 ];
 
-export type { Skill, SkillSurface } from "./types";
+export type { Skill, SkillSurface, SkillMode } from "./types";
 export { RESEARCH_SKILL } from "./research";
 export { MIP_WIDGETS_SKILL } from "./mip-widgets";
 export { INJECTION_SKILL } from "./injection";
