@@ -17,7 +17,7 @@ import { Checkbox } from "@/components/base/checkbox/checkbox";
 import { Input } from "@/components/base/input/input";
 import { Select } from "@/components/base/select/select";
 import { TextArea } from "@/components/base/textarea/textarea";
-import { chat, fetchPage, transcribe } from "@/mip/api";
+import { chat, fetchPage, testEndpoint, transcribe } from "@/mip/api";
 import { canvasBridge } from "./canvas-bridge";
 import { CANVAS_TOOLS_DOC, type CanvasOp } from "./canvas-runtime";
 import { markdownToHtml } from "@/mip/adapters/untitled/markdown";
@@ -44,11 +44,16 @@ function demoRespond(prompt: string, page: string): string {
 const CANVAS_SYSTEM = [
     "You are an agent operating a LIVE sandboxed HTML canvas via tools — you cannot access the host app, only the canvas DOM.",
     "Build and modify the canvas INCREMENTALLY with tool ops; do NOT dump a whole document. To start a fresh canvas, use a single `replace`. To change parts, use append/insert/setStyle/setText/setAttr/remove/addStyle/runJs, and `query` to inspect first.",
-    "Tools (op `kind` + args):",
+    "DOM tools (op `kind` + args):",
     CANVAS_TOOLS_DOC,
+    "Web tools (run outside the canvas, results returned to you):",
+    "fetch { url }                          — fetch a web page's readable text (returns {title, text})",
+    "search { query }                       — web search via the connected Tavily app (returns results: title/url/content)",
     "Freedom: injected HTML may use any CSS/JS and load external libraries via CDN (fonts, Tailwind Play CDN, chart libraries…).",
     "Design system: tokens are available as CSS vars on :root — --color-brand-600, --color-bg-primary, --color-text-primary, --color-text-secondary, --color-border-secondary, --radius-lg, --shadow-md, --font-body. Use them when asked to match the app.",
-    'Protocol: reply with ONE ```json block: {"say":"<one short line>","ops":[ {"kind":"...", ...}, ... ]}. After the ops run you receive their results and may continue with more ops. When done, reply with {"say":"<summary>","ops":[]}.',
+    "Workflow: when the user asks to base the canvas on real content (a site, page, or search), CALL search/fetch FIRST and build from the returned content — never invent it.",
+    "Build the page with ONE `replace` op holding the full HTML; use append/insert/setStyle/etc. ONLY for later tweaks. NEVER re-add or re-build content you already added.",
+    'Protocol: reply with ONE ```json block: {"say":"<one short line>","ops":[ {"kind":"...", ...}, ... ]}. You receive the ops\' results and may continue. As soon as the canvas matches the request, reply with {"say":"<summary>","ops":[]} and STOP.',
 ].join("\n");
 
 /** Parse an agent reply into {say, ops}; null if it isn't a tool-call object. */
@@ -140,6 +145,34 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
     // Canvas agent loop: the model emits {say, ops[]}; we run the ops through the
     // canvas runtime, feed results back, and iterate (capped) — real tool use,
     // not whole-document dumps.
+    const tavily = connections.find((c) => /tavily/i.test(c.baseUrl ?? ""));
+
+    const runOp = async (op: Record<string, unknown>): Promise<Record<string, unknown>> => {
+        const kind = op.kind as string;
+        if (kind === "fetch" && typeof op.url === "string") {
+            const r = await fetchPage(op.url);
+            return { kind, url: op.url, ok: r.ok, title: r.title, text: (r.text ?? "").slice(0, 4000), ...(r.error ? { error: String(r.error) } : {}) };
+        }
+        if (kind === "search") {
+            if (!tavily?.auth?.token) return { kind, ok: false, error: "No Tavily connection — add one in Settings → Apps." };
+            const r = await testEndpoint({
+                method: "POST",
+                url: `${(tavily.baseUrl ?? "https://api.tavily.com").replace(/\/$/, "")}/search`,
+                headers: { Authorization: `Bearer ${tavily.auth.token}` },
+                body: { query: op.query, max_results: 5, search_depth: "basic" },
+            });
+            const body = r.body as { results?: Array<{ title?: string; url?: string; content?: string }> } | undefined;
+            return {
+                kind,
+                ok: r.ok,
+                ...(r.ok && body?.results ? { results: body.results.map((x) => ({ title: x.title, url: x.url, content: (x.content ?? "").slice(0, 400) })) } : {}),
+                ...(r.ok ? {} : { error: typeof r.error === "string" ? r.error : `status ${r.status ?? "?"}` }),
+            };
+        }
+        const r = await canvasBridge.send(op as CanvasOp);
+        return { kind, ok: r.ok, ...(r.error ? { error: r.error } : {}), ...(r.result !== undefined ? { result: r.result } : {}) };
+    };
+
     const runCanvasAgent = async (initial: ApiMsg[]) => {
         const sys = [CANVAS_SYSTEM, activePage.systemPrompt ?? "", assistant.systemPrompt ?? ""].filter(Boolean).join("\n\n");
         let msgs = initial.slice();
@@ -158,14 +191,11 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             if (parsed.say) pushAssistant(parsed.say);
             if (!parsed.ops.length) return;
             const results: unknown[] = [];
-            for (const op of parsed.ops) {
-                const r = await canvasBridge.send(op);
-                results.push({ kind: op.kind, ok: r.ok, ...(r.error ? { error: r.error } : {}), ...(r.result !== undefined ? { result: r.result } : {}) });
-            }
+            for (const op of parsed.ops as Array<Record<string, unknown>>) results.push(await runOp(op));
             msgs = [
                 ...msgs,
                 { role: "assistant", content: text },
-                { role: "user", content: "Tool results:\n```json\n" + JSON.stringify(results).slice(0, 3000) + "\n```\nContinue with more ops, or finish with ops:[]." },
+                { role: "user", content: "Tool results:\n```json\n" + JSON.stringify(results).slice(0, 4000) + "\n```\nIf the canvas already matches the request, reply with {\"say\":\"<summary>\",\"ops\":[]}. Otherwise continue — do not re-add anything already present." },
             ];
         }
         pushAssistant("Reached the canvas step limit.");
