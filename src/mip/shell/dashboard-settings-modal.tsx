@@ -129,7 +129,7 @@ export function DashboardSettingsModal({ open, onClose }: { open: boolean; onClo
     return (
         <ModalOverlay isOpen={open} onOpenChange={(isOpen) => !isOpen && onClose()} isDismissable>
             <Modal className="max-w-3xl">
-                <Dialog>
+                <Dialog aria-label="Dashboard Settings">
                     <div className="flex max-h-[80vh] w-full flex-col overflow-hidden rounded-xl bg-primary shadow-xl ring-1 ring-secondary">
                         <div className="flex items-center justify-between border-b border-secondary px-5 py-4">
                             <h2 className="text-lg font-semibold text-primary">Dashboard Settings</h2>

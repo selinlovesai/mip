@@ -53,7 +53,7 @@ export function TemplatesModal({ open, onClose, onOpenConnections }: { open: boo
     return (
         <ModalOverlay isOpen={open} onOpenChange={(isOpen) => !isOpen && close()} isDismissable>
             <Modal className="max-w-3xl">
-                <Dialog>
+                <Dialog aria-label="Dashboard Templates">
                     <div className="flex h-[600px] max-h-[85vh] w-full flex-col overflow-hidden rounded-xl bg-primary shadow-xl ring-1 ring-secondary">
                         {selected ? (
                             /* ---- Import-confirm view ---- */

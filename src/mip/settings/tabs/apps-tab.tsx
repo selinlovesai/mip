@@ -198,7 +198,7 @@ function ConnectModal({
     return (
         <ModalOverlay isOpen={!!app} onOpenChange={(isOpen) => !isOpen && onClose()} isDismissable>
             <Modal className="max-w-md">
-                <Dialog>{app ? <ConnectForm app={app} onClose={onClose} onConnect={onConnect} /> : <span />}</Dialog>
+                <Dialog aria-label={app ? `Connect ${app.name}` : "Connect app"}>{app ? <ConnectForm app={app} onClose={onClose} onConnect={onConnect} /> : <span />}</Dialog>
             </Modal>
         </ModalOverlay>
     );

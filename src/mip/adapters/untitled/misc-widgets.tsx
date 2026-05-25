@@ -67,7 +67,7 @@ export function ModalWidget({ widget }: WidgetRenderProps) {
                     </Button>
                     <ModalOverlay>
                         <Modal>
-                            <Dialog>
+                            <Dialog aria-label={heading}>
                                 <div className="flex w-full max-w-md flex-col gap-3 rounded-xl bg-primary p-6 shadow-xl ring-1 ring-secondary">
                                     <h3 className="text-lg font-semibold text-primary">{heading}</h3>
                                     {body ? <p className="text-sm text-tertiary">{body}</p> : null}

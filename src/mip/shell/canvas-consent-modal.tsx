@@ -18,7 +18,7 @@ export function CanvasConsentModal({ open, onClose, onConfirm }: { open: boolean
     return (
         <ModalOverlay isOpen={open} onOpenChange={(v) => !v && onClose()} isDismissable>
             <Modal className="max-w-lg">
-                <Dialog>
+                <Dialog aria-label="Enable AI Canvas">
                     <div className="flex w-full flex-col gap-5 rounded-xl bg-primary p-6 shadow-xl ring-1 ring-secondary">
                         <div className="flex items-start justify-between gap-4">
                             <div className="flex items-center gap-3">
