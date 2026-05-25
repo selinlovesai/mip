@@ -112,11 +112,22 @@ function ComposerTextarea({ value, onChange, onKeyDown }: { value: string; onCha
     );
 }
 
+const introMessage: Message = { id: "intro", role: "assistant", text: INTRO };
+
 export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
     const { activePage } = useDashboard();
     const { assistant, aiConnections, connections, getConnection, setAssistant } = useSettings();
     const [mode, setMode] = useState<ChatMode>("sidebar");
-    const [messages, setMessages] = useState<Message[]>([{ id: "intro", role: "assistant", text: INTRO }]);
+    // Conversations are scoped per page (dashboard/canvas) — switching the active
+    // page swaps to that page's own session.
+    const [sessions, setSessions] = useState<Record<string, Message[]>>({});
+    const pageId = activePage.id;
+    const messages = sessions[pageId] ?? [introMessage];
+    const setMessages = (updater: Message[] | ((prev: Message[]) => Message[])) =>
+        setSessions((s) => {
+            const cur = s[pageId] ?? [introMessage];
+            return { ...s, [pageId]: typeof updater === "function" ? updater(cur) : updater };
+        });
     const [draft, setDraft] = useState("");
     const [thinking, setThinking] = useState(false);
     const [acfgOpen, setAcfgOpen] = useState(false);
@@ -187,6 +198,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
     const runCanvasAgent = async (initial: ApiMsg[]) => {
         const sys = [CANVAS_SYSTEM, activePage.systemPrompt ?? "", assistant.systemPrompt ?? ""].filter(Boolean).join("\n\n");
         let msgs = initial.slice();
+        let nudged = false;
         for (let round = 0; round < 8; round++) {
             const result = await callModel(msgs, sys);
             if (!result.ok) {
@@ -196,6 +208,16 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             const text = result.content ?? "";
             const parsed = parseCanvasReply(text);
             if (!parsed) {
+                // Model narrated instead of emitting tools — nudge it once.
+                if (!nudged) {
+                    nudged = true;
+                    msgs = [
+                        ...msgs,
+                        { role: "assistant", content: text },
+                        { role: "user", content: 'Reply with ONLY a ```json tool block — no prose. Use ops to ACTUALLY change the canvas (e.g. runJs to add event listeners, setStyle, setValue, click). Describing it does nothing.' },
+                    ];
+                    continue;
+                }
                 pushAssistant(text);
                 return;
             }
