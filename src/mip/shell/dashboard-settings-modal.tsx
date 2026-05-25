@@ -21,6 +21,7 @@ import { TextArea } from "@/components/base/textarea/textarea";
 import { dbAvailable, dbGet } from "@/mip/api";
 import { useDashboard, type DashboardPage, type PageAccessLevel, type PageVariable } from "@/mip/store";
 import { useSettings } from "@/mip/settings/settings-store";
+import { ModelField } from "@/mip/settings/model-field";
 import type { PageAgentConfig } from "@/mip/agent";
 import { cx } from "@/utils/cx";
 
@@ -62,7 +63,7 @@ const cardCls = "flex flex-col gap-4 rounded-xl bg-secondary p-4 ring-1 ring-sec
 
 export function DashboardSettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
     const { activePage, updatePageSettings, renamePageId, isPageIdAvailable } = useDashboard();
-    const { aiConnections, connections, skills } = useSettings();
+    const { aiConnections, connections, skills, assistant, getConnection } = useSettings();
     const [tab, setTab] = useState<TabId>("general");
     const [draft, setDraft] = useState<DashboardPage>(activePage);
     const [idError, setIdError] = useState<string | null>(null);
@@ -88,6 +89,9 @@ export function DashboardSettingsModal({ open, onClose }: { open: boolean; onClo
     const agent = draft.agent ?? {};
     const setAgentField = <K extends keyof PageAgentConfig>(key: K, value: PageAgentConfig[K]) =>
         setDraft((d) => ({ ...d, agent: { ...d.agent, [key]: value } }));
+    // The connection whose models to list: this dashboard's override, else the
+    // global default, else the first AI connection.
+    const effectiveConn = getConnection(agent.connectionId ?? assistant.connectionId ?? aiConnections[0]?.id ?? "");
     const isCanvas = draft.kind === "canvas";
     const surfaceSkills = skills.filter((s) => !s.surfaces || s.surfaces.includes(isCanvas ? "canvas" : "dashboard"));
     // A skill is active when: built-in & not disabled, or custom & enabled.
@@ -221,14 +225,6 @@ export function DashboardSettingsModal({ open, onClose }: { open: boolean; onClo
                                         >
                                             {(item) => <Select.Item id={item.id}>{item.label}</Select.Item>}
                                         </Select>
-                                        <TextArea
-                                            label="AI assistant context (system prompt)"
-                                            hint="Injected at the top of the agent's prompt whenever this dashboard is open."
-                                            value={draft.systemPrompt ?? ""}
-                                            onChange={(v) => setDraftField("systemPrompt", v)}
-                                            rows={4}
-                                            placeholder="e.g. This page tracks SEO metrics; prefer concise, data-backed answers."
-                                        />
                                     </div>
                                 ) : null}
 
@@ -251,13 +247,23 @@ export function DashboardSettingsModal({ open, onClose }: { open: boolean; onClo
                                             >
                                                 {(item) => <Select.Item id={item.id}>{item.label}</Select.Item>}
                                             </Select>
-                                            <Input
-                                                label="Model"
-                                                placeholder="Use global / connection default"
+                                            <ModelField
+                                                conn={effectiveConn}
                                                 value={agent.model ?? ""}
                                                 onChange={(v) => setAgentField("model", v.trim() || undefined)}
+                                                placeholder="Use global / connection default"
+                                                hint="Models from the selected provider; you can also type a specific id."
                                             />
                                         </div>
+
+                                        <TextArea
+                                            label="AI assistant context (system prompt)"
+                                            hint="Injected at the top of this dashboard's agent prompt."
+                                            value={draft.systemPrompt ?? ""}
+                                            onChange={(v) => setDraftField("systemPrompt", v)}
+                                            rows={4}
+                                            placeholder="e.g. This page tracks SEO metrics; prefer concise, data-backed answers."
+                                        />
 
                                         <div className="flex flex-col gap-2">
                                             <span className="text-xs font-semibold uppercase tracking-wide text-quaternary">Skills</span>

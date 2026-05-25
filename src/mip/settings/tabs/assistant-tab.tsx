@@ -7,10 +7,10 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/base/buttons/button";
-import { Input } from "@/components/base/input/input";
 import { Select } from "@/components/base/select/select";
 import { TextArea } from "@/components/base/textarea/textarea";
 import { useSettings } from "../settings-store";
+import { ModelField } from "../model-field";
 
 const DEFAULT_PROMPT =
     "You are a helpful dashboard assistant. Help the user add widgets, arrange layouts, and interpret their data.";
@@ -71,12 +71,11 @@ export function AssistantTab() {
                         {(item) => <Select.Item id={item.id}>{item.label}</Select.Item>}
                     </Select>
 
-                    <Input
-                        label="Model"
-                        hint="Defaults from the connection; override to pin a specific model."
-                        placeholder={selected?.aiModel ?? "e.g. gpt-4o-mini"}
+                    <ModelField
+                        conn={selected}
                         value={model}
                         onChange={setModel}
+                        hint="Models are listed from the selected provider; you can also type a specific id."
                     />
 
                     <TextArea
