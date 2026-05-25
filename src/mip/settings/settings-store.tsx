@@ -7,6 +7,9 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AuthMethod } from "./apps-catalog";
+import { NATIVE_SKILLS, type Skill } from "@/mip/agent/skills";
+
+export type { Skill } from "@/mip/agent/skills";
 
 export type DataSourceType = "mock" | "rest" | "json" | "csv";
 
@@ -76,8 +79,17 @@ interface SettingsState {
     apps: AppConnection[];
     assistant: AssistantConfig;
     profile: UserProfile;
+    /** Skills library — built-in (native) + user-authored. */
+    skills: Skill[];
     /** User acknowledged the risks of the freeform AI canvas (arbitrary code). */
     canvasConsented?: boolean;
+}
+
+/** Merge stored skills with the latest native skills (native content stays
+ *  fresh across app updates; custom skills are preserved). */
+function mergeSkills(stored: Skill[] | undefined): Skill[] {
+    const custom = (stored ?? []).filter((s) => !s.builtin);
+    return [...NATIVE_SKILLS, ...custom];
 }
 
 const STORAGE_KEY = "mip-settings-v1";
@@ -92,12 +104,16 @@ const DEFAULT_STATE: SettingsState = {
     apps: [],
     assistant: {},
     profile: { name: "Super Admin", email: "superadmin@protocol.dev" },
+    skills: NATIVE_SKILLS,
 };
 
 function load(): SettingsState {
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) return { ...DEFAULT_STATE, ...(JSON.parse(raw) as SettingsState) };
+        if (raw) {
+            const parsed = JSON.parse(raw) as SettingsState;
+            return { ...DEFAULT_STATE, ...parsed, skills: mergeSkills(parsed.skills) };
+        }
     } catch {
         /* ignore */
     }
@@ -120,6 +136,11 @@ interface SettingsValue {
     aiConnections: Connection[];
     assistant: AssistantConfig;
     setAssistant: (patch: Partial<AssistantConfig>) => void;
+    /** Skills library (native + custom). */
+    skills: Skill[];
+    addSkill: (skill: Omit<Skill, "id" | "builtin">) => string;
+    updateSkill: (id: string, patch: Partial<Skill>) => void;
+    removeSkill: (id: string) => void;
     profile: UserProfile;
     setProfile: (patch: Partial<UserProfile>) => void;
     canvasConsented: boolean;
@@ -175,6 +196,21 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, assistant: { ...s.assistant, ...patch } }));
     }, []);
 
+    const addSkill = useCallback((skill: Omit<Skill, "id" | "builtin">) => {
+        const id = `skill-${Date.now()}`;
+        setState((s) => ({ ...s, skills: [...s.skills, { ...skill, id }] }));
+        return id;
+    }, []);
+
+    const updateSkill = useCallback((id: string, patch: Partial<Skill>) => {
+        setState((s) => ({ ...s, skills: s.skills.map((sk) => (sk.id === id ? { ...sk, ...patch, id: sk.id } : sk)) }));
+    }, []);
+
+    const removeSkill = useCallback((id: string) => {
+        // Native skills can't be deleted (only toggled off per dashboard).
+        setState((s) => ({ ...s, skills: s.skills.filter((sk) => sk.id !== id || sk.builtin) }));
+    }, []);
+
     const setProfile = useCallback((patch: Partial<UserProfile>) => {
         setState((s) => ({ ...s, profile: { ...s.profile, ...patch } }));
     }, []);
@@ -182,8 +218,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const setCanvasConsented = useCallback((v: boolean) => setState((s) => ({ ...s, canvasConsented: v })), []);
 
     const value = useMemo<SettingsValue>(
-        () => ({ connections: state.connections, apps: state.apps, isAppConnected, connectApp, disconnectApp, addConnection, ensureConnection, updateConnection, removeConnection, getConnection, aiConnections, assistant: state.assistant, setAssistant, profile: state.profile, setProfile, canvasConsented: !!state.canvasConsented, setCanvasConsented }),
-        [state, isAppConnected, connectApp, disconnectApp, addConnection, ensureConnection, updateConnection, removeConnection, getConnection, aiConnections, setAssistant, setProfile, setCanvasConsented],
+        () => ({ connections: state.connections, apps: state.apps, isAppConnected, connectApp, disconnectApp, addConnection, ensureConnection, updateConnection, removeConnection, getConnection, aiConnections, assistant: state.assistant, setAssistant, skills: state.skills, addSkill, updateSkill, removeSkill, profile: state.profile, setProfile, canvasConsented: !!state.canvasConsented, setCanvasConsented }),
+        [state, isAppConnected, connectApp, disconnectApp, addConnection, ensureConnection, updateConnection, removeConnection, getConnection, aiConnections, setAssistant, addSkill, updateSkill, removeSkill, setProfile, setCanvasConsented],
     );
 
     return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

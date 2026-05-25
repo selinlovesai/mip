@@ -3,19 +3,14 @@
  *
  *   1. CONTEXT   — the page's "AI assistant context" + global assistant context,
  *                  injected FIRST so user-authored guidance frames everything.
- *   2. SKILLS    — the agent's knowledge (research, MIP widgets, injection, canvas).
+ *   2. SKILLS    — the knowledge active for THIS dashboard (resolved by the
+ *                  caller from the library + per-dashboard toggles).
  *   3. TOOLS     — the catalog of ops available on this surface (from the registry).
  *   4. PROTOCOL  — the strict {say, ops} contract + worked examples.
- *
- * Keeping this in one place means the prompt always matches the registry.
  */
 
 import { catalogFor } from "./tools";
 import type { Surface } from "./types";
-import { RESEARCH_SKILL } from "./skills/research";
-import { MIP_WIDGETS_SKILL } from "./skills/mip-widgets";
-import { INJECTION_SKILL } from "./skills/injection";
-import { CANVAS_SKILL } from "./skills/canvas";
 import { CANVAS_TOOLS_DOC } from "../shell/canvas-runtime";
 
 const DASHBOARD_PROTOCOL = [
@@ -36,12 +31,13 @@ const CANVAS_PROTOCOL = [
     'EVERY reply must be ONE JSON object {"say":"<one short line>","ops":[ {"kind":"...", ...}, ... ]} — never plain prose, never code outside it. You receive the ops\' results and may continue. As soon as the canvas matches the request, reply with {"say":"<summary>","ops":[]} and STOP.',
 ].join("\n");
 
-/** Context authored by the user — injected at the very top of the prompt. */
 export interface PromptContext {
     /** The active page's "AI assistant context (system prompt)". */
     pageContext?: string;
     /** The global assistant system prompt (Settings → Assistant). */
     assistantContext?: string;
+    /** Resolved skill knowledge blocks active for this dashboard + surface. */
+    skills?: string[];
 }
 
 export function buildSystemPrompt(surface: Surface, ctx: PromptContext = {}): string {
@@ -52,12 +48,16 @@ export function buildSystemPrompt(surface: Surface, ctx: PromptContext = {}): st
 
     if (surface === "dashboard") {
         sections.push("You are the dashboard assistant. You manage a LIVE widget dashboard with real tools that run on the host and return results to you.");
-        sections.push(RESEARCH_SKILL, MIP_WIDGETS_SKILL, INJECTION_SKILL);
+    } else {
+        sections.push("You are an agent operating a LIVE sandboxed HTML canvas via tools — you can touch only the canvas DOM, not the host app.");
+    }
+
+    for (const skill of ctx.skills ?? []) if (skill.trim()) sections.push(skill);
+
+    if (surface === "dashboard") {
         sections.push(`## Tools (op \`kind\` + args)\n${catalogFor("dashboard")}`);
         sections.push(DASHBOARD_PROTOCOL);
     } else {
-        sections.push("You are an agent operating a LIVE sandboxed HTML canvas via tools — you can touch only the canvas DOM, not the host app.");
-        sections.push(RESEARCH_SKILL, CANVAS_SKILL);
         sections.push(`## Canvas DOM tools (op \`kind\` + args)\n${CANVAS_TOOLS_DOC}`);
         const web = catalogFor("canvas");
         if (web) sections.push(`## Web tools\n${web}`);

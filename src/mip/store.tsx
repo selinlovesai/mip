@@ -8,6 +8,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Layout } from "react-grid-layout/core";
 import type { MipWidget, MipWidgetLayout } from "@/mip/schema";
+import type { PageAgentConfig } from "@/mip/agent/config";
 import { seedPages } from "./seed";
 
 /** Per-page access level granted to a role (mirrors mip `pagePermissions`). */
@@ -37,6 +38,8 @@ export interface DashboardPage {
     layoutMode?: "dashboard" | "fullpage";
     /** added to the assistant's system prompt while this page is open */
     systemPrompt?: string;
+    /** per-dashboard agent config: model + skills + callable connections (global default fills gaps) */
+    agent?: PageAgentConfig;
     /** role id -> access level (Access Control tab) */
     permissions?: Record<string, PageAccessLevel>;
     /** whether the AI assistant may access/see this page */

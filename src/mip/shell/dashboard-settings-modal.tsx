@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useMemo, useState, type ComponentType } from "react";
-import { Eye, LayoutAlt01, Plus, Trash01, Variable } from "@untitledui/icons";
+import { Eye, LayoutAlt01, Plus, Stars01, Trash01, Variable } from "@untitledui/icons";
 import { Dialog, Modal, ModalOverlay } from "@/components/application/modals/modal";
 import { Button } from "@/components/base/buttons/button";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
@@ -20,12 +20,15 @@ import { Select } from "@/components/base/select/select";
 import { TextArea } from "@/components/base/textarea/textarea";
 import { dbAvailable, dbGet } from "@/mip/api";
 import { useDashboard, type DashboardPage, type PageAccessLevel, type PageVariable } from "@/mip/store";
+import { useSettings } from "@/mip/settings/settings-store";
+import type { PageAgentConfig } from "@/mip/agent";
 import { cx } from "@/utils/cx";
 
-type TabId = "general" | "access" | "variables";
+type TabId = "general" | "agent" | "access" | "variables";
 
 const TABS: Array<{ id: TabId; label: string; icon: ComponentType<{ className?: string }> }> = [
     { id: "general", label: "General", icon: LayoutAlt01 },
+    { id: "agent", label: "Agent", icon: Stars01 },
     { id: "access", label: "Access", icon: Eye },
     { id: "variables", label: "Dynamic Variables", icon: Variable },
 ];
@@ -59,6 +62,7 @@ const cardCls = "flex flex-col gap-4 rounded-xl bg-secondary p-4 ring-1 ring-sec
 
 export function DashboardSettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
     const { activePage, updatePageSettings, renamePageId, isPageIdAvailable } = useDashboard();
+    const { aiConnections, connections, skills } = useSettings();
     const [tab, setTab] = useState<TabId>("general");
     const [draft, setDraft] = useState<DashboardPage>(activePage);
     const [idError, setIdError] = useState<string | null>(null);
@@ -79,6 +83,36 @@ export function DashboardSettingsModal({ open, onClose }: { open: boolean; onClo
     }, [draft.permissions]);
 
     const setDraftField = <K extends keyof DashboardPage>(key: K, value: DashboardPage[K]) => setDraft((d) => ({ ...d, [key]: value }));
+
+    // --- Agent (per-dashboard) ---
+    const agent = draft.agent ?? {};
+    const setAgentField = <K extends keyof PageAgentConfig>(key: K, value: PageAgentConfig[K]) =>
+        setDraft((d) => ({ ...d, agent: { ...d.agent, [key]: value } }));
+    const isCanvas = draft.kind === "canvas";
+    const surfaceSkills = skills.filter((s) => !s.surfaces || s.surfaces.includes(isCanvas ? "canvas" : "dashboard"));
+    // A skill is active when: built-in & not disabled, or custom & enabled.
+    const skillActive = (id: string, builtin?: boolean) =>
+        builtin ? !(agent.disabledSkillIds ?? []).includes(id) : (agent.enabledSkillIds ?? []).includes(id);
+    const toggleSkill = (id: string, builtin: boolean | undefined, on: boolean) => {
+        if (builtin) {
+            const disabled = new Set(agent.disabledSkillIds ?? []);
+            if (on) disabled.delete(id);
+            else disabled.add(id);
+            setAgentField("disabledSkillIds", [...disabled]);
+        } else {
+            const enabled = new Set(agent.enabledSkillIds ?? []);
+            if (on) enabled.add(id);
+            else enabled.delete(id);
+            setAgentField("enabledSkillIds", [...enabled]);
+        }
+    };
+    const callable = agent.callableConnectionIds;
+    const toggleCallable = (id: string, on: boolean) => {
+        // Undefined = "all allowed"; first explicit toggle materializes the list.
+        const base = callable ?? connections.map((c) => c.id);
+        const next = on ? [...new Set([...base, id])] : base.filter((c) => c !== id);
+        setAgentField("callableConnectionIds", next);
+    };
 
     const setRoleAccess = (role: string, level: PageAccessLevel) =>
         setDraft((d) => ({ ...d, permissions: { ...permissions, ...d.permissions, [role]: level } }));
@@ -119,6 +153,7 @@ export function DashboardSettingsModal({ open, onClose }: { open: boolean; onClo
             description: draft.description,
             layoutMode: draft.layoutMode ?? "dashboard",
             systemPrompt: draft.systemPrompt,
+            agent: draft.agent,
             permissions,
             aiAccess: draft.aiAccess ?? true,
             variables,
@@ -188,12 +223,84 @@ export function DashboardSettingsModal({ open, onClose }: { open: boolean; onClo
                                         </Select>
                                         <TextArea
                                             label="AI assistant context (system prompt)"
-                                            hint="Added to the assistant's system prompt whenever this dashboard is open."
+                                            hint="Injected at the top of the agent's prompt whenever this dashboard is open."
                                             value={draft.systemPrompt ?? ""}
                                             onChange={(v) => setDraftField("systemPrompt", v)}
                                             rows={4}
                                             placeholder="e.g. This page tracks SEO metrics; prefer concise, data-backed answers."
                                         />
+                                    </div>
+                                ) : null}
+
+                                {tab === "agent" ? (
+                                    <div className="flex flex-col gap-5">
+                                        <div>
+                                            <h3 className="text-sm font-semibold text-primary">Agent</h3>
+                                            <p className="mt-1 text-sm text-tertiary">
+                                                This dashboard's assistant. Anything left unset falls back to the global default (Settings → Assistant).
+                                            </p>
+                                        </div>
+
+                                        <div className="flex flex-col gap-3">
+                                            <Select
+                                                label="AI model connection"
+                                                placeholder="Use global default"
+                                                selectedKey={agent.connectionId ?? null}
+                                                items={[{ id: "", label: "Use global default" }, ...aiConnections.map((c) => ({ id: c.id, label: c.name }))]}
+                                                onSelectionChange={(key) => setAgentField("connectionId", String(key) || undefined)}
+                                            >
+                                                {(item) => <Select.Item id={item.id}>{item.label}</Select.Item>}
+                                            </Select>
+                                            <Input
+                                                label="Model"
+                                                placeholder="Use global / connection default"
+                                                value={agent.model ?? ""}
+                                                onChange={(v) => setAgentField("model", v.trim() || undefined)}
+                                            />
+                                        </div>
+
+                                        <div className="flex flex-col gap-2">
+                                            <span className="text-xs font-semibold uppercase tracking-wide text-quaternary">Skills</span>
+                                            <p className="text-xs text-tertiary">Built-in skills are on by default; turn any off, or enable your own from the library (Settings → Skills).</p>
+                                            <div className={cardCls}>
+                                                {surfaceSkills.length === 0 ? (
+                                                    <p className="text-sm text-tertiary">No skills for this surface.</p>
+                                                ) : (
+                                                    surfaceSkills.map((s) => (
+                                                        <label key={s.id} className="flex items-start gap-2.5">
+                                                            <Checkbox isSelected={skillActive(s.id, s.builtin)} onChange={(on) => toggleSkill(s.id, s.builtin, on)} />
+                                                            <span className="flex min-w-0 flex-col">
+                                                                <span className="flex items-center gap-2 text-sm font-medium text-secondary">
+                                                                    {s.name}
+                                                                    {s.builtin && <span className="rounded bg-utility-brand-50 px-1.5 py-0.5 text-xs font-medium text-utility-brand-700">Built-in</span>}
+                                                                </span>
+                                                                {s.description && <span className="text-xs text-tertiary">{s.description}</span>}
+                                                            </span>
+                                                        </label>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-col gap-2">
+                                            <span className="text-xs font-semibold uppercase tracking-wide text-quaternary">Connections this agent can use</span>
+                                            <p className="text-xs text-tertiary">Which saved APIs the agent may call or bind widgets to. All allowed by default.</p>
+                                            <div className={cardCls}>
+                                                {connections.length === 0 ? (
+                                                    <p className="text-sm text-tertiary">No connections yet.</p>
+                                                ) : (
+                                                    connections.map((c) => (
+                                                        <label key={c.id} className="flex items-start gap-2.5">
+                                                            <Checkbox isSelected={(callable ?? connections.map((x) => x.id)).includes(c.id)} onChange={(on) => toggleCallable(c.id, on)} />
+                                                            <span className="flex min-w-0 flex-col">
+                                                                <span className="truncate text-sm font-medium text-secondary">{c.name}</span>
+                                                                {c.baseUrl ? <span className="truncate font-mono text-xs text-tertiary">{c.baseUrl}</span> : <span className="text-xs text-tertiary">{c.type}</span>}
+                                                            </span>
+                                                        </label>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
                                 ) : null}
 
