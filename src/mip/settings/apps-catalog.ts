@@ -24,20 +24,50 @@ export interface AppConnector {
     color: string;
     /**
      * For AI providers: defaults used to create a real AI-model Connection when
-     * you connect with an API key (base URL + provider + a sensible model).
+     * you connect with an API key (base URL + provider + model + endpoints).
      */
-    ai?: { baseUrl: string; provider: string; model: string };
+    ai?: AiDefaults;
 }
+
+/** Endpoint template (no id — ids are assigned when the connection is created). */
+export interface AiEndpointTemplate {
+    label: string;
+    method: string;
+    path: string;
+    mapPath?: string;
+    description?: string;
+}
+
+export interface AiDefaults {
+    baseUrl: string;
+    provider: string;
+    model: string;
+    endpoints: AiEndpointTemplate[];
+}
+
+// OpenAI-compatible providers (OpenAI, DeepSeek, Mistral, …) — /v1/* paths.
+const OPENAI_ENDPOINTS: AiEndpointTemplate[] = [
+    { label: "Chat completions", method: "POST", path: "/v1/chat/completions", mapPath: "$.choices[0].message.content", description: "OpenAI-compatible chat completion." },
+    { label: "Models", method: "GET", path: "/v1/models", mapPath: "$.data", description: "List available models." },
+];
+// Gemini's OpenAI-compatible surface (base URL already ends in /v1beta/openai).
+const GEMINI_ENDPOINTS: AiEndpointTemplate[] = [
+    { label: "Chat completions", method: "POST", path: "/chat/completions", mapPath: "$.choices[0].message.content", description: "OpenAI-compatible chat completion." },
+    { label: "Models", method: "GET", path: "/models", mapPath: "$.data", description: "List available models." },
+];
+const ANTHROPIC_ENDPOINTS: AiEndpointTemplate[] = [
+    { label: "Messages", method: "POST", path: "/v1/messages", mapPath: "$.content[0].text", description: "Anthropic Messages API." },
+];
 
 export const APP_CATALOG: AppConnector[] = [
     // AI
-    { id: "anthropic", name: "Anthropic", category: "AI", auth: ["apiKey", "oauth"], description: "Claude AI models for text generation, analysis, and code.", status: "active", color: "#D97757", ai: { baseUrl: "https://api.anthropic.com", provider: "anthropic", model: "claude-3-5-sonnet-20241022" } },
-    { id: "openai", name: "OpenAI", category: "AI", auth: ["apiKey", "oauth"], description: "GPT models for chat, completions, embeddings, and vision.", status: "active", color: "#10A37F", ai: { baseUrl: "https://api.openai.com", provider: "openai", model: "gpt-4o-mini" } },
-    { id: "gemini", name: "Google AI (Gemini)", category: "AI", auth: ["apiKey", "oauth"], description: "Gemini multimodal models for text, images, and reasoning.", status: "active", color: "#4285F4", ai: { baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", provider: "openai", model: "gemini-2.0-flash" } },
-    { id: "mistral", name: "Mistral AI", category: "AI", auth: ["apiKey", "oauth"], description: "Open-weight and frontier models for fast, efficient inference.", status: "active", color: "#FF7000", ai: { baseUrl: "https://api.mistral.ai", provider: "openai", model: "mistral-small-latest" } },
+    { id: "anthropic", name: "Anthropic", category: "AI", auth: ["apiKey", "oauth"], description: "Claude AI models for text generation, analysis, and code.", status: "active", color: "#D97757", ai: { baseUrl: "https://api.anthropic.com", provider: "anthropic", model: "claude-3-5-sonnet-20241022", endpoints: ANTHROPIC_ENDPOINTS } },
+    { id: "openai", name: "OpenAI", category: "AI", auth: ["apiKey", "oauth"], description: "GPT models for chat, completions, embeddings, and vision.", status: "active", color: "#10A37F", ai: { baseUrl: "https://api.openai.com", provider: "openai", model: "gpt-4o-mini", endpoints: OPENAI_ENDPOINTS } },
+    { id: "gemini", name: "Google AI (Gemini)", category: "AI", auth: ["apiKey", "oauth"], description: "Gemini multimodal models for text, images, and reasoning.", status: "active", color: "#4285F4", ai: { baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", provider: "openai", model: "gemini-2.0-flash", endpoints: GEMINI_ENDPOINTS } },
+    { id: "mistral", name: "Mistral AI", category: "AI", auth: ["apiKey", "oauth"], description: "Open-weight and frontier models for fast, efficient inference.", status: "active", color: "#FF7000", ai: { baseUrl: "https://api.mistral.ai", provider: "openai", model: "mistral-small-latest", endpoints: OPENAI_ENDPOINTS } },
     { id: "cohere", name: "Cohere", category: "AI", auth: ["apiKey", "oauth"], description: "Command models and embeddings tuned for enterprise RAG.", status: "coming_soon", color: "#39594D" },
     { id: "perplexity", name: "Perplexity", category: "AI", auth: ["apiKey", "oauth"], description: "Answer engine with live web grounding and citations.", status: "coming_soon", color: "#1FB8CD" },
-    { id: "deepseek", name: "DeepSeek", category: "AI", auth: ["apiKey", "oauth"], description: "Reasoning and code models with strong price-performance.", status: "active", color: "#4D6BFE", ai: { baseUrl: "https://api.deepseek.com", provider: "deepseek", model: "deepseek-chat" } },
+    { id: "deepseek", name: "DeepSeek", category: "AI", auth: ["apiKey", "oauth"], description: "Reasoning and code models with strong price-performance.", status: "active", color: "#4D6BFE", ai: { baseUrl: "https://api.deepseek.com", provider: "deepseek", model: "deepseek-chat", endpoints: OPENAI_ENDPOINTS } },
     { id: "hugging-face", name: "Hugging Face", category: "AI", auth: ["apiKey", "oauth"], description: "Inference endpoints across thousands of open models.", status: "scheduled", color: "#FFD21E" },
     { id: "elevenlabs", name: "ElevenLabs", category: "AI", auth: ["apiKey"], description: "Lifelike text-to-speech and voice synthesis.", status: "coming_soon", color: "#000000" },
     { id: "replicate", name: "Replicate", category: "AI", auth: ["apiKey", "oauth"], description: "Run and fine-tune open ML models via a hosted API.", status: "scheduled", color: "#000000" },

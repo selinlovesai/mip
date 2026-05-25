@@ -151,6 +151,7 @@ export function AppsTab() {
                         // For AI providers, an API key creates a real AI-model
                         // connection and selects it as the assistant's model.
                         if (active.ai && method === "apiKey" && apiKey?.trim()) {
+                            const stamp = Date.now();
                             const id = addConnection({
                                 name: active.name,
                                 type: "rest",
@@ -159,6 +160,7 @@ export function AppsTab() {
                                 isAiModel: true,
                                 aiProvider: active.ai.provider,
                                 aiModel: active.ai.model,
+                                endpoints: active.ai.endpoints.map((e, i) => ({ id: `ep-${stamp}-${i}`, ...e })),
                             });
                             setAssistant({ connectionId: id, model: active.ai.model });
                         }
