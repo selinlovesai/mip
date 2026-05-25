@@ -10,7 +10,7 @@
  * markdown. Enter sends; Shift+Enter newlines.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Expand01, Loading02, Microphone01, LayoutRight, MessageChatCircle, Minimize01, Send01, Settings01, Stars01, StopCircle, X } from "@untitledui/icons";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { Checkbox } from "@/components/base/checkbox/checkbox";
@@ -53,6 +53,36 @@ function extractHtmlBlock(text: string): { html?: string; rest: string } {
 }
 
 const DEMO_CANVAS_HTML = `<div style="font:600 20px system-ui;display:grid;place-items:center;height:100vh;background:linear-gradient(135deg,#7f56d9,#2e90fa);color:#fff">Hello from your AI canvas 👋<br><small style="font-weight:400;opacity:.85">Connect an AI model in Settings → Assistant to generate real interfaces.</small></div>`;
+
+/**
+ * Borderless composer textarea that auto-grows with its content, pushing the
+ * row taller (icons ride to the top) up to ~2/5 of the enclosing chat panel
+ * ([data-chat-panel]); past that it scrolls.
+ */
+function ComposerTextarea({ value, onChange, onKeyDown }: { value: string; onChange: (v: string) => void; onKeyDown: (e: React.KeyboardEvent) => void }) {
+    const ref = useRef<HTMLTextAreaElement>(null);
+    useLayoutEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const panel = el.closest("[data-chat-panel]") as HTMLElement | null;
+        const max = Math.round((panel?.clientHeight ?? window.innerHeight) * 0.4);
+        el.style.height = "auto";
+        el.style.height = `${Math.min(el.scrollHeight, max)}px`;
+        el.style.overflowY = el.scrollHeight > max ? "auto" : "hidden";
+    }, [value]);
+    return (
+        <textarea
+            ref={ref}
+            aria-label="Message"
+            rows={1}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="Ask anything…"
+            className="min-w-0 flex-1 resize-none bg-transparent px-3 py-2.5 text-xs leading-4 text-primary outline-none placeholder:text-placeholder"
+        />
+    );
+}
 
 export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
     const { activePage, setCanvasHtml } = useDashboard();
@@ -357,7 +387,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             disabled={transcribing}
             onClick={toggleRecording}
             className={cx(
-                "flex items-center justify-center px-2 transition-colors disabled:opacity-40",
+                "flex items-center justify-center px-2 py-2.5 transition-colors disabled:opacity-40",
                 recording ? "text-utility-red-500" : "text-tertiary hover:text-secondary",
             )}
         >
@@ -375,25 +405,15 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
     const footer = (
         <div className="flex flex-col border-t border-secondary">
             <div className="px-3 py-2">{modeToolbar}</div>
-            <div className="flex items-stretch border-t border-secondary">
-                <TextArea
-                    aria-label="Message"
-                    size="sm"
-                    rows={1}
-                    value={draft}
-                    onChange={setDraft}
-                    onKeyDown={onComposerKeyDown}
-                    placeholder="Ask anything…"
-                    className="flex-1"
-                    textAreaClassName="max-h-32 resize-none rounded-none border-0 shadow-none ring-0 text-xs leading-4 focus:ring-0"
-                />
+            <div className="flex items-start border-t border-secondary">
+                <ComposerTextarea value={draft} onChange={setDraft} onKeyDown={onComposerKeyDown} />
                 {micButton}
                 <button
                     type="button"
                     aria-label="Send"
                     disabled={!draft.trim() || thinking}
                     onClick={() => void sendText(draft)}
-                    className="flex items-center px-3 text-tertiary transition-colors hover:text-secondary disabled:opacity-40"
+                    className="flex items-center px-3 py-2.5 text-tertiary transition-colors hover:text-secondary disabled:opacity-40"
                 >
                     <Send01 className="size-4" />
                 </button>
@@ -451,7 +471,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
     // ---- FLOATING CHAT mode ----
     if (mode === "chat") {
         return (
-            <div className="fixed right-0 top-0 z-50 flex h-[560px] max-h-[calc(100vh-1rem)] w-80 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-l-2xl rounded-br-2xl border-b border-l border-secondary bg-primary shadow-xl">
+            <div data-chat-panel className="fixed right-0 top-0 z-50 flex h-[560px] max-h-[calc(100vh-1rem)] w-80 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-l-2xl rounded-br-2xl border-b border-l border-secondary bg-primary shadow-xl">
                 {header}
                 {messageList}
                 {footer}
@@ -462,7 +482,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
 
     // ---- SIDEBAR mode (default) ----
     return (
-        <aside className="flex w-80 shrink-0 flex-col border-l border-secondary bg-primary">
+        <aside data-chat-panel className="flex w-80 shrink-0 flex-col border-l border-secondary bg-primary">
             {header}
             {messageList}
             {footer}
