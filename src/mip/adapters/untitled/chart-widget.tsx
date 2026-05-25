@@ -11,12 +11,31 @@
  * for an on-brand look instead of recharts' defaults.
  */
 
+import { useLayoutEffect, useRef, useState } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { WidgetRenderProps } from "@/mip/adapter/types";
 import { ChartActiveDot, ChartLegendContent, ChartTooltipContent } from "@/components/application/charts/charts-base";
 import { resolveRows, toChartPoints } from "./data";
 import { formatValue } from "./format";
 import { WidgetCard } from "./widget-card";
+
+/** Measure the chart container so we can pass EXPLICIT numeric width/height to
+ *  recharts' ResponsiveContainer — avoiding its -1×-1 first-frame warning. */
+function useSize<T extends HTMLElement>() {
+    const ref = useRef<T>(null);
+    const [size, setSize] = useState({ w: 0, h: 0 });
+    useLayoutEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const ro = new ResizeObserver((entries) => {
+            const r = entries[0]?.contentRect;
+            if (r) setSize({ w: Math.floor(r.width), h: Math.floor(r.height) });
+        });
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
+    return { ref, size };
+}
 
 const SERIES_COLOR = "var(--color-utility-brand-600)";
 const SLICE_COLORS = [
@@ -41,6 +60,7 @@ export function ChartWidget({ widget, dataState }: WidgetRenderProps) {
     const points = toChartPoints(resolveRows(widget, dataState, "series"), labelKey, valueKey);
 
     const isPie = widget.type === "pieChart" || widget.type === "donutChart";
+    const { ref, size } = useSize<HTMLDivElement>();
 
     // Shared Untitled-styled tooltip. The `formatter` runs every numeric value
     // through the widget's value format; `ChartTooltipContent` reads `active`,
@@ -62,8 +82,9 @@ export function ChartWidget({ widget, dataState }: WidgetRenderProps) {
             {points.length === 0 ? (
                 <EmptyState />
             ) : (
-                <div className="min-h-[200px] flex-1">
-                    <ResponsiveContainer width="100%" height="100%">
+                <div ref={ref} className="min-h-[200px] flex-1">
+                    {size.w > 0 && size.h > 0 ? (
+                    <ResponsiveContainer width={size.w} height={size.h}>
                         {isPie ? (
                             <PieChart>
                                 {tooltip}
@@ -136,6 +157,7 @@ export function ChartWidget({ widget, dataState }: WidgetRenderProps) {
                             </LineChart>
                         )}
                     </ResponsiveContainer>
+                    ) : null}
                 </div>
             )}
         </WidgetCard>
