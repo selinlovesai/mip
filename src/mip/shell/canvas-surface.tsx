@@ -35,10 +35,16 @@ const BASE_STYLE = `<style>:root{color-scheme:light dark}*{box-sizing:border-box
 
 const HINT = `<div style="height:100vh;display:grid;place-items:center;text-align:center;font-family:system-ui;color:var(--color-text-tertiary,#9aa)"><div style="max-width:24rem"><div style="font-size:15px;font-weight:600;color:var(--color-text-secondary,#bbb)">Freeform AI canvas</div><div style="font-size:13px;margin-top:6px">Ask the assistant to build something — it uses tools to inject components, styles and scripts here, sandboxed from the app.</div></div></div>`;
 
-/** Build the initial iframe document, injecting tokens + the agent runtime. */
+/** Build the initial iframe document, injecting tokens + the agent runtime.
+ *  Strips any previously-injected runtime/tokens first so they never stack. */
 function toDocument(html: string): string {
-    const inj = `${hostTokenCss()}<script>${CANVAS_RUNTIME}</script>`;
-    const trimmed = (html ?? "").trim();
+    const inj = `${hostTokenCss()}<script id="mip-runtime">${CANVAS_RUNTIME}</script>`;
+    let trimmed = (html ?? "").trim();
+    trimmed = trimmed
+        // strip any prior runtime (id'd or, for legacy snapshots, by marker) + tokens
+        .replace(/<script\b[^>]*id="mip-runtime"[^>]*>[\s\S]*?<\/script>/gi, "")
+        .replace(/<script\b[^>]*>(?:(?!<\/script>)[\s\S])*?__mipCanvas[\s\S]*?<\/script>/gi, "")
+        .replace(/<style\b[^>]*id="mip-tokens"[^>]*>[\s\S]*?<\/style>/gi, "");
     if (/<\/head>/i.test(trimmed)) return trimmed.replace(/<\/head>/i, `${inj}</head>`);
     if (/<html[\s>]/i.test(trimmed)) return trimmed.replace(/(<html[^>]*>)/i, `$1<head>${inj}</head>`);
     return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${inj}${BASE_STYLE}</head><body>${trimmed || HINT}</body></html>`;

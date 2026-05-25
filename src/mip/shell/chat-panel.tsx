@@ -53,18 +53,29 @@ const CANVAS_SYSTEM = [
     "Design system: tokens are available as CSS vars on :root — --color-brand-600, --color-bg-primary, --color-text-primary, --color-text-secondary, --color-border-secondary, --radius-lg, --shadow-md, --font-body. Use them when asked to match the app.",
     "Workflow: when the user asks to base the canvas on real content (a site, page, or search), CALL search/fetch FIRST and build from the returned content — never invent it.",
     "Build the page with ONE `replace` op holding the full HTML; use append/insert/setStyle/etc. ONLY for later tweaks. NEVER re-add or re-build content you already added.",
-    'Protocol: reply with ONE ```json block: {"say":"<one short line>","ops":[ {"kind":"...", ...}, ... ]}. You receive the ops\' results and may continue. As soon as the canvas matches the request, reply with {"say":"<summary>","ops":[]} and STOP.',
+    "To fill a form use `setValue` per field; to submit or press something use `click`; to recolor use `setStyle` on body or the relevant selector. These ARE your only way to act — describing an action in prose does nothing.",
+    'Protocol: EVERY reply must be ONE ```json block: {"say":"<one short line>","ops":[ {"kind":"...", ...}, ... ]} — never plain prose, never code outside the block. You receive the ops\' results and may continue. As soon as the canvas matches the request, reply with {"say":"<summary>","ops":[]} and STOP.',
 ].join("\n");
 
-/** Parse an agent reply into {say, ops}; null if it isn't a tool-call object. */
+/** Parse an agent reply into {say, ops} — tolerant of fences, surrounding prose,
+ *  or a bare ops array. Returns null only if no JSON tool payload is found. */
 function parseCanvasReply(text: string): { say?: string; ops: CanvasOp[] } | null {
-    const m = text.match(/```(?:json)?\s*\n([\s\S]*?)```/i);
-    const raw = (m ? m[1]! : text).trim();
-    try {
-        const o = JSON.parse(raw) as { say?: unknown; ops?: unknown };
-        if (o && typeof o === "object") return { say: typeof o.say === "string" ? o.say : undefined, ops: Array.isArray(o.ops) ? (o.ops as CanvasOp[]) : [] };
-    } catch {
-        /* not a tool-call payload */
+    const candidates: string[] = [];
+    const fence = text.match(/```(?:json)?\s*\n?([\s\S]*?)```/i);
+    if (fence) candidates.push(fence[1]!);
+    const obj = text.match(/\{[\s\S]*"ops"[\s\S]*\}/); // object containing "ops", even unfenced
+    if (obj) candidates.push(obj[0]);
+    const arr = text.match(/\[[\s\S]*\]/); // a bare ops array
+    if (arr) candidates.push(arr[0]);
+    candidates.push(text.trim());
+    for (const c of candidates) {
+        try {
+            const o = JSON.parse(c.trim()) as { say?: unknown; ops?: unknown } | unknown[];
+            if (Array.isArray(o)) return { ops: o as CanvasOp[] };
+            if (o && typeof o === "object" && "ops" in o) return { say: typeof o.say === "string" ? o.say : undefined, ops: Array.isArray(o.ops) ? (o.ops as CanvasOp[]) : [] };
+        } catch {
+            /* try next candidate */
+        }
     }
     return null;
 }
