@@ -11,7 +11,7 @@
 import type { ChatResult } from "../api";
 import { dispatch, isMutating } from "./tools";
 import { parseAgentReply, claimsAction } from "./reply";
-import type { AgentOp, ApiMsg, Surface, ToolContext } from "./types";
+import type { AgentOp, ApiMsg, OpResult, Surface, ToolContext } from "./types";
 
 /** The Brain: a single chat completion call. */
 export type Brain = (messages: ApiMsg[], system?: string, jsonMode?: boolean) => Promise<ChatResult>;
@@ -25,6 +25,8 @@ export interface RunAgentOptions {
     ctx: ToolContext;
     /** Render an assistant line in the chat. */
     say: (text: string) => void;
+    /** Report each tool call + its result (for the transcript's tool entries). */
+    onTool?: (entry: { op: AgentOp; result: OpResult; mutating: boolean }) => void;
     /** Max tool rounds before giving up. */
     maxRounds?: number;
 }
@@ -81,8 +83,11 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
         if (parsed.say) say(parsed.say);
         const results: unknown[] = [];
         for (const op of parsed.ops as AgentOp[]) {
-            if (isMutating(String(op.kind), surface)) mutated = true;
-            results.push(await dispatch(op, surface, ctx));
+            const mut = isMutating(String(op.kind), surface);
+            if (mut) mutated = true;
+            const res = await dispatch(op, surface, ctx);
+            opts.onTool?.({ op, result: res, mutating: mut });
+            results.push(res);
         }
         msgs = [
             ...msgs,

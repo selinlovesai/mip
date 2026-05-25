@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Expand01, Loading02, Microphone01, LayoutRight, MessageChatCircle, Minimize01, Send01, Stars01, StopCircle, X } from "@untitledui/icons";
+import { ChevronRight, Expand01, GraduationHat01, Loading02, Microphone01, LayoutRight, MessageChatCircle, Minimize01, Send01, Stars01, StopCircle, Tool02, X } from "@untitledui/icons";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { TextArea } from "@/components/base/textarea/textarea";
 import { chat, fetchPage, testEndpoint, transcribe } from "@/mip/api";
@@ -26,8 +26,32 @@ type ChatMode = "sidebar" | "chat" | "compact";
 
 interface Message {
     id: string;
-    role: "user" | "assistant";
+    role: "user" | "assistant" | "tool" | "skills";
     text: string;
+    /** Collapsible body for tool/skills entries (result JSON, skill contents). */
+    detail?: string;
+    /** Tool outcome (tool entries only) — drives the status dot. */
+    ok?: boolean;
+}
+
+/** A short human label for a tool call, shown in its collapsible header. */
+function opSummary(op: Record<string, unknown>): string {
+    const k = String(op.kind);
+    const s = (v: unknown) => (v == null ? "" : String(v));
+    switch (k) {
+        case "fetch": return `fetch ${s(op.url)}`;
+        case "search": return `search “${s(op.query)}”`;
+        case "callApi": return `callApi ${s(op.sourceId)} ${s(op.path)}`.trim();
+        case "injectJson":
+        case "injectConnection":
+        case "addWidget": return `${k} ${s(op.type)}${op.title ? ` · ${s(op.title)}` : ""}`.trim();
+        case "removeWidget": return `removeWidget ${s(op.id)}`.trim();
+        case "setContext": return "setContext";
+        case "getContext":
+        case "listConnections":
+        case "listWidgets": return k;
+        default: return op.selector ? `${k} ${s(op.selector)}` : k;
+    }
 }
 
 const SUGGESTIONS = ["Summarize this dashboard", "Add a bar chart of revenue", "What does the churn metric mean?", "Suggest widgets to add"];
@@ -67,6 +91,30 @@ function ComposerTextarea({ value, onChange, onKeyDown }: { value: string; onCha
             placeholder="Ask anything…"
             className="min-w-0 flex-1 resize-none bg-transparent px-3 py-2.5 text-xs leading-4 text-primary outline-none placeholder:text-placeholder"
         />
+    );
+}
+
+/**
+ * Collapsible transcript entry for a tool call or the skills-in-context note.
+ * Native <details> handles open/close; the chevron rotates via `group-open`.
+ */
+function CollapsibleEntry({ kind, title, detail, ok }: { kind: "tool" | "skills"; title: string; detail?: string; ok?: boolean }) {
+    return (
+        <details className="group ml-[34px] max-w-[88%] overflow-hidden rounded-lg ring-1 ring-secondary">
+            <summary className="flex cursor-pointer list-none items-center gap-2 bg-secondary px-2.5 py-1.5 text-xs text-tertiary [&::-webkit-details-marker]:hidden">
+                {kind === "tool" ? (
+                    <span className={cx("size-1.5 shrink-0 rounded-full", ok ? "bg-utility-success-500" : "bg-utility-error-500")} />
+                ) : (
+                    <GraduationHat01 className="size-3.5 shrink-0 text-utility-brand-600" />
+                )}
+                {kind === "tool" ? <Tool02 className="size-3.5 shrink-0 text-quaternary" /> : null}
+                <span className="min-w-0 flex-1 truncate font-mono">{title}</span>
+                <ChevronRight className="size-3.5 shrink-0 transition-transform group-open:rotate-90" />
+            </summary>
+            {detail ? (
+                <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words border-t border-secondary bg-primary px-2.5 py-2 font-mono text-[11px] leading-4 text-secondary">{detail}</pre>
+            ) : null}
+        </details>
     );
 }
 
@@ -185,7 +233,11 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         }
 
         setThinking(true);
-        const apiMessages: ApiMsg[] = history.filter((m) => m.id !== "intro").map((m) => ({ role: m.role, content: m.text }));
+        // Only real conversation turns go to the model — tool/skills entries are
+        // UI-only transcript decorations.
+        const apiMessages: ApiMsg[] = history
+            .filter((m) => m.id !== "intro" && (m.role === "user" || m.role === "assistant"))
+            .map((m) => ({ role: m.role as "user" | "assistant", content: m.text }));
 
         // Fetch any URLs in the prompt and feed their content to the model.
         const urls = trimmed.match(/https?:\/\/[^\s)]+/g)?.slice(0, 2) ?? [];
@@ -205,10 +257,38 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         // Skills active for THIS dashboard (native on-by-default minus disabled,
         // plus opted-in custom), filtered to the surface. Context is injected at
         // the TOP of the prompt (see buildSystemPrompt).
-        const activeSkills = resolveSkills(skills, activePage.agent, surface).map((s) => s.content);
-        const system = buildSystemPrompt(surface, { pageContext: activePage.systemPrompt, assistantContext: assistant.systemPrompt, skills: activeSkills });
+        const active = resolveSkills(skills, activePage.agent, surface);
+        // Surface which skills are in context as a collapsible transcript entry.
+        if (active.length) {
+            setMessages((prev) => [
+                ...prev,
+                {
+                    id: `sk-${Date.now()}`,
+                    role: "skills",
+                    text: `${active.length} skill${active.length > 1 ? "s" : ""} in context: ${active.map((s) => s.name).join(", ")}`,
+                    detail: active.map((s) => `### ${s.name}\n${s.content}`).join("\n\n"),
+                },
+            ]);
+        }
+        const system = buildSystemPrompt(surface, { pageContext: activePage.systemPrompt, assistantContext: assistant.systemPrompt, skills: active.map((s) => s.content) });
         const jsonMode = (conn.aiProvider ?? "openai") !== "anthropic";
-        await runAgent({ initial: apiMessages, surface, system, jsonMode, brain, ctx: toolContext(), say: pushAssistant });
+
+        const pushTool = (op: Record<string, unknown>, result: Record<string, unknown>) =>
+            setMessages((prev) => [
+                ...prev,
+                { id: `t-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "tool", text: opSummary(op), detail: JSON.stringify(result, null, 2), ok: result.ok !== false },
+            ]);
+
+        await runAgent({
+            initial: apiMessages,
+            surface,
+            system,
+            jsonMode,
+            brain,
+            ctx: toolContext(),
+            say: pushAssistant,
+            onTool: ({ op, result }) => pushTool(op, result),
+        });
         setThinking(false);
     };
 
@@ -276,12 +356,16 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
     // ---- Message list (shared by sidebar + chat) ----
     const messageList = (
         <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto p-4">
-            {messages.map((msg) =>
-                msg.role === "user" ? (
-                    <div key={msg.id} className="flex justify-end">
-                        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-brand-solid px-3.5 py-2.5 text-xs leading-4 text-white">{msg.text}</div>
-                    </div>
-                ) : (
+            {messages.map((msg) => {
+                if (msg.role === "user")
+                    return (
+                        <div key={msg.id} className="flex justify-end">
+                            <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-brand-solid px-3.5 py-2.5 text-xs leading-4 text-white">{msg.text}</div>
+                        </div>
+                    );
+                if (msg.role === "tool" || msg.role === "skills")
+                    return <CollapsibleEntry key={msg.id} kind={msg.role} title={msg.text} detail={msg.detail} ok={msg.ok} />;
+                return (
                     <div key={msg.id} className="flex gap-2.5">
                         <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-utility-brand-50">
                             <Stars01 className="size-3.5 text-utility-brand-700" />
@@ -291,8 +375,8 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                             dangerouslySetInnerHTML={{ __html: markdownToHtml(msg.text) }}
                         />
                     </div>
-                ),
-            )}
+                );
+            })}
 
             {thinking ? (
                 <div className="flex gap-2.5">
