@@ -129,13 +129,40 @@ function SparkleIcon({ className }: { className?: string }) {
 
 const introMessage: Message = { id: "intro", role: "assistant", text: INTRO };
 
+const CHAT_STORAGE_KEY = "mip-chat-sessions-v1";
+
+/** Load persisted per-page chat sessions (transcript survives refresh). */
+function loadSessions(): Record<string, Message[]> {
+    try {
+        const raw = localStorage.getItem(CHAT_STORAGE_KEY);
+        if (raw) return JSON.parse(raw) as Record<string, Message[]>;
+    } catch {
+        /* ignore corrupt/quota */
+    }
+    return {};
+}
+
 export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
     const { activePage, addWidget, removeWidget, updateWidget, updatePageSettings, getPage } = useDashboard();
     const { assistant, aiConnections, connections, getConnection, skills, widgetDefaults } = useSettings();
     const [mode, setMode] = useState<ChatMode>("sidebar");
     // Conversations are scoped per page (dashboard/canvas) — switching the active
     // page swaps to that page's own session.
-    const [sessions, setSessions] = useState<Record<string, Message[]>>({});
+    const [sessions, setSessions] = useState<Record<string, Message[]>>(loadSessions);
+
+    // Persist sessions across refresh (debounced; strips transient streaming bubbles).
+    useEffect(() => {
+        const t = window.setTimeout(() => {
+            try {
+                const clean: Record<string, Message[]> = {};
+                for (const [k, v] of Object.entries(sessions)) clean[k] = v.filter((m) => !m.id.startsWith("stream-"));
+                localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(clean));
+            } catch {
+                /* quota / private mode — non-fatal */
+            }
+        }, 300);
+        return () => window.clearTimeout(t);
+    }, [sessions]);
     const pageId = activePage.id;
     const messages = sessions[pageId] ?? [introMessage];
     const setMessages = (updater: Message[] | ((prev: Message[]) => Message[])) =>
