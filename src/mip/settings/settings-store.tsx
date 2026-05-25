@@ -35,6 +35,24 @@ export const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, WidgetTypeConfig> = Obje
     }),
 ) as Record<WidgetType, WidgetTypeConfig>;
 
+/** Normalize stored widget defaults to the current {name, config} shape, lifting
+ *  legacy `{ w, h }` entries (from an earlier version) into config. */
+function normalizeWidgetDefaults(stored: Record<string, unknown> | undefined): Record<WidgetType, WidgetTypeConfig> {
+    const out = { ...DEFAULT_WIDGET_CONFIGS };
+    for (const t of WIDGET_TYPES) {
+        const v = stored?.[t] as { name?: unknown; config?: unknown; w?: unknown; h?: unknown } | undefined;
+        if (v && typeof v === "object" && v.config && typeof v.config === "object") {
+            out[t] = { name: typeof v.name === "string" ? v.name : DEFAULT_WIDGET_CONFIGS[t].name, config: v.config as Record<string, unknown> };
+        } else if (v && typeof v === "object" && (typeof v.w === "number" || typeof v.h === "number")) {
+            out[t] = {
+                name: DEFAULT_WIDGET_CONFIGS[t].name,
+                config: { ...DEFAULT_WIDGET_CONFIGS[t].config, ...(typeof v.w === "number" ? { w: v.w } : {}), ...(typeof v.h === "number" ? { h: v.h } : {}) },
+            };
+        }
+    }
+    return out;
+}
+
 export type DataSourceType = "mock" | "rest" | "json" | "csv";
 
 export type AuthType = "none" | "bearer" | "basic" | "apiKeyHeader" | "apiKeyQuery" | "digest" | "custom";
@@ -195,7 +213,7 @@ function load(): SettingsState {
                 ...parsed,
                 skills: mergeSkills(parsed.skills, parsed.skillsSeeded),
                 skillsSeeded: true,
-                widgetDefaults: { ...DEFAULT_WIDGET_CONFIGS, ...(parsed.widgetDefaults ?? {}) },
+                widgetDefaults: normalizeWidgetDefaults(parsed.widgetDefaults as Record<string, unknown> | undefined),
             };
         }
     } catch {
