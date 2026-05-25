@@ -227,6 +227,20 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
     // not whole-document dumps.
     const tavily = connections.find((c) => /tavily/i.test(c.baseUrl ?? ""));
 
+    // Resolve a connection from whatever the model passed as a reference — its id,
+    // its name (case-insensitive, partial), or a substring of its baseUrl — since
+    // models often pass the human name ("Boudoir") rather than the stored id.
+    const resolveConnection = (ref: unknown) => {
+        const r = String(ref ?? "").trim().toLowerCase();
+        if (!r) return undefined;
+        return (
+            connections.find((c) => c.id.toLowerCase() === r) ??
+            connections.find((c) => c.name.toLowerCase() === r) ??
+            connections.find((c) => c.name.toLowerCase().includes(r) || r.includes(c.name.toLowerCase())) ??
+            connections.find((c) => (c.baseUrl ?? "").toLowerCase().includes(r))
+        );
+    };
+
     // Web tools shared by both the canvas and dashboard agents — they run on the
     // host (server-side fetch / Tavily search) and return data to the model.
     // Returns null when `op` is not a web tool, so callers can fall through.
@@ -255,8 +269,8 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         // Call a SAVED connection's endpoint (with its baseUrl + auth) through the
         // backend proxy — for authed APIs that anonymous `fetch` can't reach.
         if (kind === "callApi") {
-            const src = getConnection(String(op.sourceId ?? ""));
-            if (!src) return { kind, ok: false, error: `No connection with id "${String(op.sourceId)}". Call listConnections for valid ids.` };
+            const src = resolveConnection(op.sourceId);
+            if (!src) return { kind, ok: false, error: `No connection matching "${String(op.sourceId)}". Call listConnections and use one of the returned ids.` };
             const path = typeof op.path === "string" ? op.path : (src.endpoints?.[0]?.path ?? "/");
             const base = (src.baseUrl ?? "").replace(/\/$/, "");
             let url = /^https?:\/\//.test(path) ? path : base + (path.startsWith("/") ? path : `/${path}`);
@@ -317,10 +331,12 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             // Optional live REST binding → resolved by useWidgetData against the connection.
             if (op.data && typeof op.data === "object") {
                 const d = op.data as { sourceId?: unknown };
-                if (typeof d.sourceId === "string" && !connections.some((c) => c.id === d.sourceId)) {
-                    return { kind, ok: false, error: `No connection with id "${d.sourceId}". Call listConnections and use a real id.` };
+                const src = resolveConnection(d.sourceId);
+                if (!src) {
+                    return { kind, ok: false, error: `No connection matching "${String(d.sourceId)}". Call listConnections and use a returned id.` };
                 }
-                widget.data = op.data as MipWidget["data"];
+                // Normalize to the real stored id so useWidgetData resolves it.
+                widget.data = { ...(op.data as MipWidget["data"]), sourceId: src.id } as MipWidget["data"];
             }
             addWidget(widget);
             return { kind, ok: true, id: widget.id, type: widget.type, bound: !!widget.data };
