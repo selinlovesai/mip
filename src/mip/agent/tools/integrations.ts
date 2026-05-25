@@ -102,8 +102,13 @@ const callApiTool: Tool = {
         }
         const headers: Record<string, string> = {};
         for (const h of src.headers ?? []) if (h.key) headers[h.key] = h.value;
-        if (src.auth?.type === "bearer" && src.auth.token) headers["Authorization"] = `Bearer ${src.auth.token}`;
-        else if (src.auth?.type === "apiKeyHeader" && src.auth.keyName) headers[src.auth.keyName] = src.auth.keyValue ?? "";
+        // Apply the connection's configured auth (all types; tolerate token OR keyValue).
+        const a = src.auth;
+        const token = a?.token || a?.keyValue;
+        if (a?.type === "bearer" && token) headers["Authorization"] = `Bearer ${token}`;
+        else if ((a?.type === "apiKeyHeader" || a?.type === "custom") && a?.keyName) headers[a.keyName] = a.keyValue ?? "";
+        else if (a?.type === "basic" && a?.username) headers["Authorization"] = `Basic ${btoa(`${a.username}:${a.password ?? ""}`)}`;
+        else if (a?.type === "apiKeyQuery" && a?.keyName) url += (url.includes("?") ? "&" : "?") + `${encodeURIComponent(a.keyName)}=${encodeURIComponent(a.keyValue ?? "")}`;
         const r = await ctx.testEndpoint({ method, url, headers, body: op.body });
         if (r.ok) {
             ctx.apiCalls.push({ sourceId: src.id, path });

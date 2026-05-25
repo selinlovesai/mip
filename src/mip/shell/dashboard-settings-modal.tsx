@@ -68,18 +68,32 @@ export function DashboardSettingsModal({ open, onClose }: { open: boolean; onClo
     const [draft, setDraft] = useState<DashboardPage>(activePage);
     const [idError, setIdError] = useState<string | null>(null);
     // Keep the scroll position when a control (e.g. a checkbox) takes focus —
-    // react-aria focuses a hidden input, which would otherwise scroll it into
-    // view and make the modal "jump".
+    // react-aria focuses a hidden input which would scroll it into view. The
+    // SCROLLER here is the ModalOverlay (overflow-y-auto), not just our body, so
+    // we lock every scrollable ancestor.
     const bodyRef = useRef<HTMLDivElement>(null);
-    const savedScroll = useRef(0);
+    const lockedScroll = useRef<{ el: HTMLElement; top: number }[]>([]);
+    const captureScroll = () => {
+        const out: { el: HTMLElement; top: number }[] = [];
+        for (let el: HTMLElement | null = bodyRef.current; el; el = el.parentElement) {
+            if (el.scrollHeight > el.clientHeight) out.push({ el, top: el.scrollTop });
+        }
+        lockedScroll.current = out;
+    };
+    const restoreScroll = () => lockedScroll.current.forEach(({ el, top }) => (el.scrollTop = top));
 
-    // Re-sync the draft whenever the modal (re)opens or the active page changes.
+    // Re-sync the draft ONLY on the open transition — never mid-edit, so a
+    // background activePage change can't wipe in-progress edits (which looked
+    // like "settings don't save").
+    const wasOpen = useRef(false);
     useEffect(() => {
-        if (open) {
+        if (open && !wasOpen.current) {
             setDraft(activePage);
             setTab("general");
             setIdError(null);
         }
+        wasOpen.current = open;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, activePage]);
 
     const permissions = useMemo<Record<string, PageAccessLevel>>(() => {
@@ -201,12 +215,10 @@ export function DashboardSettingsModal({ open, onClose }: { open: boolean; onClo
                             {/* content */}
                             <div
                                 ref={bodyRef}
-                                onPointerDownCapture={() => {
-                                    if (bodyRef.current) savedScroll.current = bodyRef.current.scrollTop;
-                                }}
+                                onPointerDownCapture={captureScroll}
                                 onFocusCapture={() => {
-                                    const el = bodyRef.current;
-                                    if (el) requestAnimationFrame(() => (el.scrollTop = savedScroll.current));
+                                    restoreScroll();
+                                    requestAnimationFrame(restoreScroll);
                                 }}
                                 className="min-h-0 flex-1 overflow-y-auto p-5"
                             >
