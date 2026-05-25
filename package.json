@@ -6,7 +6,10 @@
     "scripts": {
         "dev": "vite",
         "build": "tsc -b && vite build",
-        "preview": "vite preview"
+        "preview": "vite preview",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "typecheck": "tsc -b"
     },
     "dependencies": {
         "@react-aria/utils": "^3.34.0",
@@ -46,6 +49,7 @@
         "prettier-plugin-tailwindcss": "^0.7.2",
         "typescript": "^5.9.3",
         "typescript-eslint": "^8.53.1",
-        "vite": "^8.0.2"
+        "vite": "^8.0.2",
+        "vitest": "^3.2.4"
     }
 }

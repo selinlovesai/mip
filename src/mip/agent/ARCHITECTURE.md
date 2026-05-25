@@ -1,8 +1,9 @@
 # MIP Agent Architecture
 
-> Status: **design doc** (no rewrite applied yet). Goal: a clean modular picture of
-> how the assistant works today, exactly what data reaches the model, where the
-> observed **reliability bugs** come from, and the target structure that fixes them.
+The in-app assistant: an LLM driving a **typed tool loop** over two surfaces (a
+widget **dashboard** and a sandboxed **canvas**). This doc is the modular
+reference — what's connected to what, exactly what data the model sees, and the
+reliability guards that keep it honest.
 
 ---
 
@@ -10,38 +11,38 @@
 
 ```
             ┌──────────────────────────────┐
-            │          LLM (Brain)         │   provider call (DeepSeek/OpenAI/Anthropic)
+            │          LLM (Brain)         │   provider (DeepSeek/OpenAI/Anthropic) via /api/chat
             └──────────────▲───────────────┘
               system+msgs  │   │  {say, ops[]}
             ┌──────────────┴───┴───────────────┐
             │            AGENT LOOP             │   agent.ts · runAgent()
             │  brain → parse → dispatch → feed  │
             └───┬───────────────────────┬───────┘
-       assembles│ prompt          uses  │ registry
+       composes │ prompt          uses  │ registry (validate → run)
         ┌───────▼────────┐      ┌────────▼─────────┐
         │     SKILLS     │      │      TOOLS       │
-        │ knowledge text │      │ run() + doc +    │
-        │ (prompt.ts)    │      │ mutating flag    │
+        │ always | catalog│     │ doc·validate·run │
+        │  (prompt.ts)   │      │  + on-demand idx │
         └────────────────┘      └────────┬─────────┘
-                                  acts on │ ToolContext
+                                  acts on │ ToolContext (the only door to the app)
                           ┌───────────────▼────────────────┐
                           │           SURFACES              │
-                          │  dashboard store · canvas iframe │
-                          │  connections · web (fetch/search)│
+                          │ dashboard store · canvas iframe │
+                          │ connections · web (fetch/search)│
                           └─────────────────────────────────┘
 ```
 
 | Layer | Module | Responsibility |
 |---|---|---|
-| **Brain** | `chat-panel.tsx` `brain()` → `api.ts chat()` → `server/main.py /api/chat` | One completion. Picks provider/model, JSON mode, abort signal. |
-| **Agent loop** | `agent.ts` `runAgent()` | Drives the turn: call brain, parse, run ops, feed results back, guard, stop. |
-| **Reply parser** | `reply.ts` | Tolerantly turns the model's text into `{say, ops[]}`. |
-| **Skills** | `skills/*` + `prompt.ts` | Knowledge injected into the system prompt. |
-| **Tools** | `tools/*` | The op registry: `name`, `doc`, `mutating`, `run(op, ctx)`. |
-| **Surfaces** | store / canvas bridge / connections / api | The real things tools mutate or read. |
+| **Brain** | `chat-panel.tsx brain()` → `api.ts chat()` → `server/main.py /api/chat` | One completion: provider/model, JSON mode, abort signal. |
+| **Agent loop** | `agent.ts runAgent()` | Drive the turn: call brain, parse, validate+run ops, feed back, guard, stop. |
+| **Reply parser** | `reply.ts` | Tolerantly turn model text into `{say, ops[]}`. |
+| **Skills** | `skills/*` + `prompt.ts` | Knowledge: `always` (inline) or `onDemand` (catalog + `loadSkill`). |
+| **Tools** | `tools/*` | Registry: `{name, doc, summary, catalog, mutating, validate, run}`. |
+| **Surfaces** | store / canvas bridge / connections / api | The real things tools read or mutate. |
 
-Public surface is `agent/index.ts`. UI glue (building `ToolContext`, rendering the
-transcript, the JSON/API toggle) lives in `shell/chat-panel.tsx`.
+Public API: `agent/index.ts`. UI glue (build `ToolContext`, render transcript,
+JSON/API toggle) lives in `shell/chat-panel.tsx`.
 
 ---
 
@@ -49,178 +50,169 @@ transcript, the JSON/API toggle) lives in `shell/chat-panel.tsx`.
 
 ```
 agent/
-  index.ts        barrel (public API)
+  index.ts        public barrel
   types.ts        AgentOp · OpResult · AgentReply · ApiMsg · Surface · Tool · ToolContext
-  agent.ts        runAgent() — the loop + Brain type + RunAgentOptions
+  agent.ts        runAgent() — loop + Brain type + RunAgentOptions
   reply.ts        parseAgentReply / coerceReply / claimsAction
-  prompt.ts       buildSystemPrompt(surface, {pageContext, assistantContext, skills})
+  prompt.ts       buildSystemPrompt() · describeDashboard()
   config.ts       PageAgentConfig + resolveSkills()
+  agent.test.ts   unit tests (parser · resolveSkills · dispatch/validation · catalog split)
   tools/
-    index.ts      ALL_TOOLS · toolsFor · catalogFor · isMutating · dispatch
-    integrations.ts  fetch · search (Tavily) · callApi (saved connection)
+    index.ts      ALL_TOOLS · toolsFor · catalogFor · toolIndexFor · isMutating · dispatch · describeTool
+    integrations.ts  fetch · search(Tavily) · callApi(saved connection)
     injection.ts     injectJson · injectConnection · addWidget(alias)
-    core.ts          listConnections · listWidgets · removeWidget · get/setContext · canvas DOM ops
+    core.ts          listConnections · listWidgets · removeWidget · updateWidget · loadSkill · get/setContext · canvas DOM ops
   skills/
-    index.ts      NATIVE_SKILLS
-    types.ts      Skill · SkillSurface
+    index.ts · types.ts (Skill · SkillMode · SkillSurface)
     research.ts · mip-widgets.ts · injection.ts · canvas.ts
 ```
 
-A **Tool** is the single source of truth tying an op `kind` to its prompt
-documentation, its implementation, and whether it mutates the surface — so the
-catalog the model sees and the dispatcher that runs ops can't drift apart.
+A **Tool** is the single source of truth tying an op `kind` → docs → validation →
+implementation → mutation flag, so the catalog the model sees and the dispatcher
+that runs ops cannot drift.
 
 ---
 
-## 3. What data is fed to the model (per turn)
+## 3. What the model receives each turn
 
-Two inputs go to `chat()`:
+Two inputs to `chat()`:
 
-### A. `system` (string) — assembled by `buildSystemPrompt(surface, …)`
-In order:
-1. **Context** — `pageContext` (the page's "AI assistant context") + `assistantContext` (global, Settings → Assistant).
-2. **Role line** — "you are the dashboard assistant" / "you operate a sandboxed canvas".
-3. **Skills** — the resolved knowledge blocks for this dashboard+surface (`resolveSkills`).
-4. **Tool catalog** — `catalogFor(surface)` (each tool's `doc`).
-5. **Protocol + examples** — the strict `{say, ops}` contract.
-6. *(appended in chat-panel)* the **injection directive** from the JSON/API toggle.
+### A. `system` — `buildSystemPrompt(surface, …)`
+```
+1 Context          page.systemPrompt + global assistant prompt   (user-authored)
+2 This dashboard   TITLE · description · current widgets          (describeDashboard — live facts)
+3 Role line        "you are the dashboard assistant" / canvas
+4 Skills (always)  resolved skill blocks injected inline
+5 Skill catalog    on-demand skills: name — description  (→ loadSkill)
+6 Tools (always)   full docs for essential tools
+7 More tools       compact index of on-demand tools     (→ describeTool)
+8 Protocol         {say,ops} contract + worked examples
+9 Directive        JSON/API injection mode (appended in chat-panel)
+```
 
-### B. `messages` (ApiMsg[]) — the conversation
-- Prior **user/assistant** turns only (tool/skills/status transcript rows are UI-only and filtered out).
-- The current user message, optionally **augmented** with the readable text of any URLs it contained.
-- During the loop, each round appends `{role:assistant, content:rawReply}` and `{role:user, content: "Tool results: …"}`.
+### B. `messages` — the conversation
+- Prior **user/assistant** turns only (tool/skills/status rows are UI-only, filtered out).
+- Current message, augmented with the readable text of any URLs it contained.
+- Each round appends `assistant(rawReply)` + `user("Tool results: …")`.
 
-### ⚠ What is NOT fed today (root of the reliability bugs)
-- **The dashboard's title, description, or list of existing widgets.** The model
-  only knows the page through whatever the user typed. → see Bug #1.
-- The model/provider identity, the available widget *defaults*, the user's
-  current selection, etc. (mostly fine, but title/widgets matter.)
-
-> Note the **inconsistency**: the *starter-suggestions* feature (chat-panel
-> `useEffect`) DOES build a context string with the title/description/widgets for a
-> separate one-off call. The main agent loop does not. That's why suggestions can
-> reference the title but the agent hallucinates it.
+> §2 (dashboard facts) closed the old "hallucinated title" bug — the model no
+> longer guesses the page; it's told. The same facts feed the suggestion
+> generator, so they can't disagree.
 
 ---
 
 ## 4. The turn loop (`runAgent`)
 
 ```
-for round in 0..maxRounds:
-    if signal.aborted: return                      # Stop button
-    result = brain(messages, system, jsonMode, signal)
-    if aborted or !result.ok: handle + return
-    parsed = parseAgentReply(result.content)
-    if !parsed:                                     # pure prose / refusal
-        nudge once ("reply with ONLY JSON {say,ops}") else show text; return
-    if parsed.ops is empty:
-        if claimsAction(say) and nothing mutated and not yet act-nudged:
-            nudge ("you haven't changed anything; emit the op"); continue
-        show say; return
-    show say
-    for op in parsed.ops:
-        mutated ||= isMutating(op.kind, surface)
-        result = dispatch(op, surface, ctx)         # registry lookup + run
-        onTool({op, result})                        # collapsible transcript entry
-    append assistant+results to messages            # feed back
+for round in 0..8:
+  signal.aborted? ───────────────────────────► return            (Stop button)
+  reply = brain(messages, system, jsonMode, signal)
+  parsed = parseAgentReply(reply)              (reply.ts — tolerant)
+  ├ no JSON?  → nudge once "reply ONLY {say,ops}" else show; return
+  ├ ops==[] ? → claims action but nothing mutated? → nudge "emit the op"; else show; return
+  └ ops:
+      show say
+      for op in ops:
+          mutated |= isMutating(op.kind)
+          result  = dispatch(op, surface, ctx)  ── validate(op) → run(op,ctx)
+          onTool(op,result)                      ── collapsible transcript row
+      messages += assistant(reply) + user("Tool results: …")
 say("step limit reached")
 ```
 
-Reliability guards already in the loop:
-- **JSON mode** (OpenAI-compatible) forces an object reply → no prose refusals.
-- **Tolerant parsing** (`coerceReply`) → never dumps raw JSON into chat.
+Reliability guards (all live):
+- **JSON mode** (OpenAI-compatible) → no prose refusals.
+- **Tolerant parse** → never dumps raw JSON to chat.
 - **Prose nudge** → recovers a narrated reply once.
 - **Mutation guard** → catches "I added a widget" with no mutating op.
-- **Abort signal** → Stop halts mid-flight.
+- **Op validation** → a malformed op returns a typed error and is *not* applied; the model self-corrects.
+- **Abort signal** → Stop halts mid-flight (cancels the in-flight model call).
 
 ---
 
-## 5. Tools & ToolContext
+## 5. Tools registry + ToolContext
 
-`dispatch(op, surface, ctx)` looks the tool up by `op.kind`, checks the surface,
-and calls `tool.run(op, ctx)`. Everything a tool needs from the live app arrives
-via **`ToolContext`** (built fresh each send in chat-panel), keeping tools free of
-React/store coupling and unit-testable:
+`dispatch(op, surface, ctx)`: look up by `op.kind` → check surface → `validate(op)`
+→ `run(op, ctx)`. Everything a tool needs from the app arrives via **`ToolContext`**
+(rebuilt each send), keeping tools React/store-free and unit-testable:
 
 ```
 ToolContext = {
-  fetchPage, testEndpoint,                  // web / proxy
-  connections, resolveConnection, tavily,   // saved APIs (dashboard-allowed subset)
-  canvasSend,                               // canvas iframe bridge
-  listWidgets, addWidget, removeWidget, widgetSize,   // dashboard store
-  getContext, setContext,                   // page system-prompt note
-  apiCalls,                                 // turn scratch (strict-REST guard)
+  fetchPage · testEndpoint                         web / proxy
+  connections · resolveConnection · tavily         saved APIs (dashboard-allowed subset)
+  canvasSend                                       sandboxed iframe bridge
+  listWidgets · getWidget · addWidget · updateWidget · removeWidget · widgetSize   store
+  getContext · setContext                          page system-prompt note
+  getSkill                                         on-demand skill lookup (loadSkill)
+  apiCalls[]                                       turn scratch (strict-REST guard)
+  injectMode                                       JSON/API toggle (enforced)
 }
 ```
 
-Tool groups:
-- **integrations** (read-only): `fetch`, `search`, `callApi`.
-- **injection** (mutating): `injectJson` (inline), `injectConnection` (live bind), `addWidget` (alias).
-- **core**: `listConnections`/`listWidgets` (read), `removeWidget`/`get`/`setContext` (mutate), canvas DOM ops.
+Tool inventory:
+- **integrations** (read): `fetch` · `search` · `callApi`.
+- **injection** (mutate): `injectJson` (inline) · `injectConnection` (live bind) · `addWidget` (alias).
+- **core**: `listConnections`/`listWidgets` (read) · `removeWidget`/`updateWidget` (mutate, edit/move/resize) · `loadSkill`/`get`/`setContext` · `describeTool` · canvas DOM ops.
+
+**On-demand tool catalog:** tools flagged `catalog:true` (editing, context, loadSkill)
+are shown as a compact one-liner index; the agent expands one with
+`describeTool { name }` before use. Essentials (fetch/search/callApi/inject/list)
+keep full docs inline — lean prompt, full discoverability.
+
+**Injection enforcement:** `injectMode` is honored in `injectJson.run` — `api`
+hard-refuses (→ use `injectConnection`), `json` relaxes the post-`callApi`
+strict-REST guard, `auto` keeps the default (API data → bind).
 
 ---
 
-## 6. Per-dashboard agent config
-
-Agent power is a property of each dashboard (`DashboardPage.agent: PageAgentConfig`),
-with the global default filling gaps:
+## 6. Per-dashboard agent config (global default fills gaps)
 
 | Aspect | Source |
 |---|---|
 | Connection / model | `page.agent.connectionId/model` → `assistant.*` → first AI connection |
-| Skills | native on-by-default minus `disabledSkillIds`, plus `enabledSkillIds`; `resolveSkills()` filters by surface |
-| Callable connections | `page.agent.callableConnectionIds` (gates the `connections` the ToolContext exposes) |
-| Context | `page.systemPrompt` |
+| Skills | NATIVE on minus `disabledSkillIds`, plus `enabledSkillIds`; `resolveSkills()` filters by surface; each skill is `always` or `onDemand` |
+| Callable connections | `page.agent.callableConnectionIds` → gates `ctx.connections` |
+| Context | `page.systemPrompt` (Dashboard Settings → Agent) |
+| Injection mode | composer JSON/API toggle → `ctx.injectMode` |
 
 ---
 
-## 7. Reliability failures — root cause → fix
+## 7. End-to-end: "show the latest posts from the Boudoir API" (API mode)
 
-### Bug #1 — Agent hallucinated the dashboard title ("Global EV Market" vs "Lingerie Market") — ✅ FIXED
-**Cause:** §3.⚠ — title/description/widgets were never put in the system prompt.
-**Fix (shipped):** `PromptContext.dashboard` + `describeDashboard()` render a
-`## This dashboard (live facts — do NOT invent)` block (title, description,
-current widgets), fed from chat-panel. `describeDashboard` is exported for reuse.
-
-### Bug #2 — "API" toggle selected but it used `injectJson` — ✅ FIXED
-**Cause:** the toggle only **appended prose**; nothing enforced it.
-**Fix (shipped):** `injectMode` is threaded into `ToolContext`; `injectJson.run`
-**hard-refuses** when `injectMode === "api"` (tells the model to `injectConnection`
-or add a connection), and relaxes the post-`callApi` strict-REST guard when
-`injectMode === "json"`.
-
-### Skill catalog / on-demand skills — ✅ ADDED
-Each skill has a `mode`: **always** (injected every turn) or **onDemand** (only
-name+description listed in a "Skill catalog"; the agent pulls the full text with
-the new `loadSkill { name }` tool). Set per skill in Settings → Skills. Keeps the
-prompt lean and lets the agent self-select relevant context.
-
-### Bug #3 — Invented data ("Market Share A/B/C")
-**Cause:** research discipline is prompt-only; nothing forces a search for vague
-real-world asks.
-**Fix (prompt, already partly done):** require search/fetch/callApi for real-world
-numbers; if unavailable, label `(sample)` and say so. *(Optional hard guard: tag a
-data widget built with no research-op this turn as `(sample)` — but that would
-false-positive on user-supplied numbers, so keep it soft.)*
+```
+chat-panel.sendText
+  ├ system = context + THIS dashboard facts + skills(+catalog) + tools(+index) + protocol + "API mode" directive
+  ├ ToolContext (allowed connections, store actions, apiCalls=[], injectMode="api")
+  └ runAgent:
+      r1  {ops:[listConnections]}                 → ids + endpoints
+      r2  {ops:[callApi sourceId,path]}            → JSON shape (apiCalls += …)
+      r3  {ops:[injectConnection …map…]}           → bound widget, first-fit placement
+          (if it tried injectJson → validate/guard refuses → "use injectConnection")
+      r4  {ops:[]}                                 → done
+   each op → collapsible transcript row
+```
 
 ---
 
-## 8. Target modular structure (incremental, low-risk)
+## 8. Tests
 
-Keep the current module boundaries; tighten three seams for reliability:
+`npm test` (vitest) covers the pure core in `agent.test.ts`:
+parser shapes (fenced/bare/alt-key/single-op/no-dump/prose), `claimsAction`,
+`resolveSkills` (builtins on, disable/enable, surface filter), and `dispatch`
+(unknown op, cross-surface block, validation, API-mode refusal, mutation flags,
+catalog split). Run `npm run typecheck` for the full type build.
 
-1. **Context provider** — a single `buildDashboardContext(page)` used by BOTH the
-   agent loop and the suggestion generator, so the model always sees the real
-   title/widgets (kills Bug #1 and the inconsistency).
-2. **Enforced modes** — move the JSON/API toggle and the strict-REST rule out of
-   prose and into `ToolContext` + `injection.ts` guards (kills Bug #2). Modes
-   become data the registry honors, not hints.
-3. **Op schemas** — give each Tool an optional `validate(op)` (zod-style) so a
-   malformed op returns a typed error to the model instead of partially applying.
-   This makes "missing nodes"-type failures self-correcting.
+---
 
-Nothing above changes the public API (`agent/index.ts`) or the chat UX; it's a
-tightening of what data flows where. Estimated change: ~3 small PRs, each
-independently shippable, each with a unit test (parser, resolveSkills, dispatch,
-injection guards) — the pieces are already pure functions.
+## 9. Known gaps / next
+
+- **Secrets not persisted** (by design) — model lists / callApi / search degrade
+  after reload until keys are re-entered. Needs encrypted-at-rest storage (backend).
+- **Research is soft** — the agent *can* still invent figures; only prompt-guided.
+  A sourcing convention (every data widget records where numbers came from) would
+  make it auditable.
+- **Canvas agent** shares the loop but its surface ops differ; deferred for a
+  dedicated pass.
+- **Token budget** — `always` skills + essential tool docs still ship every turn;
+  the on-demand catalog mechanism could extend further if needed.
 ```

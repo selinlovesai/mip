@@ -14,6 +14,7 @@ const fetchTool: Tool = {
     doc: "fetch { url }                          — read a web page's readable text (returns {title, text})",
     surfaces: ["dashboard", "canvas"],
     mutating: false,
+    validate: (op) => (typeof op.url === "string" && op.url.trim() ? null : "fetch needs a `url`."),
     run: async (op: AgentOp, ctx: ToolContext): Promise<OpResult> => {
         const r = await ctx.fetchPage(String(op.url ?? ""));
         return { kind: "fetch", url: op.url, ok: r.ok, title: r.title, text: (r.text ?? "").slice(0, 4000), ...(r.error ? { error: String(r.error) } : {}) };
@@ -25,6 +26,7 @@ const searchTool: Tool = {
     doc: "search { query }                       — web search via the connected Tavily app (returns results: title/url/content)",
     surfaces: ["dashboard", "canvas"],
     mutating: false,
+    validate: (op) => (typeof op.query === "string" && op.query.trim() ? null : "search needs a `query`."),
     run: async (op: AgentOp, ctx: ToolContext): Promise<OpResult> => {
         const tavily = ctx.tavily;
         if (!tavily?.auth?.token) return { kind: "search", ok: false, error: "No Tavily connection — add one in Settings → Apps." };
@@ -49,6 +51,7 @@ const callApiTool: Tool = {
     doc: "callApi { sourceId, path?, method?, params?, body? } — call a SAVED connection's endpoint with its baseUrl + auth (returns {status, data}); use for named/authed APIs instead of guessing a URL with fetch",
     surfaces: ["dashboard", "canvas"],
     mutating: false,
+    validate: (op) => (op.sourceId != null && String(op.sourceId).trim() ? null : "callApi needs a `sourceId` — call listConnections first to get one."),
     run: async (op: AgentOp, ctx: ToolContext): Promise<OpResult> => {
         const src = ctx.resolveConnection(op.sourceId);
         if (!src) return { kind: "callApi", ok: false, error: `No connection matching "${String(op.sourceId)}". Call listConnections and use one of the returned ids.` };

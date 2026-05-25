@@ -85,17 +85,28 @@ export interface ToolContext {
 
     // Look up an on-demand skill's content by name/id (for the loadSkill tool).
     getSkill: (ref: string) => { name: string; content: string } | undefined;
+
+    // Read a widget on the active page (for edit ops to merge layout/settings).
+    getWidget: (id: string) => MipWidget | undefined;
+    // Patch an existing widget (title/settings/layout).
+    updateWidget: (id: string, patch: Partial<MipWidget>) => void;
 }
 
 /** A single capability the agent can invoke. */
 export interface Tool {
     /** The op `kind` that selects this tool. */
     name: string;
-    /** One-line catalog entry shown to the model (empty = documented elsewhere). */
+    /** Full usage doc shown to the model (empty = documented elsewhere). */
     doc: string;
+    /** Short one-line summary for the on-demand tool index. Defaults to `doc`. */
+    summary?: string;
+    /** On-demand: listed compactly in the catalog; full `doc` fetched via describeTool. */
+    catalog?: boolean;
     /** Surfaces this tool is available on. */
     surfaces: Surface[];
     /** True if running this op changes the surface (vs. a read). */
     mutating: boolean;
+    /** Optional argument check — return an error string to reject before run(). */
+    validate?: (op: AgentOp) => string | null;
     run: (op: AgentOp, ctx: ToolContext) => Promise<OpResult>;
 }

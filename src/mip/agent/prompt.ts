@@ -9,7 +9,7 @@
  *   4. PROTOCOL  — the strict {say, ops} contract + worked examples.
  */
 
-import { catalogFor } from "./tools";
+import { catalogFor, toolIndexFor } from "./tools";
 import type { Surface } from "./types";
 import type { Skill } from "./skills/types";
 import { CANVAS_TOOLS_DOC } from "../shell/canvas-runtime";
@@ -89,13 +89,23 @@ export function buildSystemPrompt(surface: Surface, ctx: PromptContext = {}): st
         );
     }
 
+    // Tools: "always" tools get full docs inline; the rest are a compact index
+    // the agent expands with describeTool when it needs the exact args.
+    const pushTools = (s: Surface) => {
+        sections.push(`## Tools (op \`kind\` + args)\n${catalogFor(s)}`);
+        const index = toolIndexFor(s);
+        if (index) sections.push(`## More tools (call \`describeTool { name }\` for full usage before using)\n${index}`);
+    };
+
     if (surface === "dashboard") {
-        sections.push(`## Tools (op \`kind\` + args)\n${catalogFor("dashboard")}`);
+        pushTools("dashboard");
         sections.push(DASHBOARD_PROTOCOL);
     } else {
         sections.push(`## Canvas DOM tools (op \`kind\` + args)\n${CANVAS_TOOLS_DOC}`);
         const web = catalogFor("canvas");
         if (web) sections.push(`## Web tools\n${web}`);
+        const index = toolIndexFor("canvas");
+        if (index) sections.push(`## More tools (call \`describeTool { name }\` for full usage before using)\n${index}`);
         sections.push(CANVAS_PROTOCOL);
     }
 

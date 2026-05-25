@@ -62,6 +62,7 @@ const injectJson: Tool = {
     doc: "injectJson { type, title?, settings?, w?, h? } — add a widget with INLINE data (you provide settings). Use for one-off values you fetched/computed.",
     surfaces: ["dashboard"],
     mutating: true,
+    validate: (op) => (typeof op.type === "string" && op.type ? null : "injectJson needs a widget `type`."),
     run: async (op: AgentOp, ctx: ToolContext): Promise<OpResult> => {
         // Hard enforcement of the composer's API toggle.
         if (ctx.injectMode === "api") {
@@ -93,6 +94,11 @@ const injectConnection: Tool = {
     doc: "injectConnection { type, title?, sourceId, request:{method,path,params?}, map?, refreshMs?, settings?, w?, h? } — add a widget bound to a SAVED connection for LIVE data. map is JSONPath: charts→{series:\"$.arr\"}+settings.labelKey/valueKey, list→{items:\"$.arr\"}+settings.primaryKey, kpi→{value:\"$.x\",delta:\"$.y\"}.",
     surfaces: ["dashboard"],
     mutating: true,
+    validate: (op) => {
+        if (typeof op.type !== "string" || !op.type) return "injectConnection needs a widget `type`.";
+        const sid = (op.data as { sourceId?: unknown } | undefined)?.sourceId ?? op.sourceId;
+        return sid != null && String(sid).trim() ? null : "injectConnection needs a `sourceId` (the saved connection). Call listConnections first.";
+    },
     run: async (op: AgentOp, ctx: ToolContext): Promise<OpResult> => {
         const widget = buildWidget(op, ctx);
         if ("error" in widget) return { kind: op.kind, ok: false, error: widget.error };

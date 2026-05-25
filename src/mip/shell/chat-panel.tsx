@@ -130,7 +130,7 @@ function SparkleIcon({ className }: { className?: string }) {
 const introMessage: Message = { id: "intro", role: "assistant", text: INTRO };
 
 export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
-    const { activePage, addWidget, removeWidget, updatePageSettings } = useDashboard();
+    const { activePage, addWidget, removeWidget, updateWidget, updatePageSettings } = useDashboard();
     const { assistant, aiConnections, connections, getConnection, skills, widgetDefaults } = useSettings();
     const [mode, setMode] = useState<ChatMode>("sidebar");
     // Conversations are scoped per page (dashboard/canvas) — switching the active
@@ -259,6 +259,8 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         listWidgets: () => activePage.widgets.map((w) => ({ id: w.id, type: w.type, title: w.title })),
         addWidget,
         removeWidget,
+        getWidget: (id) => activePage.widgets.find((w) => w.id === id),
+        updateWidget,
         widgetSize: (type) => {
             const c = (widgetDefaults[type as keyof typeof widgetDefaults]?.config ?? {}) as { w?: number; h?: number };
             return { w: typeof c.w === "number" ? c.w : 6, h: typeof c.h === "number" ? c.h : 6 };
