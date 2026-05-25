@@ -9,10 +9,11 @@
 import { useEffect, useState } from "react";
 import { untitledAdapter } from "@/mip/adapters/untitled";
 import { UiKitProvider } from "@/mip/adapter/registry";
-import { DashboardProvider } from "@/mip/store";
+import { DashboardProvider, useDashboard } from "@/mip/store";
 import { SettingsProvider } from "@/mip/settings/settings-store";
 import { SettingsSurface, type SettingsTabId } from "@/mip/settings/settings-surface";
 import { applyAccent, getSavedAccent } from "./appearance";
+import { CanvasSurface } from "./canvas-surface";
 import { ChatPanel } from "./chat-panel";
 import { DashboardGrid } from "./dashboard-grid";
 import { DashboardSettingsModal } from "./dashboard-settings-modal";
@@ -20,6 +21,17 @@ import { Sidebar } from "./sidebar";
 import { TemplatesModal } from "./templates-modal";
 import { Topbar } from "./topbar";
 import { WidgetPicker } from "./widget-picker";
+
+/** Main page body — canvas pages render the sandboxed surface, others the grid. */
+function PageBody() {
+    const { activePage } = useDashboard();
+    if (activePage.kind === "canvas") return <CanvasSurface html={activePage.html ?? ""} />;
+    return (
+        <div className="h-full overflow-y-auto p-6">
+            <DashboardGrid />
+        </div>
+    );
+}
 
 export const AppShell = () => {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -62,9 +74,7 @@ export const AppShell = () => {
                                 {settingsOpen ? (
                                     <SettingsSurface onClose={() => setSettingsOpen(false)} initialTab={settingsTab} />
                                 ) : (
-                                    <div className="h-full overflow-y-auto p-6">
-                                        <DashboardGrid />
-                                    </div>
+                                    <PageBody />
                                 )}
                             </main>
                         </div>

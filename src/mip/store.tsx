@@ -27,6 +27,10 @@ export interface DashboardPage {
     cols: number;
     rowHeight: number;
     widgets: MipWidget[];
+    /** "dashboard" = widget grid · "canvas" = freeform AI surface (no widgets). */
+    kind?: "dashboard" | "canvas";
+    /** For canvas pages: the AI-authored HTML document rendered in a sandboxed iframe. */
+    html?: string;
     /** --- per-page Dashboard Settings (topbar gear) --- */
     description?: string;
     /** "dashboard" = sidebar + topbar shell · "fullpage" = standalone */
@@ -69,6 +73,10 @@ interface StoreValue {
     setViewMode: (next: "layout" | "feed") => void;
     setActivePage: (id: string) => void;
     addPage: (title: string) => void;
+    /** Create a freeform AI canvas page (no widgets) and activate it. */
+    addCanvas: (title: string) => void;
+    /** Replace a canvas page's HTML document. */
+    setCanvasHtml: (id: string, html: string) => void;
     /** Create a new page seeded with the given widgets (template import) and activate it. */
     importTemplate: (title: string, widgets: MipWidget[]) => void;
     renamePage: (id: string, title: string) => void;
@@ -119,6 +127,15 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     const importTemplate = useCallback((title: string, widgets: MipWidget[]) => {
         const id = `page-${Date.now()}`;
         setState((s) => ({ pages: [...s.pages, { id, title, cols: 12, rowHeight: 140, widgets }], activePageId: id }));
+    }, []);
+
+    const addCanvas = useCallback((title: string) => {
+        const id = `canvas-${Date.now()}`;
+        setState((s) => ({ pages: [...s.pages, { id, title: title.trim() || "Canvas", cols: 12, rowHeight: 140, widgets: [], kind: "canvas", html: "" }], activePageId: id }));
+    }, []);
+
+    const setCanvasHtml = useCallback((id: string, html: string) => {
+        setState((s) => ({ ...s, pages: s.pages.map((page) => (page.id === id ? { ...page, html } : page)) }));
     }, []);
 
     const renamePage = useCallback((id: string, title: string) => {
@@ -213,8 +230,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     );
 
     const value = useMemo<StoreValue>(
-        () => ({ state, activePage, editMode, setEditMode, viewMode, setViewMode, setActivePage, addPage, importTemplate, renamePage, renamePageId, isPageIdAvailable, updatePageSettings, deletePage, duplicatePage, addWidget, updateWidget, removeWidget, applyLayout }),
-        [state, activePage, editMode, viewMode, setActivePage, addPage, importTemplate, renamePage, renamePageId, isPageIdAvailable, updatePageSettings, deletePage, duplicatePage, addWidget, updateWidget, removeWidget, applyLayout],
+        () => ({ state, activePage, editMode, setEditMode, viewMode, setViewMode, setActivePage, addPage, addCanvas, setCanvasHtml, importTemplate, renamePage, renamePageId, isPageIdAvailable, updatePageSettings, deletePage, duplicatePage, addWidget, updateWidget, removeWidget, applyLayout }),
+        [state, activePage, editMode, viewMode, setActivePage, addPage, addCanvas, setCanvasHtml, importTemplate, renamePage, renamePageId, isPageIdAvailable, updatePageSettings, deletePage, duplicatePage, addWidget, updateWidget, removeWidget, applyLayout],
     );
 
     return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>;

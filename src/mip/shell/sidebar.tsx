@@ -11,7 +11,7 @@
 
 import { useState } from "react";
 import { Button as AriaButton } from "react-aria-components";
-import { ChevronLeft, ChevronRight, Copy01, DotsVertical, Grid01, LogOut01, Plus, Settings01, Trash01, User01 } from "@untitledui/icons";
+import { ChevronLeft, ChevronRight, Copy01, DotsVertical, Grid01, LogOut01, Plus, Settings01, Stars01, Trash01, User01 } from "@untitledui/icons";
 import { Avatar } from "@/components/base/avatar/avatar";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { Dropdown } from "@/components/base/dropdown/dropdown";
@@ -20,6 +20,7 @@ import { NavItemBase } from "@/components/application/app-navigation/base-compon
 import { useSettings } from "@/mip/settings/settings-store";
 import type { SettingsTabId } from "@/mip/settings/settings-surface";
 import { useDashboard } from "@/mip/store";
+import { CanvasConsentModal } from "./canvas-consent-modal";
 
 function initialsOf(name: string): string {
     const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -28,12 +29,22 @@ function initialsOf(name: string): string {
 }
 
 export function Sidebar({ onToggle, onOpenSettings, onNavigate }: { onToggle: () => void; onOpenSettings: (tab?: SettingsTabId) => void; onNavigate?: () => void }) {
-    const { state, activePage, setActivePage, addPage, renamePage, deletePage, duplicatePage } = useDashboard();
-    const { profile } = useSettings();
+    const { state, activePage, setActivePage, addPage, addCanvas, renamePage, deletePage, duplicatePage } = useDashboard();
+    const { profile, canvasConsented, setCanvasConsented } = useSettings();
     const [adding, setAdding] = useState(false);
     const [draft, setDraft] = useState("");
     const [renamingId, setRenamingId] = useState<string | null>(null);
     const [renameDraft, setRenameDraft] = useState("");
+    const [consentOpen, setConsentOpen] = useState(false);
+
+    const createCanvas = () => {
+        addCanvas("Canvas");
+        onNavigate?.();
+    };
+    const onCreateCanvas = () => {
+        if (canvasConsented) createCanvas();
+        else setConsentOpen(true);
+    };
 
     const commitAdd = () => {
         const title = draft.trim();
@@ -74,7 +85,10 @@ export function Sidebar({ onToggle, onOpenSettings, onNavigate }: { onToggle: ()
             <nav className="flex-1 overflow-y-auto px-3 py-2">
                 <div className="flex items-center justify-between px-2 py-1.5">
                     <span className="text-xs font-semibold uppercase tracking-wide text-quaternary">Workspace</span>
-                    <ButtonUtility color="tertiary" size="xs" icon={Plus} tooltip="Add page" onClick={() => setAdding(true)} />
+                    <div className="flex items-center gap-0.5">
+                        <ButtonUtility color="tertiary" size="xs" icon={Stars01} tooltip="Create new Canvas" onClick={onCreateCanvas} />
+                        <ButtonUtility color="tertiary" size="xs" icon={Plus} tooltip="Add page" onClick={() => setAdding(true)} />
+                    </div>
                 </div>
                 <ul className="flex flex-col gap-0.5">
                     {state.pages.map((page) =>
@@ -96,7 +110,7 @@ export function Sidebar({ onToggle, onOpenSettings, onNavigate }: { onToggle: ()
                                 <NavItemBase
                                     type="link"
                                     href="#"
-                                    icon={Grid01}
+                                    icon={page.kind === "canvas" ? Stars01 : Grid01}
                                     current={page.id === activePage.id}
                                     onClick={(e) => {
                                         e.preventDefault();
@@ -162,6 +176,16 @@ export function Sidebar({ onToggle, onOpenSettings, onNavigate }: { onToggle: ()
                     </Dropdown.Popover>
                 </Dropdown.Root>
             </div>
+
+            <CanvasConsentModal
+                open={consentOpen}
+                onClose={() => setConsentOpen(false)}
+                onConfirm={() => {
+                    setCanvasConsented(true);
+                    setConsentOpen(false);
+                    createCanvas();
+                }}
+            />
         </aside>
     );
 }

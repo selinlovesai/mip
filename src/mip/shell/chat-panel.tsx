@@ -39,8 +39,23 @@ function demoRespond(prompt: string, page: string): string {
     return `I'm in demo mode (no AI model connection). On the **${page}** dashboard I can still guide you:\n\n- Add or edit widgets from the **+** toolbar\n- Drag to rearrange in edit mode\n- Open **Settings → Assistant** to pick an AI model connection for live answers\n\n**You said:** "${prompt}"`;
 }
 
+const CANVAS_SYSTEM =
+    "You are rendering into a sandboxed HTML canvas with NO access to the host app. " +
+    "When asked to build, change, or fix something visual, respond with EXACTLY ONE ```html fenced code block containing a COMPLETE, self-contained HTML document — inline <style> and <script> are allowed, no external build tools or imports. Precede it with at most one short sentence.";
+
+/** Pull the first fenced code block (```html … ``` or ``` … ```) out of a reply. */
+function extractHtmlBlock(text: string): { html?: string; rest: string } {
+    const m = text.match(/```(?:html)?\s*\n([\s\S]*?)```/i);
+    if (!m) return { rest: text };
+    const html = m[1]!.trim();
+    const rest = (text.slice(0, m.index) + text.slice(m.index! + m[0].length)).trim();
+    return { html, rest };
+}
+
+const DEMO_CANVAS_HTML = `<div style="font:600 20px system-ui;display:grid;place-items:center;height:100vh;background:linear-gradient(135deg,#7f56d9,#2e90fa);color:#fff">Hello from your AI canvas 👋<br><small style="font-weight:400;opacity:.85">Connect an AI model in Settings → Assistant to generate real interfaces.</small></div>`;
+
 export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
-    const { activePage } = useDashboard();
+    const { activePage, setCanvasHtml } = useDashboard();
     const { assistant, aiConnections, connections, getConnection, setAssistant } = useSettings();
     const [mode, setMode] = useState<ChatMode>("sidebar");
     const [messages, setMessages] = useState<Message[]>([{ id: "intro", role: "assistant", text: INTRO }]);
@@ -70,14 +85,19 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         if (!trimmed || thinking) return;
         setDraft("");
 
+        const isCanvas = activePage.kind === "canvas";
         const userMsg: Message = { id: `u-${Date.now()}`, role: "user", text: trimmed };
         const history = [...messages, userMsg];
         setMessages(history);
 
-        // No connection → local demo responder.
+        // No connection → local demo responder (canvas gets a sample render).
         if (!conn) {
-            const reply: Message = { id: `a-${Date.now()}`, role: "assistant", text: demoRespond(trimmed, activePage.title) };
-            setMessages((prev) => [...prev, reply]);
+            if (isCanvas) {
+                setCanvasHtml(activePage.id, DEMO_CANVAS_HTML);
+                setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: "assistant", text: "Rendered a demo canvas. Connect an AI model in **Settings → Assistant** to generate real interfaces from your prompts." }]);
+            } else {
+                setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: "assistant", text: demoRespond(trimmed, activePage.title) }]);
+            }
             return;
         }
 
@@ -86,13 +106,15 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             .filter((m) => m.id !== "intro")
             .map((m) => ({ role: m.role, content: m.text }));
 
+        const system = [isCanvas ? CANVAS_SYSTEM : "", activePage.systemPrompt ?? "", assistant.systemPrompt ?? ""].filter(Boolean).join("\n\n") || undefined;
+
         const result = await chat({
             provider: conn.aiProvider ?? "openai",
             baseUrl: conn.baseUrl ?? "",
             apiKey: conn.auth?.token ?? conn.auth?.keyValue,
             model: assistant.model ?? conn.aiModel ?? "gpt-4o-mini",
             messages: apiMessages,
-            system: assistant.systemPrompt,
+            system,
         });
 
         setThinking(false);
@@ -100,6 +122,16 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             result.ok && result.content
                 ? result.content
                 : `**Couldn't reach the model.**\n\n${typeof result.error === "string" ? result.error : "The request failed. Check the connection's base URL and API key in Settings."}`;
+
+        // On a canvas page, pull the HTML block out of the reply and render it.
+        if (isCanvas && result.ok) {
+            const { html, rest } = extractHtmlBlock(text2);
+            if (html) {
+                setCanvasHtml(activePage.id, html);
+                setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: "assistant", text: rest || "✓ Updated the canvas." }]);
+                return;
+            }
+        }
         setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: "assistant", text: text2 }]);
     };
 

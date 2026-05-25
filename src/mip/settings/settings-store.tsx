@@ -76,6 +76,8 @@ interface SettingsState {
     apps: AppConnection[];
     assistant: AssistantConfig;
     profile: UserProfile;
+    /** User acknowledged the risks of the freeform AI canvas (arbitrary code). */
+    canvasConsented?: boolean;
 }
 
 const STORAGE_KEY = "mip-settings-v1";
@@ -120,6 +122,8 @@ interface SettingsValue {
     setAssistant: (patch: Partial<AssistantConfig>) => void;
     profile: UserProfile;
     setProfile: (patch: Partial<UserProfile>) => void;
+    canvasConsented: boolean;
+    setCanvasConsented: (v: boolean) => void;
 }
 
 const SettingsContext = createContext<SettingsValue | null>(null);
@@ -175,9 +179,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, profile: { ...s.profile, ...patch } }));
     }, []);
 
+    const setCanvasConsented = useCallback((v: boolean) => setState((s) => ({ ...s, canvasConsented: v })), []);
+
     const value = useMemo<SettingsValue>(
-        () => ({ connections: state.connections, apps: state.apps, isAppConnected, connectApp, disconnectApp, addConnection, ensureConnection, updateConnection, removeConnection, getConnection, aiConnections, assistant: state.assistant, setAssistant, profile: state.profile, setProfile }),
-        [state, isAppConnected, connectApp, disconnectApp, addConnection, ensureConnection, updateConnection, removeConnection, getConnection, aiConnections, setAssistant, setProfile],
+        () => ({ connections: state.connections, apps: state.apps, isAppConnected, connectApp, disconnectApp, addConnection, ensureConnection, updateConnection, removeConnection, getConnection, aiConnections, assistant: state.assistant, setAssistant, profile: state.profile, setProfile, canvasConsented: !!state.canvasConsented, setCanvasConsented }),
+        [state, isAppConnected, connectApp, disconnectApp, addConnection, ensureConnection, updateConnection, removeConnection, getConnection, aiConnections, setAssistant, setProfile, setCanvasConsented],
     );
 
     return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
