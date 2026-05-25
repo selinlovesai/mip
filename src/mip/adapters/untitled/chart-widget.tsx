@@ -72,7 +72,15 @@ export function ChartWidget({ widget, dataState }: WidgetRenderProps) {
         />
     );
 
-    const legend = <Legend verticalAlign="bottom" content={<ChartLegendContent className="pt-3" />} />;
+    // Legend position is configurable: "bottom" (default) | "top" | "left" |
+    // "right" | "none". Vertical positions stack the entries beside the chart.
+    const legendPos = typeof settings.legendPosition === "string" ? settings.legendPosition : "bottom";
+    const legend =
+        legendPos === "none" ? null : legendPos === "left" || legendPos === "right" ? (
+            <Legend layout="vertical" align={legendPos} verticalAlign="middle" content={<ChartLegendContent className="px-3" />} />
+        ) : (
+            <Legend verticalAlign={legendPos === "top" ? "top" : "bottom"} content={<ChartLegendContent className={legendPos === "top" ? "pb-3" : "pt-3"} />} />
+        );
 
     const axisProps = { tick: { fill: "var(--color-text-tertiary)", fontSize: 12 }, stroke: "var(--color-border-secondary)" } as const;
     const grid = <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-secondary)" vertical={false} />;

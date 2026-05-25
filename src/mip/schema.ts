@@ -92,6 +92,12 @@ export const DEFAULT_WIDGET_SIZES: Record<WidgetType, { w: number; h: number }> 
  *  example settings, so it can extend or override them. Icons are icon-class /
  *  Untitled-name strings (see WidgetIcon), not emojis. */
 export const DEFAULT_WIDGET_SETTINGS: Partial<Record<WidgetType, Record<string, unknown>>> = {
+    // Charts — legend position: bottom (default) | top | left | right | none.
+    lineChart: { legendPosition: "bottom" },
+    barChart: { legendPosition: "bottom" },
+    areaChart: { legendPosition: "bottom" },
+    pieChart: { legendPosition: "bottom" },
+    donutChart: { legendPosition: "bottom" },
     // Diagrams — mermaid source.
     flowchart: { source: "graph TD\n  A[Start] --> B{Approved?}\n  B -->|Yes| C[Ship]\n  B -->|No| D[Revise]\n  D --> B" },
     sequenceDiagram: { source: "sequenceDiagram\n  Client->>API: Request\n  API->>DB: Query\n  DB-->>API: Rows\n  API-->>Client: Response" },
