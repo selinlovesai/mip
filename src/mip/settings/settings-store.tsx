@@ -81,15 +81,65 @@ interface SettingsState {
     profile: UserProfile;
     /** Skills library — built-in (native) + user-authored. */
     skills: Skill[];
+    /** Whether the editable sample skills have been seeded (once). */
+    skillsSeeded?: boolean;
     /** User acknowledged the risks of the freeform AI canvas (arbitrary code). */
     canvasConsented?: boolean;
 }
 
+/** Editable example skills, seeded once so users have something to inspect and
+ *  tweak. NOT built-in — they can be edited or deleted freely. */
+const SAMPLE_SKILLS: Skill[] = [
+    {
+        id: "sample-concise",
+        name: "Concise answers",
+        description: "Lead with the answer; short, scannable, no filler.",
+        builtin: false,
+        surfaces: ["dashboard", "canvas"],
+        content: [
+            "## Style: concise",
+            "Lead with the direct answer in the first sentence. Prefer short paragraphs and bullet points over prose.",
+            "Cut filler ('it's worth noting', 'as you can see'). No restating the question. Surface numbers and names early.",
+        ].join("\n"),
+    },
+    {
+        id: "sample-finance",
+        name: "Finance & metrics context",
+        description: "House definitions for revenue metrics and formatting.",
+        builtin: false,
+        surfaces: ["dashboard"],
+        content: [
+            "## Domain: finance & metrics",
+            "Currency is EUR (€) unless stated; format large numbers with thousands separators and at most 1 decimal (e.g. €1.2M).",
+            "Metric definitions: MRR = monthly recurring revenue; ARR = MRR × 12; Churn = customers lost ÷ customers at period start.",
+            "When building revenue widgets, label periods clearly (month/quarter) and prefer line/area charts for trends, KPIs for headline totals.",
+        ].join("\n"),
+    },
+    {
+        id: "sample-brand-voice",
+        name: "Brand voice",
+        description: "Tone: friendly, confident, plain-spoken.",
+        builtin: false,
+        surfaces: ["dashboard", "canvas"],
+        content: [
+            "## Voice: brand tone",
+            "Be friendly, confident, and plain-spoken. Address the reader as 'you'. Avoid jargon and hype words ('revolutionary', 'synergy').",
+            "Use sentence case for headings. Keep CTAs action-oriented ('Start now', 'See your data').",
+        ].join("\n"),
+    },
+];
+
 /** Merge stored skills with the latest native skills (native content stays
- *  fresh across app updates; custom skills are preserved). */
-function mergeSkills(stored: Skill[] | undefined): Skill[] {
+ *  fresh across app updates; custom skills are preserved). Seeds the sample
+ *  skills once (tracked by `seeded`) so deletions of them stick afterward. */
+function mergeSkills(stored: Skill[] | undefined, seeded: boolean | undefined): Skill[] {
     const custom = (stored ?? []).filter((s) => !s.builtin);
-    return [...NATIVE_SKILLS, ...custom];
+    const result = [...NATIVE_SKILLS, ...custom];
+    if (!seeded) {
+        const have = new Set(result.map((s) => s.id));
+        result.push(...SAMPLE_SKILLS.filter((s) => !have.has(s.id)));
+    }
+    return result;
 }
 
 const STORAGE_KEY = "mip-settings-v1";
@@ -104,7 +154,8 @@ const DEFAULT_STATE: SettingsState = {
     apps: [],
     assistant: {},
     profile: { name: "Super Admin", email: "superadmin@protocol.dev" },
-    skills: NATIVE_SKILLS,
+    skills: [...NATIVE_SKILLS, ...SAMPLE_SKILLS],
+    skillsSeeded: true,
 };
 
 function load(): SettingsState {
@@ -112,7 +163,7 @@ function load(): SettingsState {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) {
             const parsed = JSON.parse(raw) as SettingsState;
-            return { ...DEFAULT_STATE, ...parsed, skills: mergeSkills(parsed.skills) };
+            return { ...DEFAULT_STATE, ...parsed, skills: mergeSkills(parsed.skills, parsed.skillsSeeded), skillsSeeded: true };
         }
     } catch {
         /* ignore */
