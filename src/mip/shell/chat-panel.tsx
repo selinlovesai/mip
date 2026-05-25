@@ -86,9 +86,14 @@ const DASHBOARD_SYSTEM = [
     "When the request is just a question (no dashboard change), answer it in `say` with ops:[]. Markdown is supported in `say`.",
     'Protocol: EVERY reply is ONE JSON object with EXACTLY two keys: "say" (string) and "ops" (array). Put EVERY action inside the "ops" array as {"kind":"…", …}. Do NOT invent other top-level keys, and do NOT return data/widgets at the top level — only {"say", "ops"}.',
     'You receive each op\'s result and may continue. When the dashboard matches the request (or you\'ve answered a question), reply with {"say":"…","ops":[]} and STOP. Describing an action in prose does NOTHING — only ops change the dashboard.',
+    'CRITICAL: reading data (fetch / search / callApi) does NOT create anything. To put a widget on the dashboard you MUST emit an addWidget op. NEVER say "I added a widget" unless your CURRENT ops array contains an addWidget op — claiming it without the op is a failure.',
     'Example — "add a pie chart of the top 6 countries by population":',
     'Round 1 → {"say":"Fetching population data…","ops":[{"kind":"fetch","url":"https://restcountries.com/v3.1/all?fields=name,population"}]}',
     'Round 2 (after the result) → {"say":"Added a pie chart of the 6 most populous countries.","ops":[{"kind":"addWidget","type":"pieChart","title":"Top 6 by population","settings":{"points":[{"label":"India","value":1417000000},{"label":"China","value":1412000000},{"label":"United States","value":333000000},{"label":"Indonesia","value":275000000},{"label":"Pakistan","value":240000000},{"label":"Nigeria","value":223000000}]}}]}',
+    'Example — "show the latest blog posts from the Boudoir API" (a SAVED connection):',
+    'Round 1 → {"say":"Looking up the Boudoir connection…","ops":[{"kind":"listConnections"}]}',
+    'Round 2 (after seeing its id+endpoint) → {"say":"Reading the latest posts…","ops":[{"kind":"callApi","sourceId":"<boudoir id>","path":"/<the posts endpoint>"}]}',
+    'Round 3 (NOW actually add the widget, bound to live data) → {"say":"Added a list of the latest Boudoir posts.","ops":[{"kind":"addWidget","type":"list","title":"Latest Boudoir posts","data":{"sourceId":"<boudoir id>","request":{"method":"GET","path":"/<the posts endpoint>"},"map":{"items":"$.items"}},"settings":{"primaryKey":"title","secondaryKey":"date_created"}}]}',
 ].join("\n");
 
 /** Coerce a parsed JSON value into {say, ops}. Accepts our canonical
@@ -353,11 +358,14 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
     // both the canvas (DOM ops) and the dashboard (widget + web ops).
     const runAgent = async (
         initial: ApiMsg[],
-        opts: { system: string; runner: (op: Record<string, unknown>) => Promise<Record<string, unknown>>; surface: string },
+        opts: { system: string; runner: (op: Record<string, unknown>) => Promise<Record<string, unknown>>; surface: string; isMutating: (kind: string) => boolean },
     ) => {
         const sys = [opts.system, activePage.systemPrompt ?? "", assistant.systemPrompt ?? ""].filter(Boolean).join("\n\n");
         let msgs = initial.slice();
         let nudged = false;
+        let actNudged = false;
+        let mutated = false; // did any op that actually changes the surface run this turn?
+        const claimsAction = (s?: string) => !!s && /\b(added|created|updated|built|inserted|placed|removed|deleted|set up|rendered|changed)\b/i.test(s);
         // JSON mode forces an object response on OpenAI-compatible providers, so
         // the model can't reply with a prose refusal instead of emitting ops.
         const jsonMode = (conn?.aiProvider ?? "openai") !== "anthropic";
@@ -383,10 +391,27 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                 pushAssistant(text);
                 return;
             }
+            if (!parsed.ops.length) {
+                // Model ended the turn. If it CLAIMS it changed the surface but no
+                // mutating op ever ran, it only read data — make it actually act.
+                if (claimsAction(parsed.say) && !mutated && !actNudged) {
+                    actNudged = true;
+                    msgs = [
+                        ...msgs,
+                        { role: "assistant", content: text },
+                        { role: "user", content: `You have not changed the ${opts.surface} yet — reading data (fetch/search/callApi/listConnections) does not count. Emit the op that actually performs the change NOW (e.g. addWidget), then summarize. Do not claim success without the op.` },
+                    ];
+                    continue;
+                }
+                if (parsed.say) pushAssistant(parsed.say);
+                return;
+            }
             if (parsed.say) pushAssistant(parsed.say);
-            if (!parsed.ops.length) return;
             const results: unknown[] = [];
-            for (const op of parsed.ops as Array<Record<string, unknown>>) results.push(await opts.runner(op));
+            for (const op of parsed.ops as Array<Record<string, unknown>>) {
+                if (opts.isMutating(String(op.kind))) mutated = true;
+                results.push(await opts.runner(op));
+            }
             msgs = [
                 ...msgs,
                 { role: "assistant", content: text },
@@ -434,10 +459,11 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             }
         }
 
+        const readOnly = new Set(["fetch", "search", "callApi", "query", "listConnections", "listWidgets"]);
         if (isCanvas) {
-            await runAgent(apiMessages, { system: CANVAS_SYSTEM, runner: runOp, surface: "canvas" });
+            await runAgent(apiMessages, { system: CANVAS_SYSTEM, runner: runOp, surface: "canvas", isMutating: (k) => !readOnly.has(k) });
         } else {
-            await runAgent(apiMessages, { system: DASHBOARD_SYSTEM, runner: runDashboardOp, surface: "dashboard" });
+            await runAgent(apiMessages, { system: DASHBOARD_SYSTEM, runner: runDashboardOp, surface: "dashboard", isMutating: (k) => k === "addWidget" || k === "removeWidget" });
         }
         setThinking(false);
     };
