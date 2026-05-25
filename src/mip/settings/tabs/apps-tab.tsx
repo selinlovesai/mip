@@ -43,7 +43,7 @@ function LogoTile({ app, size = "md" }: { app: AppConnector; size?: "sm" | "md" 
 }
 
 export function AppsTab() {
-    const { isAppConnected, connectApp, disconnectApp } = useSettings();
+    const { isAppConnected, connectApp, disconnectApp, addConnection, setAssistant } = useSettings();
     const [query, setQuery] = useState("");
     const [active, setActive] = useState<AppConnector | null>(null);
 
@@ -145,8 +145,24 @@ export function AppsTab() {
             <ConnectModal
                 app={active}
                 onClose={() => setActive(null)}
-                onConnect={(method) => {
-                    if (active) connectApp(active.id, method);
+                onConnect={(method, apiKey) => {
+                    if (active) {
+                        connectApp(active.id, method);
+                        // For AI providers, an API key creates a real AI-model
+                        // connection and selects it as the assistant's model.
+                        if (active.ai && method === "apiKey" && apiKey?.trim()) {
+                            const id = addConnection({
+                                name: active.name,
+                                type: "rest",
+                                baseUrl: active.ai.baseUrl,
+                                auth: { type: "bearer", token: apiKey.trim() },
+                                isAiModel: true,
+                                aiProvider: active.ai.provider,
+                                aiModel: active.ai.model,
+                            });
+                            setAssistant({ connectionId: id, model: active.ai.model });
+                        }
+                    }
                     setActive(null);
                 }}
             />
@@ -161,7 +177,7 @@ function ConnectModal({
 }: {
     app: AppConnector | null;
     onClose: () => void;
-    onConnect: (method: AuthMethod) => void;
+    onConnect: (method: AuthMethod, apiKey?: string) => void;
 }) {
     return (
         <ModalOverlay isOpen={!!app} onOpenChange={(isOpen) => !isOpen && onClose()} isDismissable>
@@ -179,7 +195,7 @@ function ConnectForm({
 }: {
     app: AppConnector;
     onClose: () => void;
-    onConnect: (method: AuthMethod) => void;
+    onConnect: (method: AuthMethod, apiKey?: string) => void;
 }) {
     const [method, setMethod] = useState<AuthMethod>(app.auth[0]);
     const [apiKey, setApiKey] = useState("");
@@ -244,14 +260,18 @@ function ConnectForm({
                     </>
                 )}
 
-                <p className="text-xs text-tertiary">Credentials are used only for this demo session and are not stored.</p>
+                <p className="text-xs text-tertiary">
+                    {app.ai && method === "apiKey"
+                        ? `Your key is saved to a Connection (${app.ai.baseUrl}) and selected as the assistant's model.`
+                        : "Credentials are used only for this demo session and are not stored."}
+                </p>
             </div>
 
             <div className="flex justify-end gap-3 border-t border-secondary px-5 py-4">
                 <Button size="sm" color="secondary" onClick={onClose}>
                     Cancel
                 </Button>
-                <Button size="sm" color="primary" isDisabled={!canConnect} onClick={() => onConnect(method)}>
+                <Button size="sm" color="primary" isDisabled={!canConnect} onClick={() => onConnect(method, method === "apiKey" ? apiKey : undefined)}>
                     Connect
                 </Button>
             </div>
