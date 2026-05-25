@@ -68,6 +68,23 @@ function migrateRowHeight(state: DashboardState): DashboardState {
     };
 }
 
+/** First-fit placement: find the top-left free slot for a w×h widget in a
+ *  `cols`-wide grid, scanning rows top→bottom and columns left→right. Lets new
+ *  widgets fill gaps instead of always stacking at the bottom. */
+function findGridSlot(widgets: MipWidget[], w: number, h: number, cols: number): { x: number; y: number } {
+    const ww = Math.min(Math.max(1, w), cols);
+    const overlaps = (x: number, y: number) =>
+        widgets.some((g) => {
+            const { x: gx, y: gy, w: gw, h: gh } = g.layout;
+            return x < gx + gw && x + ww > gx && y < gy + gh && y + h > gy;
+        });
+    for (let y = 0; ; y++) {
+        for (let x = 0; x + ww <= cols; x++) {
+            if (!overlaps(x, y)) return { x, y };
+        }
+    }
+}
+
 function load(): DashboardState {
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -211,8 +228,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     const addWidget = useCallback(
         (widget: MipWidget) => {
             updateActivePage((page) => {
-                const maxY = page.widgets.reduce((max, w) => Math.max(max, w.layout.y + w.layout.h), 0);
-                return { ...page, widgets: [...page.widgets, { ...widget, layout: { ...widget.layout, x: 0, y: maxY } }] };
+                const { x, y } = findGridSlot(page.widgets, widget.layout.w, widget.layout.h, page.cols);
+                const w = Math.min(widget.layout.w, page.cols);
+                return { ...page, widgets: [...page.widgets, { ...widget, layout: { ...widget.layout, w, x, y } }] };
             });
         },
         [updateActivePage],
