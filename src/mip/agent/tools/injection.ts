@@ -11,9 +11,12 @@
  * else direct) so older prompt patterns keep working.
  */
 
-import type { MipWidget } from "../../schema";
+import { DEFAULT_WIDGET_SETTINGS, WIDGET_TYPES, type MipWidget, type WidgetType } from "../../schema";
 import { WIDGET_CATALOG, makeWidget } from "../../shell/widget-catalog";
 import type { Tool, ToolContext, AgentOp, OpResult } from "../types";
+
+const isWidgetType = (t: unknown): t is WidgetType => typeof t === "string" && (WIDGET_TYPES as readonly string[]).includes(t);
+const prettyType = (t: string) => t.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 
 /** Widget types that carry data and therefore SHOULD bind to a connection when
  *  one is in play. Everything else (headers, text, CTAs, images…) is static and
@@ -24,16 +27,21 @@ const BINDABLE_TYPES = new Set(["kpi", "progress", "lineChart", "barChart", "are
  *  op if given, else the user's configured default for the type (Settings →
  *  Widgets); other defaults (example settings) come from the catalog. */
 function buildWidget(op: AgentOp, ctx: ToolContext): MipWidget | { error: string } {
-    const type = op.type as MipWidget["type"];
+    if (!isWidgetType(op.type)) return { error: `Unknown widget type "${String(op.type)}". Valid types: ${WIDGET_TYPES.join(", ")}.` };
+    const type = op.type;
+    // A catalog entry isn't required — every WIDGET_TYPES type has a renderer.
+    // Fall back to schema defaults for size/label/settings when uncatalogued.
     const base = WIDGET_CATALOG.find((c) => c.type === type);
-    if (!base) return { error: `Unknown widget type "${String(type)}". Pick one from the documented list.` };
-    const size = ctx.widgetSize(String(type));
+    const size = ctx.widgetSize(type);
+    const defaults = { ...(base?.settings ?? {}), ...(DEFAULT_WIDGET_SETTINGS[type] ?? {}) };
     return makeWidget({
-        ...base,
-        ...(typeof op.title === "string" ? { label: op.title } : {}),
+        type,
+        group: base?.group ?? "",
+        label: typeof op.title === "string" ? op.title : (base?.label ?? prettyType(type)),
         w: typeof op.w === "number" ? op.w : size.w,
         h: typeof op.h === "number" ? op.h : size.h,
-        ...(op.settings && typeof op.settings === "object" ? { settings: { ...base.settings, ...(op.settings as Record<string, unknown>) } } : {}),
+        ...(op.settings && typeof op.settings === "object" ? { settings: { ...defaults, ...(op.settings as Record<string, unknown>) } } : Object.keys(defaults).length ? { settings: defaults } : {}),
+        ...(base?.fields ? { fields: base.fields } : {}),
     });
 }
 
@@ -67,7 +75,7 @@ const injectJson: Tool = {
     doc: "injectJson { type, title?, settings?, w?, h? } — add a widget with INLINE data (you provide settings). Use for one-off values you fetched/computed.",
     surfaces: ["dashboard"],
     mutating: true,
-    validate: (op) => (typeof op.type === "string" && op.type ? null : "injectJson needs a widget `type`."),
+    validate: (op) => (isWidgetType(op.type) ? null : `injectJson needs a valid widget \`type\` (got "${String(op.type)}").`),
     run: async (op: AgentOp, ctx: ToolContext): Promise<OpResult> => {
         // Only DATA-bearing widgets need to bind to a connection. Static/utility
         // widgets (headers, text, CTAs, images…) are always fine as injectJson —
@@ -104,7 +112,7 @@ const injectConnection: Tool = {
     surfaces: ["dashboard"],
     mutating: true,
     validate: (op) => {
-        if (typeof op.type !== "string" || !op.type) return "injectConnection needs a widget `type`.";
+        if (!isWidgetType(op.type)) return `injectConnection needs a valid widget \`type\` (got "${String(op.type)}").`;
         const sid = (op.data as { sourceId?: unknown } | undefined)?.sourceId ?? op.sourceId;
         return sid != null && String(sid).trim() ? null : "injectConnection needs a `sourceId` (the saved connection). Call listConnections first.";
     },

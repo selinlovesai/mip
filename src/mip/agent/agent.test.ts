@@ -161,6 +161,17 @@ describe("dispatch + validation", () => {
         expect(r.ok).toBe(true);
         expect(added).toHaveLength(1);
     });
+    it("injectJson accepts any valid widget type, even uncatalogued (timeline)", async () => {
+        let added: { type?: string } = {};
+        const r = await dispatch({ kind: "injectJson", type: "timeline", settings: { source: "timeline\n  x : y" } }, "dashboard", ctx({ addWidget: (w) => (added = w as never) }));
+        expect(r.ok).toBe(true);
+        expect(added.type).toBe("timeline");
+    });
+    it("injectJson rejects a genuinely invalid type", async () => {
+        const r = await dispatch({ kind: "injectJson", type: "sparklezilla" }, "dashboard", ctx());
+        expect(r.ok).toBe(false);
+        expect(String(r.error)).toMatch(/Unknown widget type|valid/i);
+    });
     it("allows a STATIC widget via injectJson even under api mode", async () => {
         const added: unknown[] = [];
         const r = await dispatch({ kind: "injectJson", type: "markdown", settings: { content: "hi" } }, "dashboard", ctx({ injectMode: "api", addWidget: (w) => added.push(w) }));
