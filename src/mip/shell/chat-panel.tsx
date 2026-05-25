@@ -23,6 +23,8 @@ import { CANVAS_TOOLS_DOC, type CanvasOp } from "./canvas-runtime";
 import { markdownToHtml } from "@/mip/adapters/untitled/markdown";
 import { useSettings } from "@/mip/settings/settings-store";
 import { useDashboard } from "@/mip/store";
+import { WIDGET_CATALOG, makeWidget } from "./widget-catalog";
+import type { WidgetType } from "@/mip/schema";
 import { cx } from "@/utils/cx";
 
 type ChatMode = "sidebar" | "chat" | "compact";
@@ -56,6 +58,26 @@ const CANVAS_SYSTEM = [
     "Build the page with ONE `replace` op holding the full HTML; use append/insert/setStyle/etc. ONLY for later tweaks. NEVER re-add or re-build content you already added.",
     "To fill a form use `setValue` per field; to submit or press something use `click`; to recolor use `setStyle` on body or the relevant selector. These ARE your only way to act — describing an action in prose does nothing.",
     'Protocol: EVERY reply must be ONE ```json block: {"say":"<one short line>","ops":[ {"kind":"...", ...}, ... ]} — never plain prose, never code outside the block. You receive the ops\' results and may continue. As soon as the canvas matches the request, reply with {"say":"<summary>","ops":[]} and STOP.',
+].join("\n");
+
+const DASHBOARD_SYSTEM = [
+    "You are the dashboard assistant. You manage a LIVE widget dashboard and have REAL tools that execute on the host and return their results to you.",
+    "Your fetch/search tools really work — NEVER refuse with 'I can't browse the internet'; emit a fetch or search op and the host runs it, then hands you the data.",
+    "Tools (op `kind` + args):",
+    "fetch { url }                          — read a web page's readable text (returns {title, text})",
+    "search { query }                       — web search via the connected Tavily app (returns results: title/url/content)",
+    "listWidgets {}                         — list the current widgets on this page as [{id, type, title}]",
+    "addWidget { type, title?, settings?, w?, h? } — add a widget. Common types & their settings:",
+    "    kpi        settings:{ value, delta?, deltaLabel?, unit?, valueFormat? }",
+    "    lineChart|barChart|areaChart|pieChart|donutChart  settings:{ points:[{label,value},…] }",
+    "    table      settings:{ columns:[{key,label},…], rows:[{…},…] }",
+    "    list       settings:{ primaryKey, secondaryKey?, items:[{…},…] }",
+    "    markdown   settings:{ content }   ·   card  settings:{ heading, body }",
+    "    progress   settings:{ value, target, label? }",
+    "removeWidget { id }                    — remove a widget by id (use listWidgets first)",
+    "Workflow: for real numbers (prices, stats, a company's metrics) CALL fetch/search FIRST, then build widgets from the RETURNED data — never invent figures.",
+    "When the request is just a question (no dashboard change), answer it in `say` with ops:[]. Markdown is supported in `say`.",
+    'Protocol: EVERY reply is ONE JSON object {"say":"<short message>","ops":[ {"kind":"…", …}, … ]} — no prose outside it. You receive each op\'s result and may continue. When the dashboard matches the request (or you\'ve answered), reply with {"say":"…","ops":[]} and STOP. Describing an action in prose does NOTHING — only ops change the dashboard.',
 ].join("\n");
 
 /** Parse an agent reply into {say, ops} — tolerant of fences, surrounding prose,
@@ -116,7 +138,7 @@ function ComposerTextarea({ value, onChange, onKeyDown }: { value: string; onCha
 const introMessage: Message = { id: "intro", role: "assistant", text: INTRO };
 
 export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
-    const { activePage } = useDashboard();
+    const { activePage, addWidget, removeWidget } = useDashboard();
     const { assistant, aiConnections, connections, getConnection, setAssistant } = useSettings();
     const [mode, setMode] = useState<ChatMode>("sidebar");
     // Conversations are scoped per page (dashboard/canvas) — switching the active
@@ -171,7 +193,10 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
     // not whole-document dumps.
     const tavily = connections.find((c) => /tavily/i.test(c.baseUrl ?? ""));
 
-    const runOp = async (op: Record<string, unknown>): Promise<Record<string, unknown>> => {
+    // Web tools shared by both the canvas and dashboard agents — they run on the
+    // host (server-side fetch / Tavily search) and return data to the model.
+    // Returns null when `op` is not a web tool, so callers can fall through.
+    const runWebOp = async (op: Record<string, unknown>): Promise<Record<string, unknown> | null> => {
         const kind = op.kind as string;
         if (kind === "fetch" && typeof op.url === "string") {
             const r = await fetchPage(op.url);
@@ -193,12 +218,53 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                 ...(r.ok ? {} : { error: typeof r.error === "string" ? r.error : `status ${r.status ?? "?"}` }),
             };
         }
-        const r = await canvasBridge.send(op as CanvasOp);
-        return { kind, ok: r.ok, ...(r.error ? { error: r.error } : {}), ...(r.result !== undefined ? { result: r.result } : {}) };
+        return null;
     };
 
-    const runCanvasAgent = async (initial: ApiMsg[]) => {
-        const sys = [CANVAS_SYSTEM, activePage.systemPrompt ?? "", assistant.systemPrompt ?? ""].filter(Boolean).join("\n\n");
+    const runOp = async (op: Record<string, unknown>): Promise<Record<string, unknown>> => {
+        const web = await runWebOp(op);
+        if (web) return web;
+        const r = await canvasBridge.send(op as CanvasOp);
+        return { kind: op.kind as string, ok: r.ok, ...(r.error ? { error: r.error } : {}), ...(r.result !== undefined ? { result: r.result } : {}) };
+    };
+
+    // Dashboard agent ops: web tools + live widget add/remove/list against the store.
+    const runDashboardOp = async (op: Record<string, unknown>): Promise<Record<string, unknown>> => {
+        const web = await runWebOp(op);
+        if (web) return web;
+        const kind = op.kind as string;
+        if (kind === "listWidgets") {
+            return { kind, ok: true, widgets: activePage.widgets.map((w) => ({ id: w.id, type: w.type, title: w.title })) };
+        }
+        if (kind === "addWidget") {
+            const type = op.type as WidgetType;
+            const base = WIDGET_CATALOG.find((c) => c.type === type);
+            if (!base) return { kind, ok: false, error: `Unknown widget type "${String(type)}". Pick one from the documented list.` };
+            const widget = makeWidget({
+                ...base,
+                ...(typeof op.title === "string" ? { label: op.title } : {}),
+                ...(typeof op.w === "number" ? { w: op.w } : {}),
+                ...(typeof op.h === "number" ? { h: op.h } : {}),
+                ...(op.settings && typeof op.settings === "object" ? { settings: { ...base.settings, ...(op.settings as Record<string, unknown>) } } : {}),
+            });
+            addWidget(widget);
+            return { kind, ok: true, id: widget.id, type: widget.type };
+        }
+        if (kind === "removeWidget" && typeof op.id === "string") {
+            removeWidget(op.id);
+            return { kind, ok: true, removed: op.id };
+        }
+        return { kind, ok: false, error: `Unknown op "${kind}".` };
+    };
+
+    // Shared agent loop: the model emits {say, ops[]}, we run each op through the
+    // surface-specific runner, feed results back, and iterate (capped). Used by
+    // both the canvas (DOM ops) and the dashboard (widget + web ops).
+    const runAgent = async (
+        initial: ApiMsg[],
+        opts: { system: string; runner: (op: Record<string, unknown>) => Promise<Record<string, unknown>>; surface: string },
+    ) => {
+        const sys = [opts.system, activePage.systemPrompt ?? "", assistant.systemPrompt ?? ""].filter(Boolean).join("\n\n");
         let msgs = initial.slice();
         let nudged = false;
         // JSON mode forces an object response on OpenAI-compatible providers, so
@@ -219,7 +285,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                     msgs = [
                         ...msgs,
                         { role: "assistant", content: text },
-                        { role: "user", content: 'Do NOT refuse and do NOT explain limitations — your fetch/search/DOM tools are real and run on the host. Reply with ONLY a JSON object {"say":"…","ops":[…]}. Use ops to ACTUALLY act (fetch/search for live data, then replace/setStyle/setValue/click/runJs). Describing an action does nothing.' },
+                        { role: "user", content: 'Do NOT refuse and do NOT explain limitations — your fetch/search and surface tools are real and run on the host. Reply with ONLY a JSON object {"say":"…","ops":[…]}. Use ops to ACTUALLY act (fetch/search for live data, then build/modify). Describing an action does nothing.' },
                     ];
                     continue;
                 }
@@ -229,14 +295,14 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
             if (parsed.say) pushAssistant(parsed.say);
             if (!parsed.ops.length) return;
             const results: unknown[] = [];
-            for (const op of parsed.ops as Array<Record<string, unknown>>) results.push(await runOp(op));
+            for (const op of parsed.ops as Array<Record<string, unknown>>) results.push(await opts.runner(op));
             msgs = [
                 ...msgs,
                 { role: "assistant", content: text },
-                { role: "user", content: "Tool results:\n```json\n" + JSON.stringify(results).slice(0, 4000) + "\n```\nIf the canvas already matches the request, reply with {\"say\":\"<summary>\",\"ops\":[]}. Otherwise continue — do not re-add anything already present." },
+                { role: "user", content: "Tool results:\n```json\n" + JSON.stringify(results).slice(0, 4000) + `\n\`\`\`\nIf the ${opts.surface} already matches the request, reply with {"say":"<summary>","ops":[]}. Otherwise continue — do not re-add anything already present.` },
             ];
         }
-        pushAssistant("Reached the canvas step limit.");
+        pushAssistant(`Reached the ${opts.surface} step limit.`);
     };
 
     const sendText = async (text: string) => {
@@ -278,19 +344,11 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         }
 
         if (isCanvas) {
-            await runCanvasAgent(apiMessages);
-            setThinking(false);
-            return;
+            await runAgent(apiMessages, { system: CANVAS_SYSTEM, runner: runOp, surface: "canvas" });
+        } else {
+            await runAgent(apiMessages, { system: DASHBOARD_SYSTEM, runner: runDashboardOp, surface: "dashboard" });
         }
-
-        const system = [activePage.systemPrompt ?? "", assistant.systemPrompt ?? ""].filter(Boolean).join("\n\n") || undefined;
-        const result = await callModel(apiMessages, system);
         setThinking(false);
-        const text2 =
-            result.ok && result.content
-                ? result.content
-                : `**Couldn't reach the model.**\n\n${typeof result.error === "string" ? result.error : "The request failed. Check the connection's base URL and API key in Settings."}`;
-        pushAssistant(text2);
     };
 
     // --- Voice input: record via MediaRecorder, transcribe with local Whisper ---
