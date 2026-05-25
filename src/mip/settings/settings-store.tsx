@@ -8,7 +8,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AuthMethod } from "./apps-catalog";
 import { NATIVE_SKILLS, type Skill } from "@/mip/agent/skills";
-import { DEFAULT_WIDGET_SIZES, WIDGET_TYPES, type WidgetType } from "@/mip/schema";
+import { DEFAULT_WIDGET_SIZES, DEFAULT_WIDGET_SETTINGS, WIDGET_TYPES, type WidgetType } from "@/mip/schema";
 import { WIDGET_CATALOG } from "@/mip/shell/widget-catalog";
 
 export type { Skill } from "@/mip/agent/skills";
@@ -29,7 +29,10 @@ export const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, WidgetTypeConfig> = Obje
         const cat = CATALOG_BY_TYPE.get(t);
         const size = DEFAULT_WIDGET_SIZES[t];
         const config: Record<string, unknown> = { w: size.w, h: size.h };
-        if (cat?.settings) config.settings = cat.settings;
+        // Merge catalog example settings with the schema's default settings
+        // (the latter extends/overrides — e.g. icon classes, alignment, button url).
+        const settings = { ...(cat?.settings ?? {}), ...(DEFAULT_WIDGET_SETTINGS[t] ?? {}) };
+        if (Object.keys(settings).length) config.settings = settings;
         if (cat?.fields) config.fields = cat.fields;
         return [t, { name: cat?.label ?? prettyType(t), config }];
     }),
@@ -42,7 +45,12 @@ function normalizeWidgetDefaults(stored: Record<string, unknown> | undefined): R
     for (const t of WIDGET_TYPES) {
         const v = stored?.[t] as { name?: unknown; config?: unknown; w?: unknown; h?: unknown } | undefined;
         if (v && typeof v === "object" && v.config && typeof v.config === "object") {
-            out[t] = { name: typeof v.name === "string" ? v.name : DEFAULT_WIDGET_CONFIGS[t].name, config: v.config as Record<string, unknown> };
+            // Merge stored config OVER the current defaults so new default keys
+            // (e.g. diagram `source`, button `url`) appear while user edits persist.
+            out[t] = {
+                name: typeof v.name === "string" ? v.name : DEFAULT_WIDGET_CONFIGS[t].name,
+                config: { ...DEFAULT_WIDGET_CONFIGS[t].config, ...(v.config as Record<string, unknown>) },
+            };
         } else if (v && typeof v === "object" && (typeof v.w === "number" || typeof v.h === "number")) {
             out[t] = {
                 name: DEFAULT_WIDGET_CONFIGS[t].name,

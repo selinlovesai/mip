@@ -20,6 +20,11 @@ import type { WidgetRenderProps } from "@/mip/adapter/types";
 import type { MipWidget } from "@/mip/schema";
 import { cx } from "@/utils/cx";
 import { markdownToHtml } from "./markdown";
+import { WidgetIcon } from "./widget-icon";
+
+/** Map a content alignment to flex + text-align classes. */
+type Align = "left" | "center" | "right";
+const alignCls = (a?: Align) => (a === "center" ? "items-center text-center" : a === "right" ? "items-end text-right" : "items-start text-left");
 
 /** Read the content object for a design block: `settings.content` if present, else `settings`. */
 function readContent<T extends Record<string, unknown>>(widget: MipWidget, defaults: T): T {
@@ -41,41 +46,53 @@ function Prose({ text }: { text: string }) {
 // ---------------------------------------------------------------------------
 
 export function HeroWidget({ widget }: WidgetRenderProps) {
-    const c = readContent(widget, {} as { heading?: string; subheading?: string; alignment?: "left" | "center"; eyebrow?: string; ctaLabel?: string; ctaUrl?: string; secondaryLabel?: string; secondaryUrl?: string });
+    const c = readContent(widget, {} as { heading?: string; subheading?: string; alignment?: Align; eyebrow?: string; backgroundImage?: string; ctaLabel?: string; ctaUrl?: string; secondaryLabel?: string; secondaryUrl?: string });
     const heading = c.heading ?? widget.title ?? "Hero heading";
     const align = c.alignment ?? "center";
+    const hasBg = typeof c.backgroundImage === "string" && c.backgroundImage.trim() !== "";
+    const bgStyle = hasBg ? { backgroundImage: `url(${c.backgroundImage})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined;
     return (
-        <div className={cx("flex h-full flex-col justify-center gap-4 overflow-hidden rounded-xl bg-gradient-to-br from-utility-brand-100 to-bg-primary p-8 ring-1 ring-secondary", align === "center" ? "items-center text-center" : "items-start text-left")}>
-            {c.eyebrow ? (
-                <Badge type="pill-color" color="brand" size="md">
-                    {c.eyebrow}
-                </Badge>
-            ) : null}
-            <h2 className="max-w-2xl text-display-sm font-semibold text-primary">{heading}</h2>
-            {c.subheading ? <p className="max-w-xl text-lg text-tertiary">{c.subheading}</p> : null}
-            {c.ctaLabel || c.secondaryLabel ? (
-                <div className="mt-2 flex flex-wrap gap-3">
-                    {c.ctaLabel ? (
-                        <Button href={c.ctaUrl ?? "#"} color="primary" size="lg">
-                            {c.ctaLabel}
-                        </Button>
-                    ) : null}
-                    {c.secondaryLabel ? (
-                        <Button href={c.secondaryUrl ?? "#"} color="secondary" size="lg">
-                            {c.secondaryLabel}
-                        </Button>
-                    ) : null}
-                </div>
-            ) : null}
+        <div
+            style={bgStyle}
+            className={cx(
+                "relative flex h-full flex-col justify-center gap-4 overflow-hidden rounded-xl p-8 ring-1 ring-secondary",
+                hasBg ? "bg-gray-900" : "bg-gradient-to-br from-utility-brand-100 to-bg-primary",
+                alignCls(align),
+            )}
+        >
+            {hasBg ? <div className="absolute inset-0 bg-black/45" aria-hidden /> : null}
+            <div className={cx("relative flex flex-col gap-4", alignCls(align))}>
+                {c.eyebrow ? (
+                    <Badge type="pill-color" color="brand" size="md">
+                        {c.eyebrow}
+                    </Badge>
+                ) : null}
+                <h2 className={cx("max-w-2xl text-display-sm font-semibold", hasBg ? "text-white" : "text-primary")}>{heading}</h2>
+                {c.subheading ? <p className={cx("max-w-xl text-lg", hasBg ? "text-white/80" : "text-tertiary")}>{c.subheading}</p> : null}
+                {c.ctaLabel || c.secondaryLabel ? (
+                    <div className="mt-2 flex flex-wrap gap-3">
+                        {c.ctaLabel ? (
+                            <Button href={c.ctaUrl ?? "#"} color="primary" size="lg">
+                                {c.ctaLabel}
+                            </Button>
+                        ) : null}
+                        {c.secondaryLabel ? (
+                            <Button href={c.secondaryUrl ?? "#"} color="secondary" size="lg">
+                                {c.secondaryLabel}
+                            </Button>
+                        ) : null}
+                    </div>
+                ) : null}
+            </div>
         </div>
     );
 }
 
 export function CtaWidget({ widget }: WidgetRenderProps) {
-    const c = readContent(widget, {} as { heading?: string; body?: string; buttonLabel?: string; buttonUrl?: string });
+    const c = readContent(widget, {} as { heading?: string; body?: string; alignment?: Align; buttonLabel?: string; buttonUrl?: string });
     const heading = c.heading ?? widget.title ?? "Ready to get started?";
     return (
-        <div className="flex h-full flex-col items-center justify-center gap-4 rounded-xl bg-brand-solid p-8 text-center">
+        <div className={cx("flex h-full flex-col justify-center gap-4 rounded-xl bg-brand-solid p-8", alignCls(c.alignment ?? "center"))}>
             <h3 className="text-2xl font-semibold text-white">{heading}</h3>
             {c.body ? <p className="max-w-xl text-white/80">{c.body}</p> : null}
             {c.buttonLabel ? (
@@ -144,14 +161,14 @@ export function PricingWidget({ widget }: WidgetRenderProps) {
 }
 
 export function ContentSectionWidget({ widget }: WidgetRenderProps) {
-    const c = readContent(widget, {} as { heading?: string; body?: string; imageUrl?: string; imagePosition?: "left" | "right" | "top" });
+    const c = readContent(widget, {} as { heading?: string; body?: string; alignment?: Align; imageUrl?: string; imagePosition?: "left" | "right" | "top" });
     const heading = c.heading ?? widget.title ?? "Section heading";
     const pos = c.imagePosition ?? "top";
     const media = c.imageUrl ? <img src={c.imageUrl} alt="" loading="lazy" className="w-full rounded-lg object-cover" /> : null;
     return (
         <div className={cx(surface, "gap-4", pos === "left" && "sm:flex-row", pos === "right" && "sm:flex-row-reverse")}>
             {media && pos !== "top" ? <div className="sm:w-1/2">{media}</div> : null}
-            <div className="flex flex-1 flex-col gap-3">
+            <div className={cx("flex flex-1 flex-col gap-3", alignCls(c.alignment))}>
                 {media && pos === "top" ? media : null}
                 <h3 className="text-xl font-semibold text-primary">{heading}</h3>
                 {c.body ? <Prose text={c.body} /> : null}
@@ -197,7 +214,11 @@ export function FeatureGridWidget({ widget }: WidgetRenderProps) {
             <div className={cx("mt-5 grid flex-1 gap-5", cols === 2 ? "sm:grid-cols-2" : cols === 4 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-2 lg:grid-cols-3")}>
                 {arr<FeatureItem>(c.features).map((f, i) => (
                     <div key={i} className="flex flex-col gap-2">
-                        {f.icon ? <span className="flex size-10 items-center justify-center rounded-lg bg-utility-brand-50 text-lg">{f.icon}</span> : null}
+                        {f.icon ? (
+                            <span className="flex size-10 items-center justify-center rounded-lg bg-utility-brand-50 text-lg text-utility-brand-600">
+                                <WidgetIcon icon={f.icon} className="size-5" />
+                            </span>
+                        ) : null}
                         <h4 className="text-sm font-semibold text-primary">{f.title}</h4>
                         <p className="text-sm text-tertiary">{f.description}</p>
                     </div>

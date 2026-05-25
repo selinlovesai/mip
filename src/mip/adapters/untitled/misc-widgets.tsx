@@ -36,10 +36,11 @@ export function PageHeaderWidget({ widget }: WidgetRenderProps) {
     const subheading = typeof settings.subheading === "string" ? settings.subheading : undefined;
     const actionLabel = typeof settings.actionLabel === "string" ? settings.actionLabel : undefined;
     const actionUrl = typeof settings.actionUrl === "string" ? settings.actionUrl : undefined;
+    const align = settings.alignment === "center" ? "items-center text-center" : settings.alignment === "right" ? "items-end text-right" : "items-start text-left";
 
     return (
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-secondary pb-5">
-            <div className="flex flex-col gap-1">
+            <div className={cx("flex flex-col gap-1", align)}>
                 <h1 className="text-display-xs font-semibold text-primary">{heading}</h1>
                 {subheading ? <p className="text-sm text-tertiary">{subheading}</p> : null}
             </div>

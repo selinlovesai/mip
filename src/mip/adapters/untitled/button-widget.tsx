@@ -1,8 +1,8 @@
 /**
  * Button widget — Untitled UI adapter. Renders the starter's first-class
  * Untitled `Button`, mapping the MIP `style.variant`/`size` to Button props.
- * Label from `settings.label` (or the widget title); optional `settings.href`
- * renders it as a link.
+ * Settings: `label`, `url` (link), `target` (_self/_blank), `className` (extra
+ * classes), `title` (tooltip).
  */
 
 import { Button } from "@/components/base/buttons/button";
@@ -17,17 +17,28 @@ const VARIANT_TO_COLOR: Record<ButtonVariant, "primary" | "secondary" | "tertiar
     danger: "primary-destructive",
 };
 
+const str = (v: unknown) => (typeof v === "string" && v.trim() ? v : undefined);
+
 export function ButtonWidget({ widget }: WidgetRenderProps) {
     const settings = widget.settings ?? {};
-    const label = typeof settings.label === "string" ? settings.label : (widget.title ?? "Button");
-    const href = typeof settings.href === "string" ? settings.href : undefined;
+    const label = str(settings.label) ?? widget.title ?? "Button";
+    const href = str(settings.url) ?? str(settings.href);
+    const target = str(settings.target);
+    const className = str(settings.className);
+    const title = str(settings.title);
     const color = VARIANT_TO_COLOR[widget.style?.variant ?? "primary"];
     const size = widget.style?.size ?? "md";
 
     return (
         <WidgetCard>
             <div className="flex flex-1 items-center">
-                <Button color={color} size={size} {...(href ? { href } : {})}>
+                <Button
+                    color={color}
+                    size={size}
+                    className={className}
+                    title={title}
+                    {...(href ? { href, target, rel: target === "_blank" ? "noopener noreferrer" : undefined } : {})}
+                >
                     {label}
                 </Button>
             </div>

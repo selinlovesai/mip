@@ -87,6 +87,41 @@ export const DEFAULT_WIDGET_SIZES: Record<WidgetType, { w: number; h: number }> 
     testimonial: { w: 4, h: 6 },
 };
 
+/** Default seed settings per widget type, surfaced (and editable) in
+ *  Settings → Widgets and used when a widget is added. Merged OVER the catalog's
+ *  example settings, so it can extend or override them. Icons are icon-class /
+ *  Untitled-name strings (see WidgetIcon), not emojis. */
+export const DEFAULT_WIDGET_SETTINGS: Partial<Record<WidgetType, Record<string, unknown>>> = {
+    // Diagrams — mermaid source.
+    flowchart: { source: "graph TD\n  A[Start] --> B{Approved?}\n  B -->|Yes| C[Ship]\n  B -->|No| D[Revise]\n  D --> B" },
+    sequenceDiagram: { source: "sequenceDiagram\n  Client->>API: Request\n  API->>DB: Query\n  DB-->>API: Rows\n  API-->>Client: Response" },
+    mindmap: { source: "mindmap\n  root((Dashboard))\n    Widgets\n      Charts\n      Tables\n    Data\n      Sources" },
+    timeline: { source: "timeline\n  title Roadmap\n  2026 Q1 : Scaffold\n  2026 Q2 : Renderers\n  2026 Q3 : Cutover" },
+    ganttChart: { source: "gantt\n  title Plan\n  dateFormat YYYY-MM-DD\n  section Build\n  Adapter :a1, 2026-01-01, 14d\n  Widgets :after a1, 21d" },
+    // Layout / overlay blocks.
+    pageHeader: { heading: "Page title", subheading: "Supporting text", actionLabel: "", actionUrl: "#", alignment: "left" },
+    modal: { triggerLabel: "Open modal", heading: "Details", body: "Modal body text." },
+    drawer: { triggerLabel: "Open drawer", heading: "Details", body: "Drawer body text." },
+    contentSection: { heading: "Section heading", body: "Body text…", imageUrl: "", imagePosition: "top", alignment: "left" },
+    // Map — place query or lat/lng + marker.
+    googleMap: { query: "San Francisco, CA", zoom: 12, lat: null, lng: null, marker: true },
+    // Button — link + presentation.
+    button: { label: "Click me", url: "#", target: "_self", className: "", title: "" },
+    // Hero — background image + alignment.
+    hero: { alignment: "center", backgroundImage: "" },
+    cta: { alignment: "center" },
+    card: { alignment: "left" },
+    // Feature grid — icon-class / Untitled-name icons (no emojis).
+    featureGrid: {
+        heading: "Features",
+        features: [
+            { icon: "Zap", title: "Fast", description: "Lightning-quick performance." },
+            { icon: "Shield01", title: "Secure", description: "Encrypted end to end." },
+            { icon: "Globe01", title: "Global", description: "Available everywhere." },
+        ],
+    },
+};
+
 export const FIELD_TYPES = ["text", "email", "number", "date", "select", "checkbox", "toggle", "textarea"] as const;
 export type FieldType = (typeof FIELD_TYPES)[number];
 
