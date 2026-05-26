@@ -25,7 +25,7 @@ import { ACCENTS, getSavedAccent, saveAccent } from "../../shell/appearance";
 type Section = "theme" | "colors" | "typography" | "shadows" | "spacing";
 
 const SECTIONS: Array<{ id: Section; label: string }> = [
-    { id: "theme", label: "Theme" },
+    { id: "theme", label: "Interface" },
     { id: "colors", label: "Colors" },
     { id: "typography", label: "Typography" },
     { id: "shadows", label: "Shadows" },
