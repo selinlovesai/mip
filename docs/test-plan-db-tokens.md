@@ -186,19 +186,10 @@ Restart the backend → reload → pickers return (E3 works again).
 
 ## Notes / known scope
 
-- **Seeding is empty-only.** A DB first seeded before `6f58ff7` has the original
-  484 color tokens only; expanding the seed does **not** backfill an existing
-  table. If `D1`/`D2` show 484 / (249,235) instead of 584 / (325,259), re-seed:
-  ```bash
-  cd server && DATABASE_URL='postgresql+asyncpg://localhost/mip_tailwind' .venv/bin/python -c "
-  import asyncio; from sqlalchemy import text; import db, seed
-  async def m():
-      await db.init_db(); e=db._require_engine()
-      async with e.begin() as c: await c.execute(text('TRUNCATE tokens'))
-      print('re-seeded', await seed.seed_tokens_if_empty(e)); await db.dispose()
-  asyncio.run(m())"
-  ```
-  (A future "re-seed/upsert on version bump" mechanism would remove this manual step.)
+- **Token seeding backfills on every boot** (`seed_tokens`): new tokens added to
+  `tokens.seed.json` (e.g. `--color-chart-*`) are inserted automatically on the
+  next start, and edited values are never overwritten. Current seed: **590**
+  tokens. (Generic collection seeding stays empty-only — whole documents.)
 - Only **color** tokens are editable in the UI so far; typography/shadow/radius are browse-only (editing planned).
 - Emit is recomputed per request (no server-side cache yet) — fine at ~584 rows.
 - `components` table (the other half of plan step 2) is not started.

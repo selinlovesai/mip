@@ -114,7 +114,7 @@ def test_emit_json_and_css_are_pure():
 
 
 async def test_emit_roundtrips_seeded_tokens(fresh_db):
-    await seed.seed_tokens_if_empty(fresh_db)
+    await seed.seed_tokens(fresh_db)
     rows = await db.list_tokens()
     css = emit.emit_css(rows)
     assert "--color-brand-600:" in css
@@ -148,8 +148,8 @@ async def test_tokens_crud_roundtrip(fresh_db):
     assert next(r for r in rows if r["mode"] == "light")["value"] == "rgb(0 0 0)"
 
 
-async def test_tokens_seed_then_noop(fresh_db):
-    n = await seed.seed_tokens_if_empty(fresh_db)
+async def test_tokens_seed_backfills_then_noop(fresh_db):
+    n = await seed.seed_tokens(fresh_db)
     assert n > 0  # populated from tokens.seed.json (generated from theme.css)
     total = await db.count_tokens()
     assert total == n
@@ -158,8 +158,22 @@ async def test_tokens_seed_then_noop(fresh_db):
     brand = [r for r in await db.list_tokens() if r["name"] == "--color-brand-600" and r["mode"] == "light"]
     assert brand and brand[0]["value"].startswith("rgb(")
 
-    # Re-seeding a populated table is a no-op (doesn't clobber edits).
+    # Re-seeding a fully-populated table inserts nothing and never clobbers edits.
     await db.upsert_token("--color-brand-600", "light", "rgb(1 2 3)", "color", "Brand")
-    assert await seed.seed_tokens_if_empty(fresh_db) == 0
+    assert await seed.seed_tokens(fresh_db) == 0
     edited = [r for r in await db.list_tokens() if r["name"] == "--color-brand-600" and r["mode"] == "light"]
     assert edited[0]["value"] == "rgb(1 2 3)"
+
+
+async def test_tokens_seed_backfills_missing_only(fresh_db):
+    await seed.seed_tokens(fresh_db)
+    # Simulate a DB seeded before a token was added: drop one row.
+    async with fresh_db.begin() as conn:
+        await conn.execute(text("DELETE FROM tokens WHERE name = '--color-brand-600' AND mode = 'light'"))
+    before = await db.count_tokens()
+
+    # Re-seeding backfills exactly the missing row, leaving everything else.
+    assert await seed.seed_tokens(fresh_db) == 1
+    assert await db.count_tokens() == before + 1
+    restored = [r for r in await db.list_tokens() if r["name"] == "--color-brand-600" and r["mode"] == "light"]
+    assert restored and restored[0]["value"].startswith("rgb(")

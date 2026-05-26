@@ -14,6 +14,13 @@ matching the shape the CRUD routes return (`records.data` = the document).
 Adding a seed: drop `<collection>.json` in `server/seed/` (collection must be
 in `db.COLLECTIONS`). Keep the data in sync with the frontend source of truth
 noted in each file's companion comment.
+
+Two seeding policies:
+  · Generic collections (`seed_if_empty`) — whole documents are user-owned, so
+    we seed only when the collection is EMPTY (never partially overwrite).
+  · Typed tokens (`seed_tokens`) — individual rows, so we BACKFILL missing
+    (name, mode) rows on every boot. This auto-adds tokens introduced later
+    (e.g. --color-chart-*) without clobbering edited values.
 """
 
 from __future__ import annotations
@@ -84,25 +91,29 @@ async def seed_if_empty(engine: AsyncEngine) -> dict[str, int]:
     return seeded
 
 
-async def seed_tokens_if_empty(engine: AsyncEngine) -> int:
-    """Seed the typed `tokens` table from tokens.seed.json, but only when it's
-    empty (never clobbers edited tokens). Returns the number of rows seeded."""
+async def seed_tokens(engine: AsyncEngine) -> int:
+    """Backfill the typed `tokens` table from tokens.seed.json: insert any
+    (name, mode) row that isn't already present, and NEVER overwrite an existing
+    one. This both populates a fresh DB and backfills new tokens added to the
+    seed later (e.g. --color-chart-*) without clobbering user edits. Returns the
+    number of rows inserted this run."""
     if not TOKENS_SEED.is_file():
         return 0
-    if await db.count_tokens():
-        return 0  # already populated — leave user edits alone
     try:
         rows = json.loads(TOKENS_SEED.read_text())
     except Exception as exc:  # noqa: BLE001
         print(f"[seed] tokens skipped: invalid {TOKENS_SEED.name} ({exc})")
         return 0
+    existing = {(t["name"], t["mode"]) for t in await db.list_tokens()}
     n = 0
     for r in rows:
         name, mode, value = r.get("name"), r.get("mode"), r.get("value")
         if not (name and mode and value is not None):
             continue
+        if (name, mode) in existing:
+            continue  # already there — leave it (could be an edit)
         await db.upsert_token(str(name), str(mode), str(value), r.get("kind", "color"), r.get("group", ""))
         n += 1
     if n:
-        print(f"[seed] tokens: seeded {n} token row(s)")
+        print(f"[seed] tokens: backfilled {n} new token row(s)")
     return n

@@ -105,7 +105,7 @@ async def init_db() -> bool:
         # Seed AFTER the engine is published (seed.py uses the module-level CRUD).
         try:
             await seed.seed_if_empty(engine)
-            await seed.seed_tokens_if_empty(engine)
+            await seed.seed_tokens(engine)
         except Exception as exc:  # noqa: BLE001 - seeding is best-effort
             print(f"[db] seed skipped ({exc.__class__.__name__}: {exc})")
         return True

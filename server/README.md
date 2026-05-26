@@ -46,9 +46,11 @@ clobbering data a user already created. Seed files are JSON arrays of
 
 **Typed `tokens` table (directive #2).** The first typed table: every design
 token (color, typography, radius, shadow) is a row keyed by `(name, mode)` with
-a verbatim CSS `value`, `kind`, and `token_group`. It's seeded (empty-only) from
-`tokens.seed.json`, generated from the frontend's source of truth — regenerate
-after editing theme.css:
+a verbatim CSS `value`, `kind`, and `token_group`. It's seeded from
+`tokens.seed.json` (generated from the frontend's source of truth) by
+**backfilling missing `(name, mode)` rows on every boot** — so tokens added to
+the seed later (e.g. `--color-chart-*`) appear automatically, while edited
+values are never overwritten. Regenerate the seed after editing theme.css:
 
 ```bash
 .venv/bin/python tools/extract_theme_tokens.py   # → tokens.seed.json
