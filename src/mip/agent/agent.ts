@@ -65,8 +65,13 @@ function summarizeResult(value: unknown, depth = 0): unknown {
 export async function runAgent(opts: RunAgentOptions): Promise<void> {
     const { initial, surface, system, jsonMode, brain, ctx, say, signal, userRequestedChange } = opts;
     const buildSystem = typeof system === "function" ? system : () => system;
-    const maxRounds = opts.maxRounds ?? 12;
+    // No fixed step limit — let the agent work as long as it makes progress. A
+    // high backstop only guards against true runaways; the real stop is the
+    // repetition guard below (same reply/query emitted > MAX_REPEATS times).
+    const maxRounds = opts.maxRounds ?? 200;
     const maxFailStreak = opts.maxFailStreak ?? 2;
+    const MAX_REPEATS = 3;
+    const seen = new Map<string, number>(); // reply signature -> times seen
 
     let msgs = initial.slice();
     let nudged = false; // recovered a non-JSON / refusal reply
@@ -105,6 +110,19 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
         }
         const text = result.content ?? "";
         const parsed = parseAgentReply(text);
+
+        // Loop guard: stop only if the model keeps emitting the SAME reply/query
+        // over and over (> 3 times) — i.e. it's stuck, not progressing. Signature
+        // is the ops it wants to run (the "query") when present, else the text.
+        const sig = (parsed?.ops?.length ? JSON.stringify(parsed.ops) : text).trim();
+        if (sig) {
+            const n = (seen.get(sig) ?? 0) + 1;
+            seen.set(sig, n);
+            if (n > MAX_REPEATS) {
+                finish(parsed?.say || "I kept repeating the same step without progress, so I stopped. Try rephrasing or breaking the task into smaller steps.");
+                return;
+            }
+        }
 
         if (!parsed) {
             // Pure prose / refusal — nudge once to emit tools.
@@ -184,5 +202,6 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
             },
         ];
     }
-    say(`Reached the ${surface} step limit.`);
+    // Backstop only — repetition/fail-streak guards normally end the turn first.
+    finish(`I've done a lot of steps on this ${surface} — stopping here so it doesn't run away. Ask me to continue if you'd like.`);
 }
