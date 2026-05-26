@@ -25,14 +25,15 @@ export function ConnectionsTab() {
     const { connections, apps, addConnection } = useSettings();
     const [selectedId, setSelectedId] = useState<string | null>(null);
 
-    // Installed apps resolved through the catalog (only those still in the catalog).
-    const installedApps = useMemo(
-        () =>
-            apps
-                .map((a) => APP_CATALOG.find((c) => c.id === a.appId))
-                .filter((c): c is (typeof APP_CATALOG)[number] => !!c),
-        [apps],
-    );
+    // Installed apps resolved through the catalog, EXCLUDING any that already
+    // have a saved connection (quick-connect creates one named after the app, so
+    // match by name) — no point offering to connect something already connected.
+    const installedApps = useMemo(() => {
+        const connectedNames = new Set(connections.map((c) => c.name.trim().toLowerCase()));
+        return apps
+            .map((a) => APP_CATALOG.find((c) => c.id === a.appId))
+            .filter((c): c is (typeof APP_CATALOG)[number] => !!c && !connectedNames.has(c.name.trim().toLowerCase()));
+    }, [apps, connections]);
 
     if (selectedId) {
         return <ConnectionEditor id={selectedId} onClose={() => setSelectedId(null)} />;
