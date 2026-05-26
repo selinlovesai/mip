@@ -12,8 +12,8 @@
  * the chosen accent.
  */
 
-import { useEffect, useMemo, useState } from "react";
-import { Check } from "@untitledui/icons";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronDown } from "@untitledui/icons";
 import { useTheme } from "@/providers/theme-provider";
 import { cx } from "@/utils/cx";
 import { COLOR_TOKEN_GROUPS } from "@/mip/design-tokens";
@@ -91,6 +91,101 @@ function namesOfKind(tokens: DesignToken[], kind: string, filter?: (name: string
 
 function TokenName({ name }: { name: string }) {
     return <code className="font-mono text-xs text-tertiary">{name.replace(/^--/, "")}</code>;
+}
+
+/** A color-token dropdown that renders a swatch next to each token, grouped and
+ *  searchable. `value` is the selected token name ("" = default). */
+function TokenSelect({
+    value,
+    groups,
+    disabled,
+    onChange,
+}: {
+    value: string;
+    groups: Array<{ group: string; tokens: string[] }>;
+    disabled?: boolean;
+    onChange: (name: string) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const [q, setQ] = useState("");
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!open) return;
+        const onDoc = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        };
+        const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+        document.addEventListener("mousedown", onDoc);
+        document.addEventListener("keydown", onKey);
+        return () => {
+            document.removeEventListener("mousedown", onDoc);
+            document.removeEventListener("keydown", onKey);
+        };
+    }, [open]);
+
+    const filtered = useMemo(() => {
+        const needle = q.trim().toLowerCase();
+        return groups
+            .map((g) => ({ group: g.group, tokens: needle ? g.tokens.filter((n) => n.toLowerCase().includes(needle)) : g.tokens }))
+            .filter((g) => g.tokens.length);
+    }, [groups, q]);
+
+    const choose = (name: string) => {
+        onChange(name);
+        setOpen(false);
+        setQ("");
+    };
+
+    return (
+        <div ref={ref} className="relative w-44 shrink-0">
+            <button
+                type="button"
+                disabled={disabled}
+                onClick={() => setOpen((o) => !o)}
+                className="flex w-full items-center gap-2 rounded-lg bg-primary px-2.5 py-2 text-xs text-secondary ring-1 ring-secondary transition-colors hover:ring-brand disabled:cursor-not-allowed disabled:opacity-50"
+            >
+                {value ? <span className="size-3.5 shrink-0 rounded-sm ring-1 ring-inset ring-black/10" style={{ backgroundColor: `var(${value})` }} /> : null}
+                <span className="flex-1 truncate text-left">{value ? value.replace(/^--color-/, "") : "Default"}</span>
+                <ChevronDown className="size-3.5 shrink-0 text-tertiary" aria-hidden="true" />
+            </button>
+
+            {open ? (
+                <div className="absolute right-0 z-50 mt-1 flex max-h-72 w-64 flex-col overflow-hidden rounded-lg bg-primary shadow-lg ring-1 ring-secondary">
+                    <input
+                        autoFocus
+                        value={q}
+                        onChange={(e) => setQ(e.target.value)}
+                        placeholder="Search tokens…"
+                        className="border-b border-secondary bg-primary px-3 py-2 text-xs text-primary outline-none placeholder:text-placeholder"
+                    />
+                    <div className="min-h-0 flex-1 overflow-y-auto p-1">
+                        <button type="button" onClick={() => choose("")} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-tertiary transition-colors hover:bg-secondary">
+                            Default
+                        </button>
+                        {filtered.map((g) => (
+                            <div key={g.group}>
+                                <div className="px-2 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-quaternary">{groupLabel(g.group)}</div>
+                                {g.tokens.map((name) => (
+                                    <button
+                                        key={name}
+                                        type="button"
+                                        onClick={() => choose(name)}
+                                        className={cx("flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-secondary", name === value ? "text-brand-secondary" : "text-secondary")}
+                                    >
+                                        <span className="size-3.5 shrink-0 rounded-sm ring-1 ring-inset ring-black/10" style={{ backgroundColor: `var(${name})` }} />
+                                        <span className="flex-1 truncate">{name.replace(/^--color-/, "")}</span>
+                                        {name === value ? <Check className="size-3.5 shrink-0" aria-hidden="true" /> : null}
+                                    </button>
+                                ))}
+                            </div>
+                        ))}
+                        {filtered.length === 0 ? <div className="px-2 py-3 text-center text-xs text-tertiary">No matches</div> : null}
+                    </div>
+                </div>
+            ) : null}
+        </div>
+    );
 }
 
 export function AppearanceTab() {
@@ -244,24 +339,7 @@ export function AppearanceTab() {
                                             <span className="truncate text-sm font-medium text-secondary">{s.label}</span>
                                             <span className="truncate text-xs text-tertiary">{s.hint}</span>
                                         </span>
-                                        <select
-                                            aria-label={s.label}
-                                            disabled={!dbReady}
-                                            value={ref}
-                                            onChange={(e) => pickToken(s.target, e.target.value)}
-                                            className="w-44 shrink-0 rounded-lg bg-primary px-2.5 py-2 text-xs text-secondary ring-1 ring-secondary transition-colors hover:ring-brand disabled:cursor-not-allowed disabled:opacity-50"
-                                        >
-                                            <option value="">{ref ? "Custom / default" : "Default"}</option>
-                                            {colorGroups.map((g) => (
-                                                <optgroup key={g.group} label={groupLabel(g.group)}>
-                                                    {g.tokens.map((name) => (
-                                                        <option key={name} value={name}>
-                                                            {name.replace(/^--color-/, "")}
-                                                        </option>
-                                                    ))}
-                                                </optgroup>
-                                            ))}
-                                        </select>
+                                        <TokenSelect value={ref} groups={colorGroups} disabled={!dbReady} onChange={(name) => pickToken(s.target, name)} />
                                     </div>
                                 );
                             })}
