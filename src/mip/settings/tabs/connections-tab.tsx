@@ -10,8 +10,8 @@ import { Avatar } from "@/components/base/avatar/avatar";
 import { Badge, type BadgeColor } from "@/components/base/badges/badges";
 import { Button } from "@/components/base/buttons/button";
 import { cx } from "@/utils/cx";
-import { APP_CATALOG, appInitials } from "../apps-catalog";
-import { useSettings, type DataSourceType } from "../settings-store";
+import { APP_CATALOG, appInitials, type AppConnector } from "../apps-catalog";
+import { connectionFromApp, useSettings, type DataSourceType } from "../settings-store";
 import { ConnectionEditor } from "../connection-editor";
 
 const TYPE_BADGE: Record<DataSourceType, { color: BadgeColor<"pill-color">; label: string }> = {
@@ -26,22 +26,25 @@ export function ConnectionsTab() {
     const [selectedId, setSelectedId] = useState<string | null>(null);
 
     // Installed apps resolved through the catalog, EXCLUDING any that already
-    // have a saved connection (quick-connect creates one named after the app, so
-    // match by name) — no point offering to connect something already connected.
+    // have a saved connection — matched by appId (preferred) or name (legacy
+    // connections without a link). No point offering an already-connected app.
     const installedApps = useMemo(() => {
+        const connectedAppIds = new Set(connections.map((c) => c.appId).filter(Boolean) as string[]);
         const connectedNames = new Set(connections.map((c) => c.name.trim().toLowerCase()));
         return apps
             .map((a) => APP_CATALOG.find((c) => c.id === a.appId))
-            .filter((c): c is (typeof APP_CATALOG)[number] => !!c && !connectedNames.has(c.name.trim().toLowerCase()));
+            .filter((c): c is (typeof APP_CATALOG)[number] => !!c && !connectedAppIds.has(c.id) && !connectedNames.has(c.name.trim().toLowerCase()));
     }, [apps, connections]);
 
     if (selectedId) {
         return <ConnectionEditor id={selectedId} onClose={() => setSelectedId(null)} />;
     }
 
-    const quickConnect = (appName: string) => {
-        const id = addConnection({ name: appName, type: "rest", auth: { type: "none" }, headers: [], endpoints: [] });
-        setSelectedId(id);
+    const quickConnect = (app: AppConnector) => {
+        // Reuse an existing connection for this app instead of making a duplicate;
+        // otherwise create one PREFILLED from the app's catalog defaults.
+        const existing = connections.find((c) => c.appId === app.id);
+        setSelectedId(existing ? existing.id : addConnection(connectionFromApp(app)));
     };
 
     const addCustom = () => {
@@ -67,7 +70,7 @@ export function ConnectionsTab() {
                             <button
                                 key={app.id}
                                 type="button"
-                                onClick={() => quickConnect(app.name)}
+                                onClick={() => quickConnect(app)}
                                 className="flex items-center gap-3 rounded-xl bg-primary p-4 text-left ring-1 ring-secondary transition hover:ring-brand"
                             >
                                 <Avatar size="md" initials={appInitials(app.name)} alt={app.name} />

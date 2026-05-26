@@ -6,7 +6,7 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import type { AuthMethod } from "./apps-catalog";
+import type { AppConnector, AuthMethod } from "./apps-catalog";
 import { NATIVE_SKILLS, type Skill } from "@/mip/agent/skills";
 import { DEFAULT_WIDGET_SIZES, DEFAULT_WIDGET_SETTINGS, WIDGET_TYPES, type WidgetType } from "@/mip/schema";
 import { WIDGET_CATALOG } from "@/mip/shell/widget-catalog";
@@ -111,6 +111,9 @@ export interface Connection {
     isAiModel?: boolean;
     aiProvider?: string; // "openai" | "anthropic" | provider id
     aiModel?: string; // model name
+    /** Source app id when created from an installed app (links the two so we can
+     *  dedupe quick-connect and clean up on disconnect). Undefined for custom. */
+    appId?: string;
     /** REST base URL / JSON or CSV inline payload, depending on type (legacy). */
     detail?: string;
 }
@@ -119,6 +122,24 @@ export interface AppConnection {
     appId: string;
     method: AuthMethod;
     connectedAt: string;
+}
+
+/** Build a prefilled connection from a catalog app's defaults (base URL, auth,
+ *  endpoints) so quick-connect / Apps connect never produce an empty editor.
+ *  Links it back to the app via `appId`. `apiKey` fills the bearer token. */
+export function connectionFromApp(app: AppConnector, apiKey?: string): Omit<Connection, "id"> {
+    const key = apiKey?.trim();
+    const stamp = Date.now();
+    const mapEndpoints = (list: { label: string; method: string; path: string; mapPath?: string; description?: string; body?: string }[], model?: string): ConnectionEndpoint[] =>
+        list.map((e, i) => ({ id: `ep-${stamp}-${i}`, label: e.label, method: e.method, path: e.path, mapPath: e.mapPath, description: e.description, body: model ? e.body?.replaceAll("{{model}}", model) : e.body }));
+    const bearer: ConnectionAuth = { type: "bearer", ...(key ? { token: key } : {}) };
+    if (app.ai) {
+        return { name: app.name, type: "rest", appId: app.id, baseUrl: app.ai.baseUrl, auth: bearer, headers: [], endpoints: mapEndpoints(app.ai.endpoints, app.ai.model), isAiModel: true, aiProvider: app.ai.provider, aiModel: app.ai.model };
+    }
+    if (app.connection) {
+        return { name: app.name, type: "rest", appId: app.id, baseUrl: app.connection.baseUrl, auth: bearer, headers: [], endpoints: mapEndpoints(app.connection.endpoints) };
+    }
+    return { name: app.name, type: "rest", appId: app.id, auth: { type: "none" }, headers: [], endpoints: [] };
 }
 
 export interface AssistantConfig {
@@ -291,7 +312,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const disconnectApp = useCallback((appId: string) => {
-        setState((s) => ({ ...s, apps: s.apps.filter((a) => a.appId !== appId) }));
+        // Also drop the auto-created connection(s) linked to this app, so a later
+        // reconnect doesn't leave a stale duplicate behind.
+        setState((s) => ({ ...s, apps: s.apps.filter((a) => a.appId !== appId), connections: s.connections.filter((c) => c.appId !== appId) }));
     }, []);
 
     const addConnection = useCallback((conn: Omit<Connection, "id">) => {

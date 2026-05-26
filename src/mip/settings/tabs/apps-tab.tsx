@@ -21,7 +21,7 @@ import { CloseButton } from "@/components/base/buttons/close-button";
 import { Input } from "@/components/base/input/input";
 import { cx } from "@/utils/cx";
 import { APP_CATALOG, APP_CATEGORIES, appInitials, type AppConnector, type AuthMethod } from "../apps-catalog";
-import { useSettings } from "../settings-store";
+import { connectionFromApp, useSettings } from "../settings-store";
 
 const METHOD_LABEL: Record<AuthMethod, string> = {
     apiKey: "API key",
@@ -43,7 +43,7 @@ function LogoTile({ app, size = "md" }: { app: AppConnector; size?: "sm" | "md" 
 }
 
 export function AppsTab() {
-    const { isAppConnected, connectApp, disconnectApp, addConnection, setAssistant } = useSettings();
+    const { isAppConnected, connectApp, disconnectApp, addConnection, setAssistant, connections } = useSettings();
     const [query, setQuery] = useState("");
     const [active, setActive] = useState<AppConnector | null>(null);
 
@@ -148,36 +148,11 @@ export function AppsTab() {
                 onConnect={(method, apiKey) => {
                     if (active) {
                         connectApp(active.id, method);
-                        // For AI providers, an API key creates a real AI-model
-                        // connection and selects it as the assistant's model.
-                        if (active.ai && method === "apiKey" && apiKey?.trim()) {
-                            const stamp = Date.now();
-                            const id = addConnection({
-                                name: active.name,
-                                type: "rest",
-                                baseUrl: active.ai.baseUrl,
-                                auth: { type: "bearer", token: apiKey.trim() },
-                                isAiModel: true,
-                                aiProvider: active.ai.provider,
-                                aiModel: active.ai.model,
-                                endpoints: active.ai.endpoints.map((e, i) => ({
-                                    id: `ep-${stamp}-${i}`,
-                                    ...e,
-                                    body: e.body?.replaceAll("{{model}}", active.ai!.model),
-                                })),
-                            });
-                            setAssistant({ connectionId: id, model: active.ai.model });
-                        } else if (active.connection && method === "apiKey" && apiKey?.trim()) {
-                            // Non-AI tool (e.g. Tavily) → a saved REST connection.
-                            const stamp = Date.now();
-                            addConnection({
-                                name: active.name,
-                                type: "rest",
-                                baseUrl: active.connection.baseUrl,
-                                auth: { type: "bearer", token: apiKey.trim() },
-                                endpoints: active.connection.endpoints.map((e, i) => ({ id: `ep-${stamp}-${i}`, ...e })),
-                            });
-                        }
+                        // Reuse the app's existing connection if present (no dup);
+                        // else create one prefilled from the catalog defaults.
+                        const existing = connections.find((c) => c.appId === active.id);
+                        const connId = existing ? existing.id : active.ai || active.connection ? addConnection(connectionFromApp(active, apiKey)) : undefined;
+                        if (active.ai && connId) setAssistant({ connectionId: connId, model: active.ai.model });
                     }
                     setActive(null);
                 }}

@@ -156,16 +156,22 @@ function TokenSelect({
             setOpen(false);
         };
         const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-        const close = () => setOpen(false); // reposition is fiddly; just close on scroll/resize
+        const onResize = () => setOpen(false);
+        // Close when an ANCESTOR scrolls (the panel would detach), but NOT when
+        // the user scrolls inside the panel's own option list.
+        const onScroll = (e: Event) => {
+            if (panelRef.current?.contains(e.target as Node)) return;
+            setOpen(false);
+        };
         document.addEventListener("mousedown", onDoc);
         document.addEventListener("keydown", onKey);
-        window.addEventListener("resize", close);
-        window.addEventListener("scroll", close, true);
+        window.addEventListener("resize", onResize);
+        window.addEventListener("scroll", onScroll, true);
         return () => {
             document.removeEventListener("mousedown", onDoc);
             document.removeEventListener("keydown", onKey);
-            window.removeEventListener("resize", close);
-            window.removeEventListener("scroll", close, true);
+            window.removeEventListener("resize", onResize);
+            window.removeEventListener("scroll", onScroll, true);
         };
     }, [open]);
 
