@@ -9,6 +9,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { Layout } from "react-grid-layout/core";
 import type { MipWidget, MipWidgetLayout } from "@/mip/schema";
 import type { PageAgentConfig } from "@/mip/agent/config";
+import { dbAvailable, dbDelete, dbList, dbPut } from "@/mip/api";
 import { seedPages } from "./seed";
 
 /** Per-page access level granted to a role (mirrors mip `pagePermissions`). */
@@ -149,6 +150,51 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
             /* quota / private mode — non-fatal */
         }
     }, [state]);
+
+    // --- DB write-through (directive #1): localStorage is a cache; when the
+    // backend DB is up it's the source of truth. Each page is a `dashboards`
+    // record keyed by page id. We hydrate from the DB on mount, then sync only
+    // the pages that actually changed (debounced), deleting removed ones.
+    const dbEnabled = useRef(false);
+    const syncedPages = useRef(new Map<string, string>()); // page id -> last-synced JSON
+
+    useEffect(() => {
+        let alive = true;
+        void (async () => {
+            if (!(await dbAvailable())) return; // DB off → stay on localStorage cache
+            dbEnabled.current = true;
+            const records = await dbList<DashboardPage>("dashboards");
+            if (!alive || !records.length) return; // empty DB → push local pages up via the sync effect
+            for (const r of records) syncedPages.current.set(r.id, JSON.stringify(r.data));
+            const pages = migrateRowHeight({ pages: records.map((r) => r.data), activePageId: "" }).pages;
+            setState((s) => ({ pages, activePageId: pages.some((p) => p.id === s.activePageId) ? s.activePageId : pages[0]!.id }));
+        })();
+        return () => {
+            alive = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!dbEnabled.current) return;
+        const t = setTimeout(() => {
+            const present = new Set<string>();
+            for (const page of state.pages) {
+                present.add(page.id);
+                const json = JSON.stringify(page);
+                if (syncedPages.current.get(page.id) !== json) {
+                    syncedPages.current.set(page.id, json);
+                    void dbPut("dashboards", page.id, page);
+                }
+            }
+            for (const id of [...syncedPages.current.keys()]) {
+                if (!present.has(id)) {
+                    syncedPages.current.delete(id);
+                    void dbDelete("dashboards", id);
+                }
+            }
+        }, 600);
+        return () => clearTimeout(t);
+    }, [state.pages]);
 
     const activePage = useMemo(() => state.pages.find((page) => page.id === state.activePageId) ?? state.pages[0]!, [state]);
 
