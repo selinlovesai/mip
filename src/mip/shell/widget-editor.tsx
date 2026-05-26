@@ -255,6 +255,15 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
             .map(([key, value]) => ({ id: kvId(), key, value: String(value) })),
     );
     const [customOpen, setCustomOpen] = useState(false);
+    // Advanced — the COMPLEX (object/array) settings that the key-value editor
+    // can't represent: chart points, table rows/columns, list/detail inline data,
+    // markdown content, featureGrid features. Editable so inline (non-bound) data
+    // widgets aren't read-only.
+    const [advancedText, setAdvancedText] = useState(() => {
+        const complex = Object.fromEntries(Object.entries(widget.settings ?? {}).filter(([, v]) => v != null && typeof v === "object"));
+        return Object.keys(complex).length ? JSON.stringify(complex, null, 2) : "";
+    });
+    const [advancedOpen, setAdvancedOpen] = useState(false);
     const [targetPageId, setTargetPageId] = useState(currentPage.id);
 
     const defs = widgetElements(widget.type);
@@ -293,12 +302,20 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
     const setCustom = (v: string) => setElStyles((s) => ({ ...s, [activeEl]: { ...s[activeEl]!, customCss: v } }));
 
     const save = () => {
-        // Preserve complex (object/array) settings the key-value editor can't show
-        // (e.g. table columns, featureGrid features, markdown content), then layer
-        // the edited scalar custom settings + mapping field-keys on top.
-        const settings: Record<string, unknown> = Object.fromEntries(
-            Object.entries(widget.settings ?? {}).filter(([, v]) => v != null && typeof v === "object"),
-        );
+        // Complex (object/array) settings — chart points, table rows/columns,
+        // featureGrid features, markdown content — come from the editable Advanced
+        // JSON block; the scalar custom settings + mapping field-keys layer on top.
+        let settings: Record<string, unknown> = {};
+        if (advancedText.trim()) {
+            try {
+                const parsed = JSON.parse(advancedText);
+                if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) settings = parsed as Record<string, unknown>;
+            } catch (err) {
+                setError(`Advanced settings: ${err instanceof Error ? err.message : "Invalid JSON"}`);
+                setTab("settings");
+                return;
+            }
+        }
         for (const r of customRows) if (r.key.trim()) settings[r.key.trim()] = r.value;
         // Bound request body (only the body field is raw JSON now).
         let body: unknown;
@@ -513,8 +530,34 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
                             </button>
                             {customOpen ? (
                                 <div className="flex flex-col gap-2 border-t border-secondary px-3 py-3">
-                                    <p className="text-xs text-tertiary">Formatting &amp; labels (not data) — e.g. valueFormat, unit, deltaLabel. Strings only; complex settings are preserved.</p>
+                                    <p className="text-xs text-tertiary">Formatting &amp; labels (not data) — e.g. valueFormat, unit, deltaLabel. Strings only.</p>
                                     <KeyValueRows rows={customRows} onChange={setCustomRows} />
+                                </div>
+                            ) : null}
+                        </div>
+
+                        {/* Advanced — complex/inline data (chart points, table rows, etc.). */}
+                        <div className="rounded-lg ring-1 ring-secondary">
+                            <button
+                                type="button"
+                                onClick={() => setAdvancedOpen((o) => !o)}
+                                className="flex w-full items-center gap-1.5 px-3 py-2.5 text-sm font-medium text-primary"
+                            >
+                                {advancedOpen ? <ChevronDown className="size-4 text-tertiary" /> : <ChevronRight className="size-4 text-tertiary" />}
+                                <Settings01 className="size-4 text-tertiary" />
+                                Advanced data (JSON)
+                            </button>
+                            {advancedOpen ? (
+                                <div className="flex flex-col gap-2 border-t border-secondary px-3 py-3">
+                                    <p className="text-xs text-tertiary">Inline / complex settings this widget renders — e.g. chart points, table rows &amp; columns, list items, markdown content. Must be a valid JSON object.</p>
+                                    <textarea
+                                        value={advancedText}
+                                        onChange={(e) => { setAdvancedText(e.target.value); setError(null); }}
+                                        rows={10}
+                                        placeholder="{\n  \n}"
+                                        spellCheck={false}
+                                        className="w-full rounded-md bg-primary p-2 font-mono text-xs text-primary ring-1 ring-secondary outline-none focus:ring-2 focus:ring-brand"
+                                    />
                                 </div>
                             ) : null}
                         </div>

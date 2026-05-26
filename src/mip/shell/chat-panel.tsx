@@ -468,7 +468,11 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         const jsonMode = (conn.aiProvider ?? "openai") !== "anthropic";
         // Only fire the "you didn't act" nudge when the user actually asked for a
         // CHANGE — so questions and "confirm you deleted it" don't trip it.
-        const userRequestedChange = /\b(add|create|build|make|insert|put|update|change|edit|modif|move|resize|rename|remove|delete|clear|bind|generate|render|draw|plot|chart|graph|show|display|visuali[sz]e|set up)\b/i.test(trimmed);
+        const userRequestedChange =
+            /\b(add|create|build|make|insert|put|update|change|edit|modif|move|resize|rename|remove|delete|clear|bind|generate|render|draw|plot|chart|graph|show|display|visuali[sz]e|set up)\b/i.test(trimmed) ||
+            // Corrective pushback ("these aren't X", "that's wrong", "not what I asked",
+            // "fix it") is also a change request — the user wants the dashboard fixed.
+            /\b(wrong|incorrect|not what|isn't|aren't|are not|is not|doesn'?t|don'?t match|fix|redo|replace|instead|should be|mistake)\b/i.test(trimmed);
 
         const pushTool = (op: Record<string, unknown>, result: Record<string, unknown>) =>
             setMessages((prev) => [

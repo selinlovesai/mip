@@ -76,6 +76,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
     let msgs = initial.slice();
     let nudged = false; // recovered a non-JSON / refusal reply
     let actNudged = false; // recovered a false "I did it" claim
+    let emptyNudged = false; // recovered an empty {say:"",ops:[]} reply
     let mutated = false; // did any mutating op run this turn?
     let failStreak = 0; // consecutive rounds where every op failed
     let said = false; // emitted any non-blank assistant text?
@@ -155,6 +156,23 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
                     ...msgs,
                     { role: "assistant", content: text },
                     { role: "user", content: `You have not changed the ${surface} yet — reading data (fetch/search/callApi/listConnections) does not count. Emit the op that actually performs the change NOW, then summarize. Do not claim success without the op.` },
+                ];
+                continue;
+            }
+            // Model returned a BLANK reply (no text, no ops) — don't silently bail
+            // with "nothing to add". Nudge once to actually engage: act on the
+            // user's last message (e.g. fix/replace widgets they disputed) or
+            // answer them, ending with a non-empty say.
+            if (!say && !emptyNudged) {
+                emptyNudged = true;
+                opts.onStreamClear?.();
+                msgs = [
+                    ...msgs,
+                    { role: "assistant", content: text },
+                    {
+                        role: "user",
+                        content: `You replied with nothing. Respond to my LAST message now. If I pointed out a problem with the ${surface} (wrong, irrelevant, or inaccurate widgets/data), FIX it: removeWidget the wrong ones and search/fetch again for data that actually matches what I asked, then inject the corrected widgets. Otherwise answer my question. End with a non-empty "say".`,
+                    },
                 ];
                 continue;
             }
