@@ -18,7 +18,7 @@ import { Check, ChevronDown } from "@untitledui/icons";
 import { useTheme } from "@/providers/theme-provider";
 import { cx } from "@/utils/cx";
 import { COLOR_TOKEN_GROUPS } from "@/mip/design-tokens";
-import { dbAvailable, listTokens, putToken, type DesignToken } from "@/mip/api";
+import { dbAvailable, fetchTokensCss, listTokens, putToken, type DesignToken } from "@/mip/api";
 import { applyDbTokens } from "../../shell/db-tokens";
 import { ACCENTS, getSavedAccent, saveAccent } from "../../shell/appearance";
 
@@ -126,6 +126,16 @@ function namesOfKind(tokens: DesignToken[], kind: string, filter?: (name: string
 
 function TokenName({ name }: { name: string }) {
     return <code className="font-mono text-xs text-tertiary">{name.replace(/^--/, "")}</code>;
+}
+
+/** Trigger a client-side file download. */
+function downloadFile(name: string, text: string, type = "application/json") {
+    const url = URL.createObjectURL(new Blob([text], { type }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
 }
 
 /** Inline editable text value for non-color tokens (radius/shadow/typography).
@@ -386,14 +396,46 @@ export function AppearanceTab() {
 
     const activeGroup = colorGroups.find((g) => g.group === colorSub) ?? colorGroups[0];
 
+    // Export a Figma-ready tokens.json with FULLY RESOLVED concrete values
+    // (no var() refs) for both modes, read live from the DOM so every alias —
+    // including base-palette + Interface remaps — collapses to a real value.
+    const exportTokensJson = () => {
+        const root = document.documentElement;
+        const wasDark = root.classList.contains("dark-mode");
+        const names = [...new Set(tokens.map((t) => t.name))].sort();
+        const read = () => Object.fromEntries(names.map((n) => [n.replace(/^--/, ""), getComputedStyle(root).getPropertyValue(n).trim()]));
+        root.classList.remove("dark-mode");
+        const light = read();
+        root.classList.add("dark-mode");
+        const dark = read();
+        root.classList.toggle("dark-mode", wasDark);
+        downloadFile("tokens.json", JSON.stringify({ light, dark }, null, 2));
+    };
+    const exportThemeCss = async () => {
+        const css = await fetchTokensCss("theme");
+        if (css) downloadFile("theme.css", css, "text/css");
+    };
+
     return (
         <div className="flex flex-col gap-6">
-            <header>
-                <h1 className="text-xl font-semibold text-primary">Appearance</h1>
-                <p className="mt-1 text-sm text-tertiary">
-                    Design foundations — tokens the whole interface and every widget pull from.
-                    {dbReady ? " Tokens are editable and persist to the database." : " Connect the backend to edit and persist tokens."}
-                </p>
+            <header className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                    <h1 className="text-xl font-semibold text-primary">Appearance</h1>
+                    <p className="mt-1 text-sm text-tertiary">
+                        Design foundations — tokens the whole interface and every widget pull from.
+                        {dbReady ? " Tokens are editable and persist to the database." : " Connect the backend to edit and persist tokens."}
+                    </p>
+                </div>
+                {tokens.length ? (
+                    <div className="flex shrink-0 gap-2">
+                        <button type="button" onClick={exportTokensJson} className="rounded-lg bg-primary px-3 py-2 text-xs font-medium text-secondary ring-1 ring-secondary transition-colors hover:bg-secondary_hover">
+                            Export JSON
+                        </button>
+                        <button type="button" onClick={() => void exportThemeCss()} className="rounded-lg bg-primary px-3 py-2 text-xs font-medium text-secondary ring-1 ring-secondary transition-colors hover:bg-secondary_hover">
+                            Export CSS
+                        </button>
+                    </div>
+                ) : null}
             </header>
 
             {/* section tabs */}
