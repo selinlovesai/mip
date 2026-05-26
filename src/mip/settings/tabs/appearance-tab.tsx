@@ -1,18 +1,23 @@
 /**
  * Appearance settings — a categorized DESIGN-TOKEN browser (Foundations).
- * Inner tabs: Theme · Colors · Typography · Shadows · Spacing & Radius. Each
- * token's value is read live from the CSS custom properties (so it reflects
- * light/dark mode + the chosen accent). This is the UI surface for the
- * DB-backed token registry (today values come from the Untitled @theme; the
- * `tokens` table will feed these same names later).
+ * Section tabs: Theme · Colors · Typography · Shadows · Spacing & Radius.
+ *
+ * When the backend DB is up, the full token set (584 rows: color / typography /
+ * radius / shadow) is loaded from `/api/tokens` and rendered DATA-DRIVEN —
+ * Colors fans out into sub-tabs per group (Brand · Text · Background · Border ·
+ * Foreground · Utility · Palette), and color tokens are editable inline (the
+ * swatch is a color picker → PUT → live overlay refresh). When the DB is off it
+ * falls back to the curated static catalogs and is read-only. Token VALUES are
+ * always read live from the CSS custom properties, so they reflect light/dark +
+ * the chosen accent.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check } from "@untitledui/icons";
 import { useTheme } from "@/providers/theme-provider";
 import { cx } from "@/utils/cx";
 import { COLOR_TOKEN_GROUPS } from "@/mip/design-tokens";
-import { dbAvailable, putToken } from "@/mip/api";
+import { dbAvailable, listTokens, putToken, type DesignToken } from "@/mip/api";
 import { applyDbTokens } from "../../shell/db-tokens";
 import { ACCENTS, getSavedAccent, saveAccent } from "../../shell/appearance";
 
@@ -26,14 +31,16 @@ const SECTIONS: Array<{ id: Section; label: string }> = [
     { id: "spacing", label: "Spacing & Radius" },
 ];
 
-// --- token catalogs (names map to emitted CSS custom properties) ---
-const COLOR_GROUPS = COLOR_TOKEN_GROUPS;
-
+// --- static fallback catalogs (used when the DB is unavailable) ---
 const FONT_TOKENS = ["--font-body", "--font-display", "--font-mono"];
-const DISPLAY_SCALE = ["--text-display-2xl", "--text-display-xl", "--text-display-lg", "--text-display-md", "--text-display-sm", "--text-display-xs"];
+const DISPLAY_SCALE = ["--text-display-2xl", "--text-display-xl", "--text-display-lg", "--text-display-md", "--text-display-sm", "--text-display-xs", "--text-xl", "--text-lg", "--text-md", "--text-sm", "--text-xs"];
 const SHADOW_TOKENS = ["--shadow-xs", "--shadow-sm", "--shadow-md", "--shadow-lg", "--shadow-xl", "--shadow-2xl", "--shadow-3xl"];
 const RADIUS_TOKENS = ["--radius-none", "--radius-xs", "--radius-sm", "--radius-md", "--radius-lg", "--radius-xl", "--radius-2xl", "--radius-3xl", "--radius-full"];
 const SPACING_STEPS = [1, 2, 3, 4, 6, 8, 12, 16];
+
+// Display order for color sub-tabs; "Base" is shown as "Palette".
+const COLOR_GROUP_ORDER = ["Brand", "Text", "Background", "Foreground", "Border", "Utility", "Base"];
+const groupLabel = (g: string) => (g === "Base" ? "Palette" : g);
 
 const MODES = ["light", "dark", "system"] as const;
 
@@ -61,6 +68,13 @@ function toHex(color: string): string {
     return "#000000";
 }
 
+/** Unique token names of a kind (the DB has a row per mode; we want each name once). */
+function namesOfKind(tokens: DesignToken[], kind: string, filter?: (name: string) => boolean): string[] {
+    const seen = new Set<string>();
+    for (const t of tokens) if (t.kind === kind && !seen.has(t.name) && (!filter || filter(t.name))) seen.add(t.name);
+    return [...seen];
+}
+
 function TokenName({ name }: { name: string }) {
     return <code className="font-mono text-xs text-tertiary">{name.replace(/^--/, "")}</code>;
 }
@@ -72,15 +86,52 @@ export function AppearanceTab() {
     // When the backend DB is up, color tokens become editable (persisted +
     // applied live via the DB-token overlay). Otherwise the browser is read-only.
     const [dbReady, setDbReady] = useState(false);
+    const [tokens, setTokens] = useState<DesignToken[]>([]);
+    const [colorSub, setColorSub] = useState<string>("Brand");
     const [, setTick] = useState(0); // force re-read of CSS vars after an edit
 
     useEffect(() => {
         let alive = true;
-        void dbAvailable().then((ok) => alive && setDbReady(ok));
+        void dbAvailable().then(async (ok) => {
+            if (!alive) return;
+            setDbReady(ok);
+            if (ok) setTokens(await listTokens());
+        });
         return () => {
             alive = false;
         };
     }, []);
+
+    // Color groups: from the DB when available (full set), else the curated list.
+    const colorGroups = useMemo<Array<{ group: string; tokens: string[] }>>(() => {
+        if (!tokens.length) return COLOR_TOKEN_GROUPS.map((g) => ({ group: g.group, tokens: g.tokens }));
+        const byGroup = new Map<string, string[]>();
+        const seen = new Set<string>();
+        for (const t of tokens) {
+            if (t.kind !== "color" || seen.has(t.name)) continue;
+            seen.add(t.name);
+            (byGroup.get(t.group) ?? byGroup.set(t.group, []).get(t.group)!).push(t.name);
+        }
+        const ordered = [...byGroup.keys()].sort((a, b) => {
+            const ia = COLOR_GROUP_ORDER.indexOf(a), ib = COLOR_GROUP_ORDER.indexOf(b);
+            return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+        });
+        return ordered.map((group) => ({ group, tokens: byGroup.get(group)!.sort() }));
+    }, [tokens]);
+
+    // Keep the active color sub-tab valid as groups load.
+    useEffect(() => {
+        if (colorGroups.length && !colorGroups.some((g) => g.group === colorSub)) setColorSub(colorGroups[0].group);
+    }, [colorGroups, colorSub]);
+
+    // Typography / shadow / radius: DB set when available, else static fallback.
+    const fontTokens = useMemo(() => (tokens.length ? namesOfKind(tokens, "typography", (n) => n.startsWith("--font-")).sort() : FONT_TOKENS), [tokens]);
+    const textTokens = useMemo(
+        () => (tokens.length ? namesOfKind(tokens, "typography", (n) => n.startsWith("--text-") && !n.endsWith("--line-height") && !n.endsWith("--letter-spacing")).sort() : DISPLAY_SCALE),
+        [tokens],
+    );
+    const shadowTokens = useMemo(() => (tokens.length ? namesOfKind(tokens, "shadow").sort() : SHADOW_TOKENS), [tokens]);
+    const radiusTokens = useMemo(() => (tokens.length ? namesOfKind(tokens, "radius").sort() : RADIUS_TOKENS), [tokens]);
 
     const editColor = async (name: string, group: string, hex: string) => {
         const mode = resolvedMode();
@@ -90,14 +141,19 @@ export function AppearanceTab() {
         }
     };
 
+    const activeGroup = colorGroups.find((g) => g.group === colorSub) ?? colorGroups[0];
+
     return (
         <div className="flex flex-col gap-6">
             <header>
                 <h1 className="text-xl font-semibold text-primary">Appearance</h1>
-                <p className="mt-1 text-sm text-tertiary">Design foundations — tokens the whole interface and every widget pull from.</p>
+                <p className="mt-1 text-sm text-tertiary">
+                    Design foundations — tokens the whole interface and every widget pull from.
+                    {dbReady ? " Color tokens are editable and persist to the database." : " Connect the backend to edit and persist tokens."}
+                </p>
             </header>
 
-            {/* inner foundation tabs */}
+            {/* section tabs */}
             <div className="flex gap-1 border-b border-secondary">
                 {SECTIONS.map((s) => (
                     <button
@@ -135,36 +191,47 @@ export function AppearanceTab() {
                 </div>
             ) : null}
 
-            {section === "colors" ? (
-                <div className="flex flex-col gap-8">
-                    {COLOR_GROUPS.map((g) => (
-                        <section key={g.group} className="flex flex-col gap-3">
-                            <span className="text-xs font-semibold uppercase tracking-wide text-quaternary">{g.group}</span>
-                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                                {g.tokens.map((name) => (
-                                    <div key={name} className="flex items-center gap-3 rounded-lg p-2 ring-1 ring-secondary">
-                                        {dbReady ? (
-                                            <label className="relative size-9 shrink-0 cursor-pointer rounded-md ring-1 ring-inset ring-black/10" style={{ backgroundColor: `var(${name})` }} title={`Edit ${name.replace(/^--/, "")} (${resolvedMode()} mode)`}>
-                                                <input
-                                                    type="color"
-                                                    aria-label={`Edit ${name}`}
-                                                    defaultValue={toHex(readVar(name))}
-                                                    onChange={(e) => void editColor(name, g.group, e.target.value)}
-                                                    className="absolute inset-0 size-full cursor-pointer opacity-0"
-                                                />
-                                            </label>
-                                        ) : (
-                                            <span className="size-9 shrink-0 rounded-md ring-1 ring-inset ring-black/10" style={{ backgroundColor: `var(${name})` }} />
-                                        )}
-                                        <span className="flex min-w-0 flex-col">
-                                            <TokenName name={name} />
-                                            <span className="truncate text-xs text-tertiary">{readVar(name) || "—"}</span>
-                                        </span>
-                                    </div>
-                                ))}
+            {section === "colors" && activeGroup ? (
+                <div className="flex flex-col gap-5">
+                    {/* color group sub-tabs */}
+                    <div className="flex flex-wrap gap-1.5">
+                        {colorGroups.map((g) => (
+                            <button
+                                key={g.group}
+                                onClick={() => setColorSub(g.group)}
+                                className={cx(
+                                    "rounded-full px-3 py-1.5 text-xs font-medium ring-1 transition-colors",
+                                    g.group === colorSub ? "bg-brand-50 text-brand-secondary ring-brand" : "bg-primary text-tertiary ring-secondary hover:text-secondary",
+                                )}
+                            >
+                                {groupLabel(g.group)} <span className="opacity-60">{g.tokens.length}</span>
+                            </button>
+                        ))}
+                    </div>
+
+                    <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                        {activeGroup.tokens.map((name) => (
+                            <div key={name} className="flex items-center gap-3 rounded-lg p-2 ring-1 ring-secondary">
+                                {dbReady ? (
+                                    <label className="relative size-9 shrink-0 cursor-pointer rounded-md ring-1 ring-inset ring-black/10" style={{ backgroundColor: `var(${name})` }} title={`Edit ${name.replace(/^--/, "")} (${resolvedMode()} mode)`}>
+                                        <input
+                                            type="color"
+                                            aria-label={`Edit ${name}`}
+                                            defaultValue={toHex(readVar(name))}
+                                            onChange={(e) => void editColor(name, activeGroup.group, e.target.value)}
+                                            className="absolute inset-0 size-full cursor-pointer opacity-0"
+                                        />
+                                    </label>
+                                ) : (
+                                    <span className="size-9 shrink-0 rounded-md ring-1 ring-inset ring-black/10" style={{ backgroundColor: `var(${name})` }} />
+                                )}
+                                <span className="flex min-w-0 flex-col">
+                                    <TokenName name={name} />
+                                    <span className="truncate text-xs text-tertiary">{readVar(name) || "—"}</span>
+                                </span>
                             </div>
-                        </section>
-                    ))}
+                        ))}
+                    </section>
                 </div>
             ) : null}
 
@@ -173,7 +240,7 @@ export function AppearanceTab() {
                     <section className="flex flex-col gap-3">
                         <span className="text-xs font-semibold uppercase tracking-wide text-quaternary">Font families</span>
                         <div className="flex flex-col gap-2">
-                            {FONT_TOKENS.map((name) => (
+                            {fontTokens.map((name) => (
                                 <div key={name} className="flex items-center justify-between gap-4 rounded-lg p-3 ring-1 ring-secondary">
                                     <span className="text-lg text-primary" style={{ fontFamily: `var(${name})` }}>The quick brown fox</span>
                                     <TokenName name={name} />
@@ -182,9 +249,9 @@ export function AppearanceTab() {
                         </div>
                     </section>
                     <section className="flex flex-col gap-3">
-                        <span className="text-xs font-semibold uppercase tracking-wide text-quaternary">Display scale</span>
+                        <span className="text-xs font-semibold uppercase tracking-wide text-quaternary">Type scale ({textTokens.length})</span>
                         <div className="flex flex-col gap-2">
-                            {DISPLAY_SCALE.map((name) => (
+                            {textTokens.map((name) => (
                                 <div key={name} className="flex items-baseline justify-between gap-4 rounded-lg p-3 ring-1 ring-secondary">
                                     <span className="truncate font-semibold text-primary" style={{ fontSize: `var(${name})` }}>Ag</span>
                                     <span className="flex shrink-0 flex-col items-end">
@@ -200,7 +267,7 @@ export function AppearanceTab() {
 
             {section === "shadows" ? (
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                    {SHADOW_TOKENS.map((name) => (
+                    {shadowTokens.map((name) => (
                         <div key={name} className="flex flex-col items-center gap-3 rounded-xl bg-secondary p-6">
                             <span className="size-16 rounded-xl border border-secondary bg-white" style={{ boxShadow: `var(${name})` }} />
                             <TokenName name={name} />
@@ -212,9 +279,9 @@ export function AppearanceTab() {
             {section === "spacing" ? (
                 <div className="flex flex-col gap-8">
                     <section className="flex flex-col gap-3">
-                        <span className="text-xs font-semibold uppercase tracking-wide text-quaternary">Radius</span>
+                        <span className="text-xs font-semibold uppercase tracking-wide text-quaternary">Radius ({radiusTokens.length})</span>
                         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-                            {RADIUS_TOKENS.map((name) => (
+                            {radiusTokens.map((name) => (
                                 <div key={name} className="flex flex-col items-center gap-2">
                                     <span className="size-14 bg-brand-solid" style={{ borderRadius: `var(${name})` }} />
                                     <TokenName name={name} />
