@@ -118,6 +118,36 @@ function TokenName({ name }: { name: string }) {
     return <code className="font-mono text-xs text-tertiary">{name.replace(/^--/, "")}</code>;
 }
 
+/** Inline editable text value for non-color tokens (radius/shadow/typography).
+ *  Commits on blur or Enter; reverts to the latest value otherwise. Read-only
+ *  (shows the value as text) when disabled. */
+function ValueInput({ value, onCommit, disabled, className }: { value: string; onCommit: (v: string) => void; disabled?: boolean; className?: string }) {
+    const [v, setV] = useState(value);
+    useEffect(() => setV(value), [value]);
+    if (disabled) return <span className={cx("truncate text-xs text-tertiary", className)}>{value || "—"}</span>;
+    const commit = () => {
+        const next = v.trim();
+        if (next && next !== value) onCommit(next);
+        else setV(value);
+    };
+    return (
+        <input
+            value={v}
+            spellCheck={false}
+            onChange={(e) => setV(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") {
+                    setV(value);
+                    e.currentTarget.blur();
+                }
+            }}
+            className={cx("rounded-lg bg-primary px-2.5 py-1.5 font-mono text-xs text-secondary ring-1 ring-secondary outline-none focus:ring-brand", className)}
+        />
+    );
+}
+
 /** A color-token dropdown that renders a swatch next to each token, grouped and
  *  searchable. `value` is the selected token name ("" = default). */
 function TokenSelect({
@@ -307,16 +337,16 @@ export function AppearanceTab() {
     const shadowTokens = useMemo(() => (tokens.length ? namesOfKind(tokens, "shadow").sort() : SHADOW_TOKENS), [tokens]);
     const radiusTokens = useMemo(() => (tokens.length ? namesOfKind(tokens, "radius").sort() : RADIUS_TOKENS), [tokens]);
 
-    /** Persist a token edit, keep local state in sync, and refresh the overlay. */
-    const saveToken = async (name: string, value: string, group: string) => {
+    /** Persist a token edit (any kind), keep local state in sync, refresh overlay. */
+    const saveToken = async (name: string, value: string, group: string, kind = "color") => {
         const mode = resolvedMode();
-        if (!(await putToken(name, mode, value, "color", group))) return false;
+        if (!(await putToken(name, mode, value, kind, group))) return false;
         setTokens((prev) => {
             const i = prev.findIndex((t) => t.name === name && t.mode === mode);
-            const row: DesignToken = { name, mode, value, kind: "color", group, updatedAt: new Date().toISOString() };
+            const row: DesignToken = { name, mode, value, kind, group, updatedAt: new Date().toISOString() };
             if (i === -1) return [...prev, row];
             const next = prev.slice();
-            next[i] = { ...next[i], value, group };
+            next[i] = { ...next[i], value, group, kind };
             return next;
         });
         await applyDbTokens(); // refresh the :root overlay so the var updates live
@@ -325,6 +355,8 @@ export function AppearanceTab() {
     };
 
     const editColor = (name: string, group: string, hex: string) => void saveToken(name, hex, group);
+    /** Current stored value for a token (this mode), else the live computed value. */
+    const storedValue = (name: string) => tokens.find((t) => t.name === name && t.mode === resolvedMode())?.value ?? readVar(name);
 
     /** The token a semantic target currently points at (when stored as `var(--x)`). */
     const currentRef = (target: string): string => {
@@ -346,7 +378,7 @@ export function AppearanceTab() {
                 <h1 className="text-xl font-semibold text-primary">Appearance</h1>
                 <p className="mt-1 text-sm text-tertiary">
                     Design foundations — tokens the whole interface and every widget pull from.
-                    {dbReady ? " Color tokens are editable and persist to the database." : " Connect the backend to edit and persist tokens."}
+                    {dbReady ? " Tokens are editable and persist to the database." : " Connect the backend to edit and persist tokens."}
                 </p>
             </header>
 
@@ -469,8 +501,11 @@ export function AppearanceTab() {
                         <div className="flex flex-col gap-2">
                             {fontTokens.map((name) => (
                                 <div key={name} className="flex items-center justify-between gap-4 rounded-lg p-3 ring-1 ring-secondary">
-                                    <span className="text-lg text-primary" style={{ fontFamily: `var(${name})` }}>The quick brown fox</span>
-                                    <TokenName name={name} />
+                                    <span className="min-w-0 flex-1 truncate text-lg text-primary" style={{ fontFamily: `var(${name})` }}>The quick brown fox</span>
+                                    <span className="flex shrink-0 flex-col items-end gap-1">
+                                        <TokenName name={name} />
+                                        <ValueInput value={storedValue(name)} disabled={!dbReady} onCommit={(v) => void saveToken(name, v, "Typography", "typography")} className="w-56" />
+                                    </span>
                                 </div>
                             ))}
                         </div>
@@ -479,11 +514,11 @@ export function AppearanceTab() {
                         <span className="text-xs font-semibold uppercase tracking-wide text-quaternary">Type scale ({textTokens.length})</span>
                         <div className="flex flex-col gap-2">
                             {textTokens.map((name) => (
-                                <div key={name} className="flex items-baseline justify-between gap-4 rounded-lg p-3 ring-1 ring-secondary">
-                                    <span className="truncate font-semibold text-primary" style={{ fontSize: `var(${name})` }}>Ag</span>
-                                    <span className="flex shrink-0 flex-col items-end">
+                                <div key={name} className="flex items-center justify-between gap-4 rounded-lg p-3 ring-1 ring-secondary">
+                                    <span className="w-12 shrink-0 truncate font-semibold text-primary" style={{ fontSize: `var(${name})` }}>Ag</span>
+                                    <span className="flex shrink-0 flex-col items-end gap-1">
                                         <TokenName name={name} />
-                                        <span className="text-xs text-tertiary">{readVar(name) || "—"}</span>
+                                        <ValueInput value={storedValue(name)} disabled={!dbReady} onCommit={(v) => void saveToken(name, v, "Typography", "typography")} className="w-56" />
                                     </span>
                                 </div>
                             ))}
@@ -493,11 +528,14 @@ export function AppearanceTab() {
             ) : null}
 
             {section === "shadows" ? (
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                     {shadowTokens.map((name) => (
-                        <div key={name} className="flex flex-col items-center gap-3 rounded-xl bg-secondary p-6">
-                            <span className="size-16 rounded-xl border border-secondary bg-white" style={{ boxShadow: `var(${name})` }} />
-                            <TokenName name={name} />
+                        <div key={name} className="flex items-center gap-4 rounded-xl bg-secondary p-4">
+                            <span className="size-16 shrink-0 rounded-xl border border-secondary bg-white" style={{ boxShadow: `var(${name})` }} />
+                            <span className="flex min-w-0 flex-1 flex-col gap-1">
+                                <TokenName name={name} />
+                                <ValueInput value={storedValue(name)} disabled={!dbReady} onCommit={(v) => void saveToken(name, v, "Shadow", "shadow")} className="w-full" />
+                            </span>
                         </div>
                     ))}
                 </div>
@@ -507,11 +545,12 @@ export function AppearanceTab() {
                 <div className="flex flex-col gap-8">
                     <section className="flex flex-col gap-3">
                         <span className="text-xs font-semibold uppercase tracking-wide text-quaternary">Radius ({radiusTokens.length})</span>
-                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                             {radiusTokens.map((name) => (
                                 <div key={name} className="flex flex-col items-center gap-2">
                                     <span className="size-14 bg-brand-solid" style={{ borderRadius: `var(${name})` }} />
                                     <TokenName name={name} />
+                                    <ValueInput value={storedValue(name)} disabled={!dbReady} onCommit={(v) => void saveToken(name, v, "Radius", "radius")} className="w-24 text-center" />
                                 </div>
                             ))}
                         </div>
