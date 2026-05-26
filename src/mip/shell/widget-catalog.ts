@@ -47,7 +47,9 @@ export function makeWidget(entry: CatalogEntry): MipWidget {
         id: `${entry.type}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         type: entry.type,
         title: entry.label,
-        layout: { x: 0, y: 0, w: entry.w, h: entry.h },
+        // Catalog sizes are authored on the legacy 12-col grid; the live grid is
+        // 24-col (GRID_COLS) for finer steps, so double w/h at construction.
+        layout: { x: 0, y: 0, w: entry.w * 2, h: entry.h * 2 },
         ...(entry.settings ? { settings: entry.settings } : {}),
         ...(entry.fields ? { fields: entry.fields } : {}),
     };

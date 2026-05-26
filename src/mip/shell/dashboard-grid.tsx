@@ -13,7 +13,9 @@ import type { Layout, LayoutItem } from "react-grid-layout/core";
 import { useDashboard } from "@/mip/store";
 import { WidgetChrome } from "./widget-chrome";
 
-const MARGIN: [number, number] = [16, 16];
+// Smaller margin pairs with the finer 24-col / 35px grid so widgets keep their
+// visual size while drag/resize steps roughly halve.
+const MARGIN: [number, number] = [8, 8];
 
 export function DashboardGrid() {
     const { activePage, editMode, viewMode, applyLayout, removeWidget } = useDashboard();

@@ -56,6 +56,11 @@ interface DashboardState {
 
 const STORAGE_KEY = "mip-tailwind-dashboard-v3";
 
+/** Grid resolution. 24 cols / 35px rows (vs the old 12 / 70) gives finer drag &
+ *  resize steps; layouts authored at 12/70 are scaled ×2 on load (migrateGrid). */
+export const GRID_COLS = 24;
+export const GRID_ROW_HEIGHT = 35;
+
 /** Halve old 140px-row pages to the new ~70px scale, doubling widget heights so
  *  they keep their visual size. Idempotent: only pages with rowHeight > 100. */
 function migrateRowHeight(state: DashboardState): DashboardState {
@@ -67,6 +72,36 @@ function migrateRowHeight(state: DashboardState): DashboardState {
                 : p,
         ),
     };
+}
+
+/** Double a 12-col/70px page to the finer 24-col/35px grid (×2 on every layout
+ *  coordinate) so it looks identical but snaps in half-steps. Idempotent: only
+ *  pages still below GRID_COLS are scaled. Canvas pages (no widgets) just adopt
+ *  the new cols. */
+function migrateGrid(state: DashboardState): DashboardState {
+    const scale = (n: number | undefined) => (typeof n === "number" ? n * 2 : n);
+    return {
+        ...state,
+        pages: state.pages.map((p) =>
+            (p.cols ?? 12) >= GRID_COLS
+                ? p
+                : {
+                      ...p,
+                      cols: GRID_COLS,
+                      rowHeight: GRID_ROW_HEIGHT,
+                      widgets: p.widgets.map((w) => ({
+                          ...w,
+                          layout: { ...w.layout, x: w.layout.x * 2, y: w.layout.y * 2, w: w.layout.w * 2, h: w.layout.h * 2, minW: scale(w.layout.minW), minH: scale(w.layout.minH) },
+                      })),
+                  },
+        ),
+    };
+}
+
+/** Scale widgets authored on the 12-col grid (catalog / templates) up to the
+ *  current finer grid before they enter a page. */
+export function scaleWidgetToGrid(w: MipWidget): MipWidget {
+    return { ...w, layout: { ...w.layout, x: w.layout.x * 2, y: w.layout.y * 2, w: w.layout.w * 2, h: w.layout.h * 2 } };
 }
 
 /** First-fit placement: find the top-left free slot for a w×h widget in a
@@ -89,12 +124,12 @@ function findGridSlot(widgets: MipWidget[], w: number, h: number, cols: number):
 function load(): DashboardState {
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) return migrateRowHeight(JSON.parse(raw) as DashboardState);
+        if (raw) return migrateGrid(migrateRowHeight(JSON.parse(raw) as DashboardState));
     } catch {
         /* ignore corrupt state */
     }
     const pages = seedPages();
-    return { pages, activePageId: pages[0]!.id };
+    return migrateGrid({ pages, activePageId: pages[0]!.id });
 }
 
 interface StoreValue {
@@ -175,7 +210,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
             // user already has local pages they win and are uploaded by the sync
             // effect below — hydration must not delete or overwrite them.
             if (!hadLocal.current && records.length) {
-                const pages = migrateRowHeight({ pages: records.map((r) => r.data), activePageId: "" }).pages;
+                const pages = migrateGrid(migrateRowHeight({ pages: records.map((r) => r.data), activePageId: "" })).pages;
                 setState((s) => ({ pages, activePageId: pages.some((p) => p.id === s.activePageId) ? s.activePageId : pages[0]!.id }));
             }
         })();
@@ -238,17 +273,18 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
     const addPage = useCallback((title: string) => {
         const id = `page-${Date.now()}`;
-        setState((s) => ({ pages: [...s.pages, { id, title, cols: 12, rowHeight: 70, widgets: [] }], activePageId: id }));
+        setState((s) => ({ pages: [...s.pages, { id, title, cols: GRID_COLS, rowHeight: GRID_ROW_HEIGHT, widgets: [] }], activePageId: id }));
     }, []);
 
-    const importTemplate = useCallback((title: string, widgets: MipWidget[]) => {
+    const importTemplate = useCallback((title: string, rawWidgets: MipWidget[]) => {
+        const widgets = rawWidgets.map(scaleWidgetToGrid);
         const id = `page-${Date.now()}`;
-        setState((s) => ({ pages: [...s.pages, { id, title, cols: 12, rowHeight: 70, widgets }], activePageId: id }));
+        setState((s) => ({ pages: [...s.pages, { id, title, cols: GRID_COLS, rowHeight: GRID_ROW_HEIGHT, widgets }], activePageId: id }));
     }, []);
 
     const addCanvas = useCallback((title: string) => {
         const id = `canvas-${Date.now()}`;
-        setState((s) => ({ pages: [...s.pages, { id, title: title.trim() || "Canvas", cols: 12, rowHeight: 70, widgets: [], kind: "canvas", html: "" }], activePageId: id }));
+        setState((s) => ({ pages: [...s.pages, { id, title: title.trim() || "Canvas", cols: GRID_COLS, rowHeight: GRID_ROW_HEIGHT, widgets: [], kind: "canvas", html: "" }], activePageId: id }));
     }, []);
 
     const setCanvasHtml = useCallback((id: string, html: string) => {
