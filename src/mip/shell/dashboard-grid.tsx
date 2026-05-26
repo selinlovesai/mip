@@ -7,7 +7,8 @@
  */
 
 import { useMemo } from "react";
-import GridLayout, { useContainerWidth } from "react-grid-layout";
+import GridLayout, { useContainerWidth, verticalCompactor } from "react-grid-layout";
+import { defaultConstraints } from "react-grid-layout/core";
 import type { Layout, LayoutItem } from "react-grid-layout/core";
 import { useDashboard } from "@/mip/store";
 import { WidgetChrome } from "./widget-chrome";
@@ -58,8 +59,13 @@ export function DashboardGrid() {
                     width={width}
                     layout={layout}
                     autoSize
+                    // Vertical compaction keeps it a real grid: no overlaps, items
+                    // pack to the top. Constraints (gridBounds + min/max size) keep
+                    // items inside the columns/rows on drag, resize, and width change.
+                    compactor={verticalCompactor}
+                    constraints={defaultConstraints}
                     gridConfig={{ cols: activePage.cols, rowHeight: activePage.rowHeight, margin: MARGIN, containerPadding: [0, 0], maxRows: Infinity }}
-                    dragConfig={{ enabled: editMode, bounded: false, handle: ".mip-drag-handle", cancel: "button,input,select,textarea,a", threshold: 3 }}
+                    dragConfig={{ enabled: editMode, bounded: true, handle: ".mip-drag-handle", cancel: "button,input,select,textarea,a", threshold: 3 }}
                     resizeConfig={{ enabled: editMode, handles: ["se"] }}
                     onLayoutChange={(next) => applyLayout(next)}
                 >
