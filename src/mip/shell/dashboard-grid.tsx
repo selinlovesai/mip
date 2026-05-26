@@ -44,8 +44,13 @@ export function DashboardGrid() {
         return (
             <div className="mx-auto flex max-w-2xl flex-col gap-4">
                 {ordered.map((widget) => (
-                    <div key={widget.id} data-mip-widget-id={widget.id} style={{ minHeight: widget.layout.h * activePage.rowHeight }}>
-                        <WidgetChrome widget={widget} editMode={false} onDelete={removeWidget} />
+                    // flex-col + flex-1 child lets the card FILL the reserved
+                    // height (no dead space below short content like charts), while
+                    // still growing for taller content (tables/lists).
+                    <div key={widget.id} data-mip-widget-id={widget.id} className="flex flex-col" style={{ minHeight: widget.layout.h * activePage.rowHeight }}>
+                        <div className="flex-1">
+                            <WidgetChrome widget={widget} editMode={false} onDelete={removeWidget} />
+                        </div>
                     </div>
                 ))}
             </div>
