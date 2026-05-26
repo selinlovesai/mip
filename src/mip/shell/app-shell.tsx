@@ -111,7 +111,7 @@ export const AppShell = () => {
                         <WidgetPicker open={pickerOpen} onClose={() => setPickerOpen(false)} />
                         <DashboardSettingsModal open={dashboardSettingsOpen} onClose={() => setDashboardSettingsOpen(false)} />
                         <TemplatesModal open={templatesOpen} onClose={() => setTemplatesOpen(false)} onOpenConnections={() => openSettings("connections")} />
-                        <IntroBeam />
+                        <IntroBeam onOpenChat={() => setChatOpen(true)} />
                     </div>
                 </DashboardProvider>
             </SettingsProvider>

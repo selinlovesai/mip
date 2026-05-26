@@ -42,15 +42,20 @@ function findStart(): { x: number; y: number } {
 const TIMES = [0, 0.16, 0.42, 0.9, 1];
 const DURATION = 2.0;
 
-export function IntroBeam() {
+export function IntroBeam({ onOpenChat }: { onOpenChat?: () => void } = {}) {
     const [beam, setBeam] = useState<Beam | null>(null);
 
-    // Launch the comet from `start` to the current AI icon position.
-    const launch = useCallback((start: { x: number; y: number }) => {
-        if (typeof window === "undefined") return;
-        if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-        const el = document.querySelector<HTMLElement>("[data-ai-icon]");
-        if (!el) return;
+    // Launch the comet from `start` to the current AI icon position. When
+    // `openOnEnd` is set, open the AI chat once the comet lands on the icon.
+    const launch = useCallback(
+        (start: { x: number; y: number }, openOnEnd = false) => {
+            if (typeof window === "undefined") return;
+            if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+                if (openOnEnd) onOpenChat?.(); // honor the intent without animating
+                return;
+            }
+            const el = document.querySelector<HTMLElement>("[data-ai-icon]");
+            if (!el) return;
         const r = el.getBoundingClientRect();
         const end = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
         const dx = end.x - start.x;
@@ -66,9 +71,13 @@ export function IntroBeam() {
         const bow = Math.min(Math.max(dist * 0.35, 80), 220);
         const cx = start.x + dx * 0.5 + px * bow;
         const cy = start.y + dy * 0.5 + py * bow;
-        const path = `path("M ${start.x} ${start.y} Q ${cx} ${cy} ${end.x} ${end.y}")`;
-        setBeam({ id: Date.now(), path, end });
-    }, []);
+            const path = `path("M ${start.x} ${start.y} Q ${cx} ${cy} ${end.x} ${end.y}")`;
+            setBeam({ id: Date.now(), path, end });
+            // Open the AI chat as the comet lands on the icon.
+            if (openOnEnd) setTimeout(() => onOpenChat?.(), DURATION * 1000);
+        },
+        [onOpenChat],
+    );
 
     // On page load: play once from the "Get started" button (or center).
     useEffect(() => {
@@ -76,14 +85,15 @@ export function IntroBeam() {
         return () => clearTimeout(t);
     }, [launch]);
 
-    // Replay whenever a "Get started" button is clicked — starting from it.
+    // Replay whenever a "Get started" button is clicked — starting from it — then
+    // open the AI chat when it arrives.
     useEffect(() => {
         const onClick = (e: MouseEvent) => {
             const t = (e.target as HTMLElement | null)?.closest?.("button, a, [data-intro-start]");
             if (!t) return;
             if (!(t.matches("[data-intro-start]") || /get\s*started/i.test(t.textContent ?? ""))) return;
             const r = t.getBoundingClientRect();
-            launch({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+            launch({ x: r.left + r.width / 2, y: r.top + r.height / 2 }, true);
         };
         // Capture phase: React Aria buttons/links stop click propagation, so a
         // bubble-phase listener never fires — capture sees it first regardless.
