@@ -44,6 +44,20 @@ const groupLabel = (g: string) => (g === "Base" ? "Palette" : g);
 
 const MODES = ["light", "dark", "system"] as const;
 
+/** Friendly UI-level settings: each maps a SEMANTIC token (the thing the app
+ *  actually uses) to whichever token the user picks. Changing one re-points the
+ *  semantic token at the chosen color (stored as `var(--…)`), so every element
+ *  using it updates at once — e.g. "Icon color" drives icons across buttons,
+ *  inputs, and nav. These are friendlier than editing the raw token grid. */
+const UI_SETTINGS: Array<{ target: string; label: string; hint: string }> = [
+    { target: "--color-fg-primary", label: "Icon color (primary)", hint: "High-contrast icons" },
+    { target: "--color-fg-quaternary", label: "Icon color (muted)", hint: "Input, help & button icons" },
+    { target: "--color-fg-brand-primary", label: "Accent color", hint: "Featured icons, progress, active states" },
+    { target: "--color-bg-brand-solid", label: "Primary button", hint: "Solid brand background" },
+    { target: "--color-text-brand-secondary", label: "Link color", hint: "Links & brand text" },
+    { target: "--color-focus-ring", label: "Focus ring", hint: "Keyboard-focus outline" },
+];
+
 function readVar(name: string): string {
     if (typeof window === "undefined") return "";
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -133,12 +147,35 @@ export function AppearanceTab() {
     const shadowTokens = useMemo(() => (tokens.length ? namesOfKind(tokens, "shadow").sort() : SHADOW_TOKENS), [tokens]);
     const radiusTokens = useMemo(() => (tokens.length ? namesOfKind(tokens, "radius").sort() : RADIUS_TOKENS), [tokens]);
 
-    const editColor = async (name: string, group: string, hex: string) => {
+    /** Persist a token edit, keep local state in sync, and refresh the overlay. */
+    const saveToken = async (name: string, value: string, group: string) => {
         const mode = resolvedMode();
-        if (await putToken(name, mode, hex, "color", group)) {
-            await applyDbTokens(); // refresh the :root overlay so the var updates live
-            setTick((t) => t + 1); // re-render so the printed value reflects the edit
-        }
+        if (!(await putToken(name, mode, value, "color", group))) return false;
+        setTokens((prev) => {
+            const i = prev.findIndex((t) => t.name === name && t.mode === mode);
+            const row: DesignToken = { name, mode, value, kind: "color", group, updatedAt: new Date().toISOString() };
+            if (i === -1) return [...prev, row];
+            const next = prev.slice();
+            next[i] = { ...next[i], value, group };
+            return next;
+        });
+        await applyDbTokens(); // refresh the :root overlay so the var updates live
+        setTick((t) => t + 1); // re-render so printed values reflect the edit
+        return true;
+    };
+
+    const editColor = (name: string, group: string, hex: string) => void saveToken(name, hex, group);
+
+    /** The token a semantic target currently points at (when stored as `var(--x)`). */
+    const currentRef = (target: string): string => {
+        const row = tokens.find((t) => t.name === target && t.mode === resolvedMode());
+        const m = (row?.value ?? "").match(/^var\((--[a-z0-9-]+)\)$/i);
+        return m ? m[1] : "";
+    };
+
+    const pickToken = (target: string, ref: string) => {
+        const group = tokens.find((t) => t.name === target)?.group ?? "";
+        void saveToken(target, ref ? `var(${ref})` : readVar(target) || "#000000", group);
     };
 
     const activeGroup = colorGroups.find((g) => g.group === colorSub) ?? colorGroups[0];
@@ -186,6 +223,48 @@ export function AppearanceTab() {
                                     {accent === key ? <Check className="size-4 text-white" /> : null}
                                 </button>
                             ))}
+                        </div>
+                    </section>
+
+                    {/* UI elements — map semantic tokens to a chosen token from the list */}
+                    <section className="flex flex-col gap-3">
+                        <div className="flex flex-col">
+                            <span className="text-sm font-medium text-secondary">UI elements</span>
+                            <span className="text-xs text-tertiary">
+                                {dbReady ? `Point a UI element at any token. Applies to ${resolvedMode()} mode.` : "Connect the backend to customize and persist these."}
+                            </span>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            {UI_SETTINGS.map((s) => {
+                                const ref = currentRef(s.target);
+                                return (
+                                    <div key={s.target} className="flex items-center gap-3 rounded-lg p-3 ring-1 ring-secondary">
+                                        <span className="size-8 shrink-0 rounded-md ring-1 ring-inset ring-black/10" style={{ backgroundColor: `var(${s.target})` }} aria-hidden="true" />
+                                        <span className="flex min-w-0 flex-1 flex-col">
+                                            <span className="truncate text-sm font-medium text-secondary">{s.label}</span>
+                                            <span className="truncate text-xs text-tertiary">{s.hint}</span>
+                                        </span>
+                                        <select
+                                            aria-label={s.label}
+                                            disabled={!dbReady}
+                                            value={ref}
+                                            onChange={(e) => pickToken(s.target, e.target.value)}
+                                            className="w-44 shrink-0 rounded-lg bg-primary px-2.5 py-2 text-xs text-secondary ring-1 ring-secondary transition-colors hover:ring-brand disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            <option value="">{ref ? "Custom / default" : "Default"}</option>
+                                            {colorGroups.map((g) => (
+                                                <optgroup key={g.group} label={groupLabel(g.group)}>
+                                                    {g.tokens.map((name) => (
+                                                        <option key={name} value={name}>
+                                                            {name.replace(/^--color-/, "")}
+                                                        </option>
+                                                    ))}
+                                                </optgroup>
+                                            ))}
+                                        </select>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </section>
                 </div>
