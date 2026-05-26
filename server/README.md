@@ -24,13 +24,37 @@ OpenAI-compatible local server (Ollama, LM Studio, llama.cpp, vLLM).
 The DB routes back a single generic `records` table keyed by
 `(collection, id)` with a `jsonb` payload — one table for every entity
 (`dashboards`, `connections`, `settings`, `tokens`, `components`, `apps`,
-`conversations`, `themes`, `templates`, `users`, `access_tokens`). The schema is
-created automatically on startup.
+`conversations`, `themes`, `templates`, `users`, `access_tokens`).
+
+**Migrations (`migrations.py`).** On startup the service runs an ordered,
+idempotent migration runner that tracks applied steps in a `schema_migrations`
+table — so schema changes are repeatable and adopting them on an existing
+database is a safe no-op. Add a step by appending a `(version, sql)` tuple to
+`MIGRATIONS` (never edit a released step). This is the seam for the upcoming
+typed `tokens` / `components` tables.
+
+**Seeding (`seed.py` + `seed/*.json`).** After migrating, each
+`seed/<collection>.json` is loaded into its collection **only when that
+collection is empty** — giving a fresh database the starter content (e.g. the
+Overview / Marketing dashboards in `seed/dashboards.json`) without ever
+clobbering data a user already created. Seed files are JSON arrays of
+`{ "id": "…", "data": { … } }` and the collection must be in `db.COLLECTIONS`.
 
 **Graceful degradation:** if `DATABASE_URL` is unset or the DB is unreachable,
 the service still runs — `/api/health` reports `db: false` and the CRUD routes
 return `{ ok: false, db: false }`, so the frontend keeps working off its
 localStorage cache.
+
+## Tests
+
+```bash
+createdb mip_tailwind_test          # one-time (or set TEST_DATABASE_URL)
+.venv/bin/pytest                    # from server/
+```
+
+`test_db.py` covers migration idempotency, generic CRUD, and idempotent seeding
+against a real Postgres test database; it SKIPS automatically when that DB is
+unreachable, so a DB-less checkout stays green.
 
 ## Run
 

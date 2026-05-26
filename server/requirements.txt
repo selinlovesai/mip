@@ -5,3 +5,7 @@ sqlalchemy[asyncio]>=2.0
 asyncpg>=0.29
 python-multipart>=0.0.9
 faster-whisper>=1.0
+
+# Tests (integration tests in test_db.py run against a Postgres test DB)
+pytest>=8
+pytest-asyncio>=0.24

@@ -1,0 +1,36 @@
+[
+  {
+    "id": "overview",
+    "data": {
+      "id": "overview",
+      "title": "Overview",
+      "cols": 12,
+      "rowHeight": 70,
+      "widgets": [
+        { "id": "revenue", "type": "kpi", "title": "Revenue", "layout": { "x": 0, "y": 0, "w": 4, "h": 2 }, "settings": { "value": 128400, "valueFormat": "currency", "delta": 12.5, "deltaLabel": "vs. last month" } },
+        { "id": "active-users", "type": "kpi", "title": "Active users", "layout": { "x": 4, "y": 0, "w": 4, "h": 2 }, "settings": { "value": 8420, "delta": 4.1, "deltaLabel": "vs. last week" } },
+        { "id": "churn", "type": "kpi", "title": "Churn rate", "layout": { "x": 8, "y": 0, "w": 4, "h": 2 }, "settings": { "value": 2.3, "valueFormat": "percent", "delta": -0.8, "deltaLabel": "vs. last month" } },
+        { "id": "trend", "type": "areaChart", "title": "Signups over time", "layout": { "x": 0, "y": 1, "w": 8, "h": 6 }, "settings": { "points": [{ "label": "Jan", "value": 120 }, { "label": "Feb", "value": 210 }, { "label": "Mar", "value": 180 }, { "label": "Apr", "value": 320 }, { "label": "May", "value": 290 }, { "label": "Jun", "value": 410 }] } },
+        { "id": "goal", "type": "progress", "title": "Quarterly goal", "layout": { "x": 8, "y": 1, "w": 4, "h": 2 }, "settings": { "value": 74, "target": 100, "label": "$740k of $1M" } },
+        { "id": "channels", "type": "donutChart", "title": "Traffic by channel", "layout": { "x": 8, "y": 2, "w": 4, "h": 4 }, "settings": { "points": [{ "label": "Organic", "value": 45 }, { "label": "Paid", "value": 25 }, { "label": "Referral", "value": 18 }, { "label": "Social", "value": 12 }] } },
+        { "id": "revenue-by-region", "type": "barChart", "title": "Revenue by region", "layout": { "x": 0, "y": 4, "w": 8, "h": 4 }, "settings": { "valueFormat": "currency", "points": [{ "label": "NA", "value": 52000 }, { "label": "EMEA", "value": 38000 }, { "label": "APAC", "value": 24000 }, { "label": "LATAM", "value": 14400 }] } },
+        { "id": "recent-orders", "type": "table", "title": "Recent orders", "layout": { "x": 8, "y": 4, "w": 4, "h": 4 }, "settings": { "columns": [{ "key": "order", "label": "Order" }, { "key": "customer", "label": "Customer" }, { "key": "status", "label": "Status" }], "rows": [{ "order": "#1042", "customer": "Acme Inc.", "status": "Paid" }, { "order": "#1041", "customer": "Globex", "status": "Pending" }, { "order": "#1040", "customer": "Initech", "status": "Failed" }, { "order": "#1039", "customer": "Umbrella", "status": "Paid" }] } }
+      ]
+    }
+  },
+  {
+    "id": "marketing",
+    "data": {
+      "id": "marketing",
+      "title": "Marketing",
+      "cols": 12,
+      "rowHeight": 70,
+      "widgets": [
+        { "id": "hero", "type": "hero", "title": "Hero", "layout": { "x": 0, "y": 0, "w": 12, "h": 6 }, "settings": { "heading": "Build dashboards, faster", "subheading": "A kit-agnostic widget system on Tailwind v4 + Untitled UI.", "ctaLabel": "Get started", "secondaryLabel": "Learn more" } },
+        { "id": "features", "type": "featureGrid", "title": "Features", "layout": { "x": 0, "y": 3, "w": 8, "h": 4 }, "settings": { "heading": "Why teams choose us", "features": [{ "icon": "⚡", "title": "Lightning fast", "description": "Instant page loads." }, { "icon": "🔒", "title": "Secure", "description": "End-to-end encryption." }, { "icon": "🌐", "title": "Global scale", "description": "30+ regions." }] } },
+        { "id": "testimonial", "type": "testimonial", "title": "Testimonial", "layout": { "x": 8, "y": 3, "w": 4, "h": 4 }, "settings": { "quote": "“This transformed how we ship dashboards.”", "author": "Olivia Rhye", "role": "VP Product, Acme", "rating": 5 } },
+        { "id": "pricing", "type": "pricing", "title": "Pricing", "layout": { "x": 0, "y": 5, "w": 12, "h": 6 }, "settings": { "heading": "Simple, transparent pricing", "tiers": [{ "name": "Starter", "price": "$29", "period": "mo", "description": "For small teams.", "features": ["5 projects", "Basic analytics"], "ctaLabel": "Start free" }, { "name": "Pro", "price": "$79", "period": "mo", "description": "For growing teams.", "features": ["Unlimited projects", "Priority support"], "highlighted": true, "ctaLabel": "Get started" }, { "name": "Enterprise", "price": "Custom", "description": "For large orgs.", "features": ["SSO & SAML", "SLA guarantee"], "ctaLabel": "Contact sales" }] } }
+      ]
+    }
+  }
+]

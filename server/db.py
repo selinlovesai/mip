@@ -74,14 +74,26 @@ def is_enabled() -> bool:
 
 
 async def init_db() -> bool:
-    """Create the engine + ensure the schema exists. Returns True on success."""
+    """Create the engine, run pending migrations, and seed empty collections.
+    Returns True on success; on any failure the backend degrades to db-disabled
+    (frontend falls back to its localStorage cache) rather than crashing."""
     global _engine
+    import migrations
+    import seed
+
     url = _normalize_url(os.environ.get("DATABASE_URL", DEFAULT_URL))
     try:
         engine = create_async_engine(url, pool_pre_ping=True, future=True)
         async with engine.begin() as conn:
-            await conn.run_sync(metadata.create_all)
+            ran = await migrations.apply_migrations(conn)
+        if ran:
+            print(f"[db] applied migrations: {', '.join(ran)}")
         _engine = engine
+        # Seed AFTER the engine is published (seed.py uses the module-level CRUD).
+        try:
+            await seed.seed_if_empty(engine)
+        except Exception as exc:  # noqa: BLE001 - seeding is best-effort
+            print(f"[db] seed skipped ({exc.__class__.__name__}: {exc})")
         return True
     except Exception as exc:  # noqa: BLE001 - degrade gracefully
         print(f"[db] disabled — could not connect ({exc.__class__.__name__}: {exc})")
