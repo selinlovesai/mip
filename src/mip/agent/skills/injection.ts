@@ -13,7 +13,7 @@ export const INJECTION_SKILL = [
     "  · `map` is JSONPath ($.a.b[0].c) from the response to the field a widget needs:",
     "      charts → { series:\"$.path.to.array\" }  (+ settings.labelKey / settings.valueKey for the point fields)",
     "      list   → { items:\"$.path.to.array\" }    (+ settings.primaryKey / settings.secondaryKey)",
-    "      kpi    → { value:\"$.x\", delta:\"$.y\" }",
+    "      kpi    → { value:\"$.x\", delta:\"$.y\" } — ALWAYS map `delta` too when the response has a change / Δ / percent / trend field (e.g. priceChangePercent, change, pctChange), and set settings.deltaLabel (e.g. \"24h\", \"vs. last week\"). A bound KPI shows NO delta unless it's in the data — never leave a real change value unmapped.",
     "  · refreshMs (e.g. 10000) polls; omit for fetch-once. A bound widget ignores static settings once data loads.",
     "STRICT RULE: if the data comes from an API or saved connection (anything you reach with callApi, or any request to use an API), you MUST use injectConnection so the widget reads it LIVE. NEVER copy callApi/API results into injectJson — a snapshot is wrong and will be rejected. injectJson is ONLY for values with no live source (hand-given numbers, ad-hoc web facts).",
     "So the correct flow for an API is: listConnections → callApi (to learn the response shape) → injectConnection (bind sourceId + the SAME path + a map derived from the shape you saw). Do not addWidget/injectJson with the rows you fetched.",

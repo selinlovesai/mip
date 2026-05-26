@@ -34,9 +34,18 @@ export function KpiWidget({ widget, dataState }: WidgetRenderProps) {
     // Delta may arrive as a number (5.2) OR a string ("+5.2%", "-3%"). Show it in
     // either case — parse a leading number for the trend arrow, fall back to the
     // sign in the string.
-    // For a bound widget, only show a delta that actually came from the data —
-    // don't fall back to the inline placeholder (which looks like stale mock).
-    const rawDelta = mapped("delta") ?? (isBound ? undefined : settings.delta);
+    // Delta resolution: explicit map["delta"] wins; otherwise (for bound data)
+    // auto-detect a common change/percent field from the response so a live KPI
+    // fills its delta even when the map omitted it. Never fall back to the
+    // inline placeholder for bound widgets (that's stale mock).
+    const DELTA_KEYS = ["delta", "change", "changePercent", "change_percent", "priceChangePercent", "percentChange", "pctChange", "pct_change", "trend"];
+    const autoDelta = () => {
+        if (fetched == null || typeof fetched !== "object") return undefined;
+        const obj = fetched as Record<string, unknown>;
+        for (const k of DELTA_KEYS) if (obj[k] != null) return obj[k];
+        return undefined;
+    };
+    const rawDelta = mapped("delta") ?? (isBound ? autoDelta() : settings.delta);
     const deltaStr = rawDelta == null ? "" : String(rawDelta).trim();
     const deltaNum = typeof rawDelta === "number" ? rawDelta : parseFloat(deltaStr.replace(/[^0-9.+-]/g, ""));
     const hasDelta = deltaStr !== "";
