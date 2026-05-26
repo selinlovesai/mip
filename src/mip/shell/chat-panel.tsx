@@ -204,6 +204,10 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
     const suggestingRef = useRef<Set<string>>(new Set());
     const [recording, setRecording] = useState(false);
     const [transcribing, setTranscribing] = useState(false);
+    // In-app approval prompt for higher-risk agent actions (write API calls,
+    // page-context changes). `resolve` is the pending confirmAction promise's
+    // resolver — Approve → true, Deny/close → false.
+    const [pendingConfirm, setPendingConfirm] = useState<{ summary: string; resolve: (ok: boolean) => void } | null>(null);
     const listRef = useRef<HTMLDivElement>(null);
     const recorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
@@ -360,6 +364,24 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                 const r = ref.trim().toLowerCase();
                 return activeSkills.find((s) => s.id.toLowerCase() === r || s.name.toLowerCase() === r);
             },
+            // Human-in-the-loop gate for write API calls + page-context changes.
+            // Guards against injected content steering the agent into actions the
+            // user didn't ask for. Surfaces an inline Approve/Deny card in the
+            // transcript and resolves when the user chooses (Stop also denies).
+            confirmAction: (summary) =>
+                new Promise<boolean>((resolve) => {
+                    if (signal.aborted) return resolve(false);
+                    const settle = (ok: boolean) => {
+                        signal.removeEventListener("abort", onAbort);
+                        resolve(ok);
+                    };
+                    const onAbort = () => {
+                        setPendingConfirm(null);
+                        settle(false);
+                    };
+                    signal.addEventListener("abort", onAbort, { once: true });
+                    setPendingConfirm({ summary, resolve: settle });
+                }),
         };
     };
 
@@ -594,6 +616,40 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                             {s}
                         </button>
                     ))}
+                </div>
+            ) : null}
+
+            {pendingConfirm ? (
+                <div className="flex gap-2.5">
+                    <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-warning-secondary">
+                        <Tool02 className="size-3.5 text-fg-warning-primary" aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0 flex-1 rounded-2xl rounded-tl-sm bg-warning-primary px-3.5 py-2.5 ring-1 ring-secondary">
+                        <p className="text-xs font-semibold text-primary">Approval needed</p>
+                        <p className="mt-1 whitespace-pre-wrap text-xs leading-4 text-secondary">{pendingConfirm.summary}</p>
+                        <div className="mt-2.5 flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    pendingConfirm.resolve(true);
+                                    setPendingConfirm(null);
+                                }}
+                                className="rounded-lg bg-brand-solid px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-solid_hover"
+                            >
+                                Approve
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    pendingConfirm.resolve(false);
+                                    setPendingConfirm(null);
+                                }}
+                                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-secondary ring-1 ring-secondary transition-colors hover:bg-primary_hover"
+                            >
+                                Deny
+                            </button>
+                        </div>
+                    </div>
                 </div>
             ) : null}
         </div>

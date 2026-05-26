@@ -90,6 +90,12 @@ export interface ToolContext {
     getWidget: (id: string) => MipWidget | undefined;
     // Patch an existing widget (title/settings/layout).
     updateWidget: (id: string, patch: Partial<MipWidget>) => void;
+
+    // Human-in-the-loop gate for higher-risk actions the model might be steered
+    // into by injected content — state-changing API calls (non-GET/HEAD) and
+    // self-modifying the persisted page context. Returns true to proceed. When
+    // unset, callers MUST treat the action as denied (fail safe).
+    confirmAction?: (summary: string) => boolean | Promise<boolean>;
 }
 
 /** A single capability the agent can invoke. */

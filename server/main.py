@@ -20,7 +20,10 @@ from typing import Any
 
 import os
 import re
+import socket
+import ipaddress
 import tempfile
+from urllib.parse import urlparse
 
 import json
 
@@ -32,6 +35,59 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 import db
+
+
+# ---------------------------------------------------------------------------
+# SSRF guard
+# ---------------------------------------------------------------------------
+# The agent can be steered (by injected web/API content) into fetching arbitrary
+# URLs. Before any outbound request to a *caller-supplied* URL, resolve the host
+# and refuse private / loopback / link-local / reserved targets so it can't be
+# used to reach the cloud metadata endpoint (169.254.169.254) or internal
+# services. Applies to /api/fetch and /api/test-endpoint. Set
+# MIP_ALLOW_PRIVATE_URLS=1 to bypass for trusted local-only development.
+
+
+class BlockedURLError(Exception):
+    """Raised when a target URL resolves to a disallowed (internal) address."""
+
+
+def _ip_is_blocked(ip: str) -> bool:
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return True  # un-parseable → refuse
+    return (
+        addr.is_private
+        or addr.is_loopback
+        or addr.is_link_local
+        or addr.is_reserved
+        or addr.is_multicast
+        or addr.is_unspecified
+    )
+
+
+def _assert_url_allowed(url: str) -> None:
+    """Validate a caller-supplied URL before we make a request to it. Raises
+    BlockedURLError on anything that isn't a public http(s) host."""
+    if os.environ.get("MIP_ALLOW_PRIVATE_URLS") == "1":
+        return
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise BlockedURLError(f"Only http/https URLs are allowed (got '{parsed.scheme or 'none'}').")
+    host = parsed.hostname
+    if not host:
+        raise BlockedURLError("URL has no host.")
+    # Resolve every address the host maps to and block if ANY is internal
+    # (defeats DNS names that point at private space / rebinding).
+    try:
+        infos = socket.getaddrinfo(host, parsed.port or (443 if parsed.scheme == "https" else 80), proto=socket.IPPROTO_TCP)
+    except socket.gaierror as exc:
+        raise BlockedURLError(f"Could not resolve host '{host}': {exc}")
+    for info in infos:
+        ip = info[4][0]
+        if _ip_is_blocked(ip):
+            raise BlockedURLError(f"Refusing to connect to internal address {ip} (host '{host}').")
 
 app = FastAPI(title="MIP-Tailwind backend", version="0.1.0")
 
@@ -214,7 +270,13 @@ class TestRequest(BaseModel):
 async def test_endpoint(req: TestRequest) -> dict[str, Any]:
     started = time.perf_counter()
     try:
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+        _assert_url_allowed(req.url)
+    except BlockedURLError as exc:
+        return {"ok": False, "error": str(exc), "durationMs": round((time.perf_counter() - started) * 1000)}
+    try:
+        # follow_redirects=False: a 3xx must not bounce us past the SSRF guard to
+        # an internal host. (Re-enable per-hop validation if redirects are needed.)
+        async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
             kwargs: dict[str, Any] = {"headers": req.headers}
             if req.body is not None and req.method.upper() not in ("GET", "HEAD"):
                 kwargs["json"] = req.body
@@ -255,8 +317,21 @@ def _html_to_text(html: str) -> str:
 @app.post("/api/fetch")
 async def fetch_page(req: FetchRequest) -> dict[str, Any]:
     try:
-        async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers={"user-agent": "Mozilla/5.0 (compatible; MIP-Tailwind/0.1)"}) as client:
-            resp = await client.get(req.url)
+        _assert_url_allowed(req.url)
+    except BlockedURLError as exc:
+        return {"ok": False, "error": f"Could not fetch {req.url}: {exc}"}
+    try:
+        # Follow redirects manually so each hop is re-validated against the SSRF
+        # guard — an external page must not be able to redirect us to localhost.
+        async with httpx.AsyncClient(timeout=20, follow_redirects=False, headers={"user-agent": "Mozilla/5.0 (compatible; MIP-Tailwind/0.1)"}) as client:
+            url = req.url
+            for _ in range(5):
+                resp = await client.get(url)
+                if resp.is_redirect and resp.has_redirect_location:
+                    url = str(resp.next_request.url)
+                    _assert_url_allowed(url)
+                    continue
+                break
         html = resp.text
         title_m = re.search(r"<title[^>]*>(.*?)</title>", html, flags=re.IGNORECASE | re.DOTALL)
         title = re.sub(r"\s+", " ", title_m.group(1)).strip() if title_m else ""
