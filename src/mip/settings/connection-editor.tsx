@@ -16,6 +16,7 @@ import { TextArea } from "@/components/base/textarea/textarea";
 import { cx } from "@/utils/cx";
 import { testEndpoint } from "@/mip/api";
 import {
+    connectionFromApp,
     useSettings,
     type AuthType,
     type Connection,
@@ -23,6 +24,7 @@ import {
     type ConnectionHeader,
     type DataSourceType,
 } from "./settings-store";
+import { APP_CATALOG } from "./apps-catalog";
 
 const SOURCE_TYPES: { id: DataSourceType; label: string }[] = [
     { id: "rest", label: "REST API" },
@@ -95,7 +97,7 @@ interface TestState {
 }
 
 export function ConnectionEditor({ id, onClose }: { id: string; onClose: () => void }) {
-    const { connections, getConnection, updateConnection, removeConnection } = useSettings();
+    const { apps, getConnection, updateConnection, removeConnection } = useSettings();
     const stored = getConnection(id);
 
     // Local draft seeded from the stored connection.
@@ -121,10 +123,39 @@ export function ConnectionEditor({ id, onClose }: { id: string; onClose: () => v
     const headers = draft.headers ?? [];
     const endpoints = draft.endpoints ?? [];
 
-    const connectionItems = useMemo(
-        () => connections.map((c) => ({ id: c.id, label: c.name, supportingText: c.type.toUpperCase() })),
-        [connections],
-    );
+    // "Related app" options: Custom (No App) + currently installed apps. Include
+    // the connection's own linked app even if somehow not installed, so the
+    // current selection always resolves.
+    const CUSTOM_APP = "__custom__";
+    const appItems = useMemo(() => {
+        const ids = new Set(apps.map((a) => a.appId));
+        if (draft.appId) ids.add(draft.appId);
+        const cards = [...ids].map((aid) => APP_CATALOG.find((c) => c.id === aid)).filter((c): c is (typeof APP_CATALOG)[number] => !!c);
+        return [{ id: CUSTOM_APP, label: "Custom (No App)", supportingText: "" }, ...cards.map((c) => ({ id: c.id, label: c.name, supportingText: c.category }))];
+    }, [apps, draft.appId]);
+
+    // Selecting an app links it and fills the fields from its catalog defaults,
+    // preserving an entered token when the auth type is unchanged. "Custom"
+    // just unlinks (keeps current fields).
+    const selectApp = (key: string) => {
+        if (key === CUSTOM_APP) return patch({ appId: undefined });
+        const app = APP_CATALOG.find((a) => a.id === key);
+        if (!app) return;
+        const def = connectionFromApp(app);
+        const keepToken = draft.auth && def.auth && draft.auth.type === def.auth.type ? { token: draft.auth.token, keyValue: draft.auth.keyValue } : {};
+        patch({
+            appId: app.id,
+            name: def.name,
+            type: def.type,
+            baseUrl: def.baseUrl,
+            auth: { ...(def.auth ?? { type: "none" }), ...keepToken },
+            headers: def.headers ?? [],
+            endpoints: def.endpoints ?? [],
+            isAiModel: def.isAiModel,
+            aiProvider: def.aiProvider,
+            aiModel: def.aiModel,
+        });
+    };
 
     // --- Headers ---
     const setHeader = (index: number, p: Partial<ConnectionHeader>) =>
@@ -283,13 +314,10 @@ export function ConnectionEditor({ id, onClose }: { id: string; onClose: () => v
             {/* Row: data source switcher / source type / name */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <Select
-                    label="Data source"
-                    selectedKey={id}
-                    items={connectionItems}
-                    onSelectionChange={() => {
-                        /* switching handled by parent via row click; keep current */
-                    }}
-                    isDisabled
+                    label="Related app"
+                    selectedKey={draft.appId ?? CUSTOM_APP}
+                    items={appItems}
+                    onSelectionChange={(key) => selectApp(String(key))}
                 >
                     {(item) => (
                         <Select.Item id={item.id} supportingText={item.supportingText}>
