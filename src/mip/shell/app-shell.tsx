@@ -96,6 +96,7 @@ export const AppShell = () => {
                                 onOpenTemplates={() => setTemplatesOpen(true)}
                                 sidebarCollapsed={sidebarCollapsed}
                                 onExpandSidebar={() => setSidebarCollapsed(false)}
+                                settingsOpen={settingsOpen}
                             />
                             <main className="min-h-0 flex-1 overflow-hidden">
                                 {settingsOpen ? (

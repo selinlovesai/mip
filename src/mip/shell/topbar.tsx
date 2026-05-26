@@ -10,7 +10,7 @@ import { useTheme } from "@/providers/theme-provider";
 import { useDashboard } from "@/mip/store";
 import { cx } from "@/utils/cx";
 
-export function Topbar({ onAddWidget, onToggleChat, chatOpen, onOpenDashboardSettings, dashboardSettingsOpen, onOpenTemplates, sidebarCollapsed, onExpandSidebar }: { onAddWidget: () => void; onToggleChat: () => void; chatOpen: boolean; onOpenDashboardSettings: () => void; dashboardSettingsOpen: boolean; onOpenTemplates: () => void; sidebarCollapsed: boolean; onExpandSidebar: () => void }) {
+export function Topbar({ onAddWidget, onToggleChat, chatOpen, onOpenDashboardSettings, dashboardSettingsOpen, onOpenTemplates, sidebarCollapsed, onExpandSidebar, settingsOpen }: { onAddWidget: () => void; onToggleChat: () => void; chatOpen: boolean; onOpenDashboardSettings: () => void; dashboardSettingsOpen: boolean; onOpenTemplates: () => void; sidebarCollapsed: boolean; onExpandSidebar: () => void; settingsOpen?: boolean }) {
     const { activePage, editMode, setEditMode, viewMode, setViewMode } = useDashboard();
     const isCanvas = activePage.kind === "canvas";
     const { theme, setTheme } = useTheme();
@@ -24,11 +24,12 @@ export function Topbar({ onAddWidget, onToggleChat, chatOpen, onOpenDashboardSet
             <div className="flex items-center gap-2.5">
                 {sidebarCollapsed ? <ButtonUtility color="tertiary" size="sm" icon={ChevronRight} tooltip="Open sidebar" onClick={onExpandSidebar} /> : null}
                 <div className="flex flex-col leading-tight">
-                    <span className="text-xs text-tertiary">Page</span>
-                    <h1 className="text-lg font-semibold text-primary">{activePage.title}</h1>
+                    <span className="text-xs text-tertiary">{settingsOpen ? "Workspace" : "Page"}</span>
+                    <h1 className="text-lg font-semibold text-primary">{settingsOpen ? "Settings" : activePage.title}</h1>
                 </div>
             </div>
-            <div className="flex items-center gap-1.5">
+            {/* Dashboard/page controls are hidden while the Settings surface is open. */}
+            <div className={cx("flex items-center gap-1.5", settingsOpen && "hidden")}>
                 <ButtonUtility
                     color="tertiary"
                     icon={isDark ? Sun : Moon01}
