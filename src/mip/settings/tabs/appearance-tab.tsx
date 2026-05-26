@@ -332,11 +332,12 @@ export function AppearanceTab() {
         if (colorGroups.length && !colorGroups.some((g) => g.group === colorSub)) setColorSub(colorGroups[0].group);
     }, [colorGroups, colorSub]);
 
-    // UI-element pickers offer only ORIGINAL Untitled UI concrete colors
-    // (Brand / Palette / Utility) — never the semantic alias groups
-    // (Text/Background/Border/Foreground), which would couple tokens, and never
-    // the custom token groups we added (Chart / Navigation / Controls).
-    const pickerGroups = useMemo(() => colorGroups.filter((g) => ["Brand", "Base", "Utility"].includes(g.group)), [colorGroups]);
+    // UI-element pickers offer all ORIGINAL Untitled UI color tokens (Brand,
+    // Text, Background, Foreground, Border, Utility, Palette) — but NOT the
+    // custom token groups we added (Chart / Navigation / Controls), which are
+    // app-specific targets, not selectable source colors.
+    const CUSTOM_GROUPS = ["Chart", "Navigation", "Controls"];
+    const pickerGroups = useMemo(() => colorGroups.filter((g) => !CUSTOM_GROUPS.includes(g.group)), [colorGroups]);
 
     // Typography / shadow / radius: DB set when available, else static fallback.
     const fontTokens = useMemo(() => (tokens.length ? namesOfKind(tokens, "typography", (n) => n.startsWith("--font-")).sort() : FONT_TOKENS), [tokens]);
