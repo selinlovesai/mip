@@ -89,14 +89,20 @@ const injectJson: Tool = {
                 error: "API injection mode is selected — do NOT use injectJson for data widgets. Bind with injectConnection to a saved connection (listConnections → callApi → injectConnection). If no connection fits, ask the user to add one in Settings → Apps.",
             };
         }
-        // Strict REST: if a saved API was called this turn, a DATA widget must be
-        // bound live — refuse to snapshot it. Relaxed when the user forced JSON mode.
+        // Strict REST: if a saved API was called this turn, a DATA widget MIGHT be
+        // a snapshot of that API — nudge ONCE toward injectConnection. This is a
+        // one-shot, non-fatal guard: we clear ctx.apiCalls when it fires so the
+        // rest of a mixed web+API dashboard build (web-search-sourced KPIs/charts)
+        // is NOT blocked. We can't tell web-search data from API data here, so we
+        // refuse at most once rather than rejecting every data widget in the turn.
+        // Relaxed entirely when the user forced JSON mode.
         const api = ctx.injectMode === "json" || !bindable ? undefined : ctx.apiCalls[ctx.apiCalls.length - 1];
         if (api) {
+            ctx.apiCalls.length = 0; // one-shot: don't block subsequent data widgets
             return {
                 kind: op.kind,
                 ok: false,
-                error: `This data came from a saved API (sourceId "${api.sourceId}"${api.path ? `, path "${api.path}"` : ""}). Do NOT snapshot API data with injectJson — use injectConnection so the widget reads it live, e.g. {"kind":"injectConnection","type":"${String(op.type)}","sourceId":"${api.sourceId}","request":{"method":"GET","path":"${api.path ?? "/"}"},"map":{…}}.`,
+                error: `Data from a saved API should bind live, not snapshot. If THIS widget's data came from the API "${api.sourceId}"${api.path ? `, path "${api.path}"` : ""}, re-emit it as injectConnection, e.g. {"kind":"injectConnection","type":"${String(op.type)}","sourceId":"${api.sourceId}","request":{"method":"GET","path":"${api.path ?? "/"}"},"map":{…}}. If this data came from web search / a fetch / values you were given (NOT that API), just re-emit the same injectJson and it will succeed.`,
             };
         }
         const widget = buildWidget(op, ctx);
@@ -122,6 +128,13 @@ const injectConnection: Tool = {
         const bound = bind(widget, op, ctx);
         if ("error" in bound) return { kind: op.kind, ok: false, error: bound.error };
         ctx.addWidget(widget);
+        // This API's data is now bound live — drop its calls from the turn buffer so
+        // the strict-REST guard doesn't later mistake a web-sourced widget for a
+        // snapshot of it.
+        if (widget.data?.sourceId) {
+            const sid = widget.data.sourceId;
+            ctx.apiCalls = ctx.apiCalls.filter((c) => c.sourceId !== sid);
+        }
         return { kind: op.kind, ok: true, id: widget.id, type: widget.type, bound: true };
     },
 };
