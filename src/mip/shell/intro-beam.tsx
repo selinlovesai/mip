@@ -18,8 +18,8 @@ interface Beam {
     end: { x: number; y: number };
 }
 
-// appear · grown · end-of-hold · near icon · at icon
-const TIMES = [0, 0.16, 0.42, 0.88, 1];
+// appear · grown · end-of-hold · ARRIVED at icon · faded out (in place over icon)
+const TIMES = [0, 0.16, 0.42, 0.9, 1];
 const DURATION = 2.0;
 
 export function IntroBeam() {
@@ -31,6 +31,8 @@ export function IntroBeam() {
         const t = setTimeout(() => {
             const el = document.querySelector<HTMLElement>("[data-ai-icon]");
             if (!el) return;
+            // Measure after a frame so the topbar has settled (accurate icon center).
+            requestAnimationFrame(() => {
             const r = el.getBoundingClientRect();
             const end = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
             const start = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
@@ -49,6 +51,7 @@ export function IntroBeam() {
             const cy = start.y + dy * 0.5 + py * bow;
             const path = `path("M ${start.x} ${start.y} Q ${cx} ${cy} ${end.x} ${end.y}")`;
             setBeam({ path, end });
+            });
         }, 180);
         return () => clearTimeout(t);
     }, []);
@@ -89,9 +92,11 @@ export function IntroBeam() {
                         }}
                         initial={{ offsetDistance: "0%", scale: 0.3, opacity: 0 }}
                         animate={{
-                            offsetDistance: ["0%", "0%", "0%", "92%", "100%"],
-                            scale: head ? [0.3, 1.25, 1.15, 0.7, 0.45] : [0.2, 0.9, 0.85, 0.55, 0.2],
-                            opacity: head ? [0, 1, 1, 1, 0] : [0, 0.55, 0.55, 0.45, 0],
+                            // Reach the icon (100%) at 0.9, then hold there and fade —
+                            // so it disappears exactly OVER the AI icon, not just before it.
+                            offsetDistance: ["0%", "0%", "0%", "100%", "100%"],
+                            scale: head ? [0.3, 1.25, 1.15, 1, 0.5] : [0.2, 0.9, 0.85, 0.6, 0.25],
+                            opacity: head ? [0, 1, 1, 1, 0] : [0, 0.55, 0.55, 0.5, 0],
                         }}
                         transition={{ duration: DURATION, delay, ease: "easeInOut", times: TIMES }}
                     />
