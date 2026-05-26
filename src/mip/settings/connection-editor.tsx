@@ -138,7 +138,10 @@ export function ConnectionEditor({ id, onClose }: { id: string; onClose: () => v
     // preserving an entered token when the auth type is unchanged. "Custom"
     // just unlinks (keeps current fields).
     const selectApp = (key: string) => {
-        if (key === CUSTOM_APP) return patch({ appId: undefined });
+        // "Custom (No App)" → unlink and clear the app-derived fields/endpoints
+        // back to a blank custom connection (keeps the connection's name).
+        if (key === CUSTOM_APP)
+            return patch({ appId: undefined, baseUrl: "", auth: { type: "none" }, headers: [], endpoints: [], isAiModel: false, aiProvider: undefined, aiModel: undefined });
         const app = APP_CATALOG.find((a) => a.id === key);
         if (!app) return;
         const def = connectionFromApp(app);
