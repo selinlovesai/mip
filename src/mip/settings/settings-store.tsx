@@ -6,7 +6,7 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import type { AppConnector, AuthMethod } from "./apps-catalog";
+import { APP_CATALOG, type AppConnector, type AuthMethod } from "./apps-catalog";
 import { NATIVE_SKILLS, type Skill } from "@/mip/agent/skills";
 import { DEFAULT_WIDGET_SIZES, DEFAULT_WIDGET_SETTINGS, WIDGET_TYPES, type WidgetType } from "@/mip/schema";
 import { WIDGET_CATALOG } from "@/mip/shell/widget-catalog";
@@ -312,9 +312,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const disconnectApp = useCallback((appId: string) => {
-        // Also drop the auto-created connection(s) linked to this app, so a later
-        // reconnect doesn't leave a stale duplicate behind.
-        setState((s) => ({ ...s, apps: s.apps.filter((a) => a.appId !== appId), connections: s.connections.filter((c) => c.appId !== appId) }));
+        // Also drop the app's connection(s): those linked by appId, plus legacy
+        // ones (created before the link) matched by the app's name.
+        const appName = APP_CATALOG.find((a) => a.id === appId)?.name.trim().toLowerCase();
+        setState((s) => ({
+            ...s,
+            apps: s.apps.filter((a) => a.appId !== appId),
+            connections: s.connections.filter((c) => c.appId !== appId && !(c.appId == null && appName != null && c.name.trim().toLowerCase() === appName)),
+        }));
     }, []);
 
     const addConnection = useCallback((conn: Omit<Connection, "id">) => {
