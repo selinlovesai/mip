@@ -257,6 +257,12 @@ export function AppearanceTab() {
         if (colorGroups.length && !colorGroups.some((g) => g.group === colorSub)) setColorSub(colorGroups[0].group);
     }, [colorGroups, colorSub]);
 
+    // UI-element pickers offer only CONCRETE colors (Brand / Palette / Utility /
+    // Chart) — never the semantic groups (Text/Background/Border/Foreground),
+    // which are themselves aliases. This prevents pointing one semantic token at
+    // another (e.g. menu-active → page-background), which would couple them.
+    const pickerGroups = useMemo(() => colorGroups.filter((g) => ["Brand", "Base", "Utility", "Chart"].includes(g.group)), [colorGroups]);
+
     // Typography / shadow / radius: DB set when available, else static fallback.
     const fontTokens = useMemo(() => (tokens.length ? namesOfKind(tokens, "typography", (n) => n.startsWith("--font-")).sort() : FONT_TOKENS), [tokens]);
     const textTokens = useMemo(
@@ -366,7 +372,7 @@ export function AppearanceTab() {
                                                     <span className="truncate text-sm font-medium text-secondary">{s.label}</span>
                                                     <span className="truncate text-xs text-tertiary">{s.hint}</span>
                                                 </span>
-                                                <TokenSelect value={ref} groups={colorGroups} disabled={!dbReady} onChange={(name) => pickToken(s.target, name)} />
+                                                <TokenSelect value={ref} groups={pickerGroups} disabled={!dbReady} onChange={(name) => pickToken(s.target, name)} />
                                             </div>
                                         );
                                     })}
