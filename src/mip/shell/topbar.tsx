@@ -61,6 +61,7 @@ export function Topbar({ onAddWidget, onToggleChat, chatOpen, onOpenDashboardSet
                     color="tertiary"
                     icon={Stars01}
                     tooltip="AI assistant"
+                    data-ai-icon
                     className={cx(chatOpen && activeClass)}
                     onClick={onToggleChat}
                 />

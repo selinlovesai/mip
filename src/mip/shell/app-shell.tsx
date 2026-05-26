@@ -17,6 +17,7 @@ import { CanvasSurface } from "./canvas-surface";
 import { ChatPanel } from "./chat-panel";
 import { DashboardGrid } from "./dashboard-grid";
 import { DashboardSettingsModal } from "./dashboard-settings-modal";
+import { IntroBeam } from "./intro-beam";
 import { LoginScreen } from "./login-screen";
 import { Sidebar } from "./sidebar";
 import { TemplatesModal } from "./templates-modal";
@@ -110,6 +111,7 @@ export const AppShell = () => {
                         <WidgetPicker open={pickerOpen} onClose={() => setPickerOpen(false)} />
                         <DashboardSettingsModal open={dashboardSettingsOpen} onClose={() => setDashboardSettingsOpen(false)} />
                         <TemplatesModal open={templatesOpen} onClose={() => setTemplatesOpen(false)} onOpenConnections={() => openSettings("connections")} />
+                        <IntroBeam />
                     </div>
                 </DashboardProvider>
             </SettingsProvider>
