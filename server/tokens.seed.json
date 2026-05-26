@@ -2060,7 +2060,7 @@
   {
     "name": "--text-display-2xl",
     "mode": "light",
-    "value": "calc(var(--spacing) * 18)",
+    "value": "4.5rem",
     "kind": "typography",
     "group": "Typography"
   },
@@ -2074,14 +2074,14 @@
   {
     "name": "--text-display-2xl--line-height",
     "mode": "light",
-    "value": "calc(var(--spacing) * 22.5)",
+    "value": "5.625rem",
     "kind": "typography",
     "group": "Typography"
   },
   {
     "name": "--text-display-lg",
     "mode": "light",
-    "value": "calc(var(--spacing) * 12)",
+    "value": "3rem",
     "kind": "typography",
     "group": "Typography"
   },
@@ -2095,14 +2095,14 @@
   {
     "name": "--text-display-lg--line-height",
     "mode": "light",
-    "value": "calc(var(--spacing) * 15)",
+    "value": "3.75rem",
     "kind": "typography",
     "group": "Typography"
   },
   {
     "name": "--text-display-md",
     "mode": "light",
-    "value": "calc(var(--spacing) * 9)",
+    "value": "2.25rem",
     "kind": "typography",
     "group": "Typography"
   },
@@ -2116,28 +2116,28 @@
   {
     "name": "--text-display-md--line-height",
     "mode": "light",
-    "value": "calc(var(--spacing) * 11)",
+    "value": "2.75rem",
     "kind": "typography",
     "group": "Typography"
   },
   {
     "name": "--text-display-sm",
     "mode": "light",
-    "value": "calc(var(--spacing) * 7.5)",
+    "value": "1.875rem",
     "kind": "typography",
     "group": "Typography"
   },
   {
     "name": "--text-display-sm--line-height",
     "mode": "light",
-    "value": "calc(var(--spacing) * 9.5)",
+    "value": "2.375rem",
     "kind": "typography",
     "group": "Typography"
   },
   {
     "name": "--text-display-xl",
     "mode": "light",
-    "value": "calc(var(--spacing) * 15)",
+    "value": "3.75rem",
     "kind": "typography",
     "group": "Typography"
   },
@@ -2151,91 +2151,91 @@
   {
     "name": "--text-display-xl--line-height",
     "mode": "light",
-    "value": "calc(var(--spacing) * 18)",
+    "value": "4.5rem",
     "kind": "typography",
     "group": "Typography"
   },
   {
     "name": "--text-display-xs",
     "mode": "light",
-    "value": "calc(var(--spacing) * 6)",
+    "value": "1.5rem",
     "kind": "typography",
     "group": "Typography"
   },
   {
     "name": "--text-display-xs--line-height",
     "mode": "light",
-    "value": "calc(var(--spacing) * 8)",
+    "value": "2rem",
     "kind": "typography",
     "group": "Typography"
   },
   {
     "name": "--text-lg",
     "mode": "light",
-    "value": "calc(var(--spacing) * 4.5)",
+    "value": "1.125rem",
     "kind": "typography",
     "group": "Typography"
   },
   {
     "name": "--text-lg--line-height",
     "mode": "light",
-    "value": "calc(var(--spacing) * 7)",
+    "value": "1.75rem",
     "kind": "typography",
     "group": "Typography"
   },
   {
     "name": "--text-md",
     "mode": "light",
-    "value": "calc(var(--spacing) * 4)",
+    "value": "1rem",
     "kind": "typography",
     "group": "Typography"
   },
   {
     "name": "--text-md--line-height",
     "mode": "light",
-    "value": "calc(var(--spacing) * 6)",
+    "value": "1.5rem",
     "kind": "typography",
     "group": "Typography"
   },
   {
     "name": "--text-sm",
     "mode": "light",
-    "value": "calc(var(--spacing) * 3.5)",
+    "value": "0.875rem",
     "kind": "typography",
     "group": "Typography"
   },
   {
     "name": "--text-sm--line-height",
     "mode": "light",
-    "value": "calc(var(--spacing) * 5)",
+    "value": "1.25rem",
     "kind": "typography",
     "group": "Typography"
   },
   {
     "name": "--text-xl",
     "mode": "light",
-    "value": "calc(var(--spacing) * 5)",
+    "value": "1.25rem",
     "kind": "typography",
     "group": "Typography"
   },
   {
     "name": "--text-xl--line-height",
     "mode": "light",
-    "value": "calc(var(--spacing) * 7.5)",
+    "value": "1.875rem",
     "kind": "typography",
     "group": "Typography"
   },
   {
     "name": "--text-xs",
     "mode": "light",
-    "value": "calc(var(--spacing) * 3)",
+    "value": "0.75rem",
     "kind": "typography",
     "group": "Typography"
   },
   {
     "name": "--text-xs--line-height",
     "mode": "light",
-    "value": "calc(var(--spacing) * 4.5)",
+    "value": "1.125rem",
     "kind": "typography",
     "group": "Typography"
   },
