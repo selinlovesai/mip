@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "@untitledui/icons";
 import { useTheme } from "@/providers/theme-provider";
 import { cx } from "@/utils/cx";
@@ -132,19 +133,39 @@ function TokenSelect({
 }) {
     const [open, setOpen] = useState(false);
     const [q, setQ] = useState("");
-    const ref = useRef<HTMLDivElement>(null);
+    const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
+    const btnRef = useRef<HTMLButtonElement>(null);
+    const panelRef = useRef<HTMLDivElement>(null);
+
+    const WIDTH = 256;
+    const place = () => {
+        const r = btnRef.current?.getBoundingClientRect();
+        if (r) setPos({ top: r.bottom + 4, left: Math.max(8, Math.min(r.right - WIDTH, window.innerWidth - WIDTH - 8)), width: WIDTH });
+    };
+    const toggle = () => {
+        if (disabled) return;
+        if (!open) place();
+        setOpen((o) => !o);
+    };
 
     useEffect(() => {
         if (!open) return;
         const onDoc = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+            const t = e.target as Node;
+            if (btnRef.current?.contains(t) || panelRef.current?.contains(t)) return;
+            setOpen(false);
         };
         const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+        const close = () => setOpen(false); // reposition is fiddly; just close on scroll/resize
         document.addEventListener("mousedown", onDoc);
         document.addEventListener("keydown", onKey);
+        window.addEventListener("resize", close);
+        window.addEventListener("scroll", close, true);
         return () => {
             document.removeEventListener("mousedown", onDoc);
             document.removeEventListener("keydown", onKey);
+            window.removeEventListener("resize", close);
+            window.removeEventListener("scroll", close, true);
         };
     }, [open]);
 
@@ -162,11 +183,12 @@ function TokenSelect({
     };
 
     return (
-        <div ref={ref} className="relative w-44 shrink-0">
+        <div className="w-44 shrink-0">
             <button
+                ref={btnRef}
                 type="button"
                 disabled={disabled}
-                onClick={() => setOpen((o) => !o)}
+                onClick={toggle}
                 className="flex w-full items-center gap-2 rounded-lg bg-primary px-2.5 py-2 text-xs text-secondary ring-1 ring-secondary transition-colors hover:ring-brand disabled:cursor-not-allowed disabled:opacity-50"
             >
                 {value ? <span className="size-3.5 shrink-0 rounded-sm ring-1 ring-inset ring-black/10" style={{ backgroundColor: `var(${value})` }} /> : null}
@@ -174,40 +196,47 @@ function TokenSelect({
                 <ChevronDown className="size-3.5 shrink-0 text-tertiary" aria-hidden="true" />
             </button>
 
-            {open ? (
-                <div className="absolute right-0 z-50 mt-1 flex max-h-72 w-64 flex-col overflow-hidden rounded-lg bg-primary shadow-lg ring-1 ring-secondary">
-                    <input
-                        autoFocus
-                        value={q}
-                        onChange={(e) => setQ(e.target.value)}
-                        placeholder="Search tokens…"
-                        className="border-b border-secondary bg-primary px-3 py-2 text-xs text-primary outline-none placeholder:text-placeholder"
-                    />
-                    <div className="min-h-0 flex-1 overflow-y-auto p-1">
-                        <button type="button" onClick={() => choose("")} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-tertiary transition-colors hover:bg-secondary">
-                            Default
-                        </button>
-                        {filtered.map((g) => (
-                            <div key={g.group}>
-                                <div className="px-2 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-quaternary">{groupLabel(g.group)}</div>
-                                {g.tokens.map((name) => (
-                                    <button
-                                        key={name}
-                                        type="button"
-                                        onClick={() => choose(name)}
-                                        className={cx("flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-secondary", name === value ? "text-brand-secondary" : "text-secondary")}
-                                    >
-                                        <span className="size-3.5 shrink-0 rounded-sm ring-1 ring-inset ring-black/10" style={{ backgroundColor: `var(${name})` }} />
-                                        <span className="flex-1 truncate">{name.replace(/^--color-/, "")}</span>
-                                        {name === value ? <Check className="size-3.5 shrink-0" aria-hidden="true" /> : null}
-                                    </button>
-                                ))}
-                            </div>
-                        ))}
-                        {filtered.length === 0 ? <div className="px-2 py-3 text-center text-xs text-tertiary">No matches</div> : null}
-                    </div>
-                </div>
-            ) : null}
+            {open && pos
+                ? createPortal(
+                      <div
+                          ref={panelRef}
+                          style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width, zIndex: 9999 }}
+                          className="flex max-h-72 flex-col overflow-hidden rounded-lg bg-primary shadow-lg ring-1 ring-secondary"
+                      >
+                          <input
+                              autoFocus
+                              value={q}
+                              onChange={(e) => setQ(e.target.value)}
+                              placeholder="Search tokens…"
+                              className="border-b border-secondary bg-primary px-3 py-2 text-xs text-primary outline-none placeholder:text-placeholder"
+                          />
+                          <div className="min-h-0 flex-1 overflow-y-auto p-1">
+                              <button type="button" onClick={() => choose("")} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-tertiary transition-colors hover:bg-secondary">
+                                  Default
+                              </button>
+                              {filtered.map((g) => (
+                                  <div key={g.group}>
+                                      <div className="px-2 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-quaternary">{groupLabel(g.group)}</div>
+                                      {g.tokens.map((name) => (
+                                          <button
+                                              key={name}
+                                              type="button"
+                                              onClick={() => choose(name)}
+                                              className={cx("flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-secondary", name === value ? "text-brand-secondary" : "text-secondary")}
+                                          >
+                                              <span className="size-3.5 shrink-0 rounded-sm ring-1 ring-inset ring-black/10" style={{ backgroundColor: `var(${name})` }} />
+                                              <span className="flex-1 truncate">{name.replace(/^--color-/, "")}</span>
+                                              {name === value ? <Check className="size-3.5 shrink-0" aria-hidden="true" /> : null}
+                                          </button>
+                                      ))}
+                                  </div>
+                              ))}
+                              {filtered.length === 0 ? <div className="px-2 py-3 text-center text-xs text-tertiary">No matches</div> : null}
+                          </div>
+                      </div>,
+                      document.body,
+                  )
+                : null}
         </div>
     );
 }

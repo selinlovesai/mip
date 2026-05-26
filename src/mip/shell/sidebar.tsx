@@ -11,7 +11,7 @@
 
 import { useState } from "react";
 import { Button as AriaButton } from "react-aria-components";
-import { ChevronLeft, ChevronRight, Copy01, DotsVertical, Grid01, LogOut01, Plus, Settings01, Stars01, Trash01, User01 } from "@untitledui/icons";
+import { ChevronLeft, ChevronRight, Copy01, DotsVertical, Grid01, LogOut01, Plus, Settings01, Stars01, Trash01 } from "@untitledui/icons";
 import { Avatar } from "@/components/base/avatar/avatar";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { Dropdown } from "@/components/base/dropdown/dropdown";
@@ -169,7 +169,6 @@ export function Sidebar({ onToggle, onOpenSettings, onNavigate }: { onToggle: ()
                     </AriaButton>
                     <Dropdown.Popover placement="top end">
                         <Dropdown.Menu>
-                            <Dropdown.Item icon={User01} label="Profile" onAction={() => onOpenSettings("profile")} />
                             <Dropdown.Item icon={Settings01} label="Settings" onAction={() => onOpenSettings()} />
                             <Dropdown.Item icon={LogOut01} label="Sign out" onAction={() => window.location.reload()} />
                         </Dropdown.Menu>

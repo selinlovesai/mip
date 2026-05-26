@@ -109,7 +109,7 @@ export function AppsTab() {
                                                 </span>
                                             </div>
                                             <p className="line-clamp-2 text-xs text-tertiary">{app.description}</p>
-                                            <div className="mt-1 flex items-center gap-2">
+                                            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                                                 {connected ? (
                                                     <>
                                                         <Badge type="pill-color" color="success" size="sm">
