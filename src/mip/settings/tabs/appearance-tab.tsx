@@ -580,6 +580,15 @@ export function AppearanceTab() {
                     </section>
                     <section className="flex flex-col gap-3">
                         <span className="text-xs font-semibold uppercase tracking-wide text-quaternary">Spacing</span>
+                        {/* The base unit drives every spacing step (spacing-N =
+                            base × N), so editing it rescales spacing app-wide. */}
+                        <div className="flex items-center justify-between gap-4 rounded-lg p-3 ring-1 ring-secondary">
+                            <span className="flex min-w-0 flex-col">
+                                <span className="text-sm font-medium text-secondary">Base unit</span>
+                                <span className="text-xs text-tertiary">Scales every spacing step (spacing-N = base × N)</span>
+                            </span>
+                            <ValueInput value={storedValue("--spacing")} disabled={!dbReady} onCommit={(v) => void saveToken("--spacing", v, "Spacing", "spacing")} className="w-28 text-center" />
+                        </div>
                         <div className="flex flex-col gap-2">
                             {SPACING_STEPS.map((step) => (
                                 <div key={step} className="flex items-center gap-3">

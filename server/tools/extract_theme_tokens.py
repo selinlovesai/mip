@@ -46,6 +46,10 @@ def _kind(name: str) -> str | None:
     # Typography. The real color tokens live under --color-text-* (kind color).
     if name.startswith("--text-color-"):
         return None
+    # The base spacing unit (Tailwind v4: every p-/m-/gap-/size- utility is
+    # calc(var(--spacing) * N)). Editing it rescales the whole spacing system.
+    if name == "--spacing" or name.startswith("--spacing-"):
+        return "spacing"
     for prefix, kind in KIND_BY_PREFIX.items():
         if name.startswith(prefix):
             return kind
@@ -72,7 +76,7 @@ def _block(css: str, start_pat: str) -> str:
 def _group(name: str, kind: str) -> str:
     if kind != "color":
         # Non-color primitives group by kind (Typography / Radius / Shadow).
-        return {"typography": "Typography", "radius": "Radius", "shadow": "Shadow"}.get(kind, kind.title())
+        return {"typography": "Typography", "radius": "Radius", "shadow": "Shadow", "spacing": "Spacing"}.get(kind, kind.title())
     body = name[len("--color-") :]
     for prefix, group in (
         ("brand-", "Brand"),

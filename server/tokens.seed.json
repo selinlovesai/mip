@@ -2051,6 +2051,13 @@
     "group": "Shadow"
   },
   {
+    "name": "--spacing",
+    "mode": "light",
+    "value": "0.25rem",
+    "kind": "spacing",
+    "group": "Spacing"
+  },
+  {
     "name": "--text-display-2xl",
     "mode": "light",
     "value": "calc(var(--spacing) * 18)",
