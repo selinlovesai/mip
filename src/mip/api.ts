@@ -212,6 +212,59 @@ export async function dbDelete(collection: DbCollection, id: string): Promise<bo
 }
 
 // ---------------------------------------------------------------------------
+// Typed design tokens (directive #2). Backed by the `tokens` table; the
+// Appearance browser reads + edits these and the app injects the emitted CSS at
+// boot. All calls degrade gracefully (reads → [], writes → false) so a DB-less
+// run keeps the bundled theme.css.
+// ---------------------------------------------------------------------------
+
+export type TokenMode = "light" | "dark";
+
+export interface DesignToken {
+    name: string; // CSS var, e.g. "--color-brand-600"
+    mode: TokenMode;
+    value: string; // verbatim CSS value
+    kind: string; // "color" | "typography" | "radius" | "shadow"
+    group: string;
+    updatedAt: string;
+}
+
+export async function listTokens(kind?: string): Promise<DesignToken[]> {
+    try {
+        const res = await fetch(`${BASE}/api/tokens${kind ? `?kind=${encodeURIComponent(kind)}` : ""}`);
+        const json = (await res.json()) as { ok: boolean; tokens?: DesignToken[] };
+        return json.ok && json.tokens ? json.tokens : [];
+    } catch {
+        return [];
+    }
+}
+
+export async function putToken(name: string, mode: TokenMode, value: string, kind = "color", group = ""): Promise<boolean> {
+    try {
+        const res = await fetch(`${BASE}/api/tokens/${encodeURIComponent(name)}/${mode}`, {
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ value, kind, group }),
+        });
+        const json = (await res.json()) as { ok: boolean };
+        return json.ok === true;
+    } catch {
+        return false;
+    }
+}
+
+/** Fetch the DB tokens compiled to CSS. `scope: "root"` for runtime injection,
+ *  `"theme"` for the build-time `@theme` artifact. null when the DB is off. */
+export async function fetchTokensCss(scope: "root" | "theme" = "root"): Promise<string | null> {
+    try {
+        const res = await fetch(`${BASE}/api/tokens.css?scope=${scope}`);
+        return res.ok ? await res.text() : null;
+    } catch {
+        return null;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Speech-to-text — POST a recorded audio blob to the backend, which runs a
 // local Whisper model (faster-whisper) and returns the transcript.
 // ---------------------------------------------------------------------------

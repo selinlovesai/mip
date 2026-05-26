@@ -36,23 +36,34 @@ def emit_json(rows: Iterable[TokenRow]) -> dict[str, dict[str, str]]:
     return {mode: {k: by_mode[mode][k] for k in sorted(by_mode[mode])} for mode in ("light", "dark")}
 
 
-def emit_css(rows: Iterable[TokenRow]) -> str:
-    """A `@theme` (light/base) + `.dark-mode` stylesheet, mirroring theme.css."""
-    by_mode = _by_mode(rows)
-    lines: list[str] = ["/* GENERATED from the DB `tokens` table — do not edit by hand. */"]
+def emit_css(rows: Iterable[TokenRow], scope: str = "theme") -> str:
+    """A light/base + `.dark-mode` stylesheet from the tokens.
 
-    lines.append("@theme {")
+    scope="theme" (default): light vars in a Tailwind `@theme {}` block — the
+      build-time artifact that can replace the hand-written theme.css.
+    scope="root": light vars in `:root {}` — a RUNTIME override the SPA can
+      inject at boot so DB token edits take effect without a rebuild (Tailwind's
+      already-generated utilities read the same custom properties).
+    Dark overrides always target `.dark-mode` (the app's dark-mode class)."""
+    by_mode = _by_mode(rows)
+    light_open = "@theme {" if scope == "theme" else ":root {"
+    lines: list[str] = ["/* GENERATED from the DB `tokens` table — do not edit by hand. */", light_open]
     for name in sorted(by_mode["light"]):
         lines.append(f"    {name}: {by_mode['light'][name]};")
     lines.append("}")
 
     if by_mode["dark"]:
         lines.append("")
-        lines.append("@layer base {")
-        lines.append("    .dark-mode {")
+        if scope == "theme":
+            lines += ["@layer base {", "    .dark-mode {"]
+            indent = "        "
+            close = ["    }", "}"]
+        else:
+            lines.append(".dark-mode {")
+            indent = "    "
+            close = ["}"]
         for name in sorted(by_mode["dark"]):
-            lines.append(f"        {name}: {by_mode['dark'][name]};")
-        lines.append("    }")
-        lines.append("}")
+            lines.append(f"{indent}{name}: {by_mode['dark'][name]};")
+        lines += close
 
     return "\n".join(lines) + "\n"

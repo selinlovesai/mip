@@ -7,11 +7,13 @@
  * `tokens` table will feed these same names later).
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check } from "@untitledui/icons";
 import { useTheme } from "@/providers/theme-provider";
 import { cx } from "@/utils/cx";
 import { COLOR_TOKEN_GROUPS } from "@/mip/design-tokens";
+import { dbAvailable, putToken } from "@/mip/api";
+import { applyDbTokens } from "../../shell/db-tokens";
 import { ACCENTS, getSavedAccent, saveAccent } from "../../shell/appearance";
 
 type Section = "theme" | "colors" | "typography" | "shadows" | "spacing";
@@ -40,6 +42,25 @@ function readVar(name: string): string {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
+/** The currently rendered mode — read from the dark-mode class the theme
+ *  provider toggles, so "system" resolves correctly. Token edits target it. */
+function resolvedMode(): "light" | "dark" {
+    return typeof document !== "undefined" && document.documentElement.classList.contains("dark-mode") ? "dark" : "light";
+}
+
+/** Best-effort CSS color → #rrggbb for an <input type="color"> value. Handles
+ *  `rgb(r g b)` / `rgb(r, g, b)` (what getComputedStyle returns) and hex. */
+function toHex(color: string): string {
+    const m = color.match(/rgba?\(([^)]+)\)/i);
+    if (m) {
+        const [r, g, b] = m[1].split(/[\s,/]+/).map(Number);
+        if ([r, g, b].every((n) => Number.isFinite(n))) return "#" + [r, g, b].map((n) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, "0")).join("");
+    }
+    if (/^#[0-9a-f]{6}$/i.test(color)) return color;
+    if (/^#[0-9a-f]{3}$/i.test(color)) return "#" + [...color.slice(1)].map((c) => c + c).join("");
+    return "#000000";
+}
+
 function TokenName({ name }: { name: string }) {
     return <code className="font-mono text-xs text-tertiary">{name.replace(/^--/, "")}</code>;
 }
@@ -48,6 +69,26 @@ export function AppearanceTab() {
     const { theme, setTheme } = useTheme();
     const [section, setSection] = useState<Section>("theme");
     const [accent, setAccent] = useState(getSavedAccent());
+    // When the backend DB is up, color tokens become editable (persisted +
+    // applied live via the DB-token overlay). Otherwise the browser is read-only.
+    const [dbReady, setDbReady] = useState(false);
+    const [, setTick] = useState(0); // force re-read of CSS vars after an edit
+
+    useEffect(() => {
+        let alive = true;
+        void dbAvailable().then((ok) => alive && setDbReady(ok));
+        return () => {
+            alive = false;
+        };
+    }, []);
+
+    const editColor = async (name: string, group: string, hex: string) => {
+        const mode = resolvedMode();
+        if (await putToken(name, mode, hex, "color", group)) {
+            await applyDbTokens(); // refresh the :root overlay so the var updates live
+            setTick((t) => t + 1); // re-render so the printed value reflects the edit
+        }
+    };
 
     return (
         <div className="flex flex-col gap-6">
@@ -102,7 +143,19 @@ export function AppearanceTab() {
                             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                                 {g.tokens.map((name) => (
                                     <div key={name} className="flex items-center gap-3 rounded-lg p-2 ring-1 ring-secondary">
-                                        <span className="size-9 shrink-0 rounded-md ring-1 ring-inset ring-black/10" style={{ backgroundColor: `var(${name})` }} />
+                                        {dbReady ? (
+                                            <label className="relative size-9 shrink-0 cursor-pointer rounded-md ring-1 ring-inset ring-black/10" style={{ backgroundColor: `var(${name})` }} title={`Edit ${name.replace(/^--/, "")} (${resolvedMode()} mode)`}>
+                                                <input
+                                                    type="color"
+                                                    aria-label={`Edit ${name}`}
+                                                    defaultValue={toHex(readVar(name))}
+                                                    onChange={(e) => void editColor(name, g.group, e.target.value)}
+                                                    className="absolute inset-0 size-full cursor-pointer opacity-0"
+                                                />
+                                            </label>
+                                        ) : (
+                                            <span className="size-9 shrink-0 rounded-md ring-1 ring-inset ring-black/10" style={{ backgroundColor: `var(${name})` }} />
+                                        )}
                                         <span className="flex min-w-0 flex-col">
                                             <TokenName name={name} />
                                             <span className="truncate text-xs text-tertiary">{readVar(name) || "—"}</span>

@@ -107,6 +107,11 @@ def test_emit_json_and_css_are_pure():
     # A mode with no rows emits no dark block.
     assert ".dark-mode" not in emit.emit_css([rows[2]])
 
+    # Runtime scope swaps @theme → :root (so the SPA can inject it live).
+    root_css = emit.emit_css(rows, scope="root")
+    assert ":root {" in root_css and "@theme" not in root_css
+    assert "--color-brand-600: rgb(127 86 217);" in root_css and ".dark-mode {" in root_css
+
 
 async def test_emit_roundtrips_seeded_tokens(fresh_db):
     await seed.seed_tokens_if_empty(fresh_db)

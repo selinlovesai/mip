@@ -477,12 +477,15 @@ async def tokens_json() -> dict[str, Any]:
 
 
 @app.get("/api/tokens.css")
-async def tokens_css() -> Response:
-    """Emit the DB tokens as a Tailwind-compatible stylesheet (`@theme` +
-    `.dark-mode`). 503 when the DB is off so the app keeps its bundled theme.css."""
+async def tokens_css(scope: str = "theme") -> Response:
+    """Emit the DB tokens as a stylesheet. `scope=theme` (build-time `@theme`) or
+    `scope=root` (runtime `:root` override the SPA injects at boot). 503 when the
+    DB is off so the app keeps its bundled theme.css."""
     import emit
 
+    if scope not in ("theme", "root"):
+        raise HTTPException(status_code=400, detail="scope must be 'theme' or 'root'")
     if not db.is_enabled():
         raise HTTPException(status_code=503, detail="database not configured")
-    css = emit.emit_css(await db.list_tokens())
+    css = emit.emit_css(await db.list_tokens(), scope=scope)
     return Response(content=css, media_type="text/css", headers={"Cache-Control": "no-cache"})
