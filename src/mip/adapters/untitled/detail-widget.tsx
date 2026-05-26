@@ -9,6 +9,7 @@ import { Badge } from "@/components/base/badges/badges";
 import type { BadgeColor } from "@/components/base/badges/badges";
 import type { WidgetRenderProps } from "@/mip/adapter/types";
 import { resolveColumns, type Row } from "./data";
+import { formatCell } from "./format";
 import { WidgetCard } from "./widget-card";
 
 const STATUS_TONE: Record<string, BadgeColor<"pill-color">> = {
@@ -46,7 +47,7 @@ export function DetailWidget(props: WidgetRenderProps) {
                 <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2.5 text-sm">
                     {fields.map((field) => {
                         const raw = record[field.key];
-                        const text = raw == null ? "--" : String(raw);
+                        const text = raw == null ? "--" : formatCell(raw, field.format) || "--";
                         const tone = field.key.toLowerCase().includes("status") ? STATUS_TONE[text.toLowerCase()] : undefined;
                         return (
                             <div key={field.key} className="contents">

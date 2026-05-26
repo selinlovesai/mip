@@ -79,9 +79,27 @@ export function toChartPoints(rows: Row[], labelKey = "label", valueKey = "value
 export interface Column {
     key: string;
     label: string;
+    /** Optional value format id (see format.ts CELL_FORMATS) applied per cell. */
+    format?: string;
+    /** Optional cell animation id (e.g. "flash" on change). */
+    animation?: string;
 }
 
-/** Columns from `settings.columns` ([{key,label}] or ["key"]), else inferred from the first row. */
+/** Cell animation ids surfaced in the editor. */
+export const CELL_ANIMATIONS = [
+    { id: "none", label: "None" },
+    { id: "flash", label: "Flash on change" },
+    { id: "pulse", label: "Pulse" },
+] as const;
+
+/** Tailwind class for a cell animation id. `flash` is keyed on value change by
+ *  the renderer (remount replays the entrance), `pulse` is continuous. */
+export function animationClass(id?: string): string {
+    return id === "pulse" ? "animate-pulse" : id === "flash" ? "animate-in fade-in zoom-in-95 duration-500" : "";
+}
+
+/** Columns from `settings.columns` ([{key,label,format?,animation?}] or ["key"]),
+ *  else inferred from the first row. */
 export function resolveColumns(widget: MipWidget, rows: Row[]): Column[] {
     const configured = widget.settings?.columns;
     if (Array.isArray(configured) && configured.length) {
@@ -89,7 +107,12 @@ export function resolveColumns(widget: MipWidget, rows: Row[]): Column[] {
             if (typeof col === "string") return { key: col, label: col };
             const record = col as Row;
             const key = String(record.key ?? "");
-            return { key, label: String(record.label ?? key) };
+            return {
+                key,
+                label: String(record.label ?? key),
+                ...(typeof record.format === "string" ? { format: record.format } : {}),
+                ...(typeof record.animation === "string" ? { animation: record.animation } : {}),
+            };
         });
     }
     const first = rows[0];

@@ -12,7 +12,9 @@ import { Badge } from "@/components/base/badges/badges";
 import type { BadgeColor } from "@/components/base/badges/badges";
 import { Table } from "@/components/application/table/table";
 import type { WidgetRenderProps } from "@/mip/adapter/types";
-import { resolveColumns, resolveRows, type Row } from "./data";
+import { animationClass, resolveColumns, resolveRows, type Column, type Row } from "./data";
+import { formatCell } from "./format";
+import { cx } from "@/utils/cx";
 import { WidgetCard } from "./widget-card";
 
 const STATUS_TONE: Record<string, BadgeColor<"pill-color">> = {
@@ -25,10 +27,11 @@ const STATUS_TONE: Record<string, BadgeColor<"pill-color">> = {
     overdue: "error",
 };
 
-function Cell({ columnKey, row }: { columnKey: string; row: Row }) {
-    const raw = row[columnKey];
-    const text = raw == null ? "" : String(raw);
-    const tone = columnKey.toLowerCase().includes("status") ? STATUS_TONE[text.toLowerCase()] : undefined;
+function Cell({ column, row }: { column: Column; row: Row }) {
+    const raw = row[column.key];
+    const text = formatCell(raw, column.format);
+    const tone = column.key.toLowerCase().includes("status") ? STATUS_TONE[text.toLowerCase()] : undefined;
+    const anim = animationClass(column.animation);
     if (tone) {
         return (
             <Badge size="sm" color={tone}>
@@ -36,7 +39,12 @@ function Cell({ columnKey, row }: { columnKey: string; row: Row }) {
             </Badge>
         );
     }
-    return <span className="text-secondary">{text}</span>;
+    // `flash` remounts on value change (key) so its entrance animation replays.
+    return (
+        <span key={column.animation === "flash" ? text : undefined} className={cx("text-secondary", anim)}>
+            {text}
+        </span>
+    );
 }
 
 export function TableWidget({ widget, dataState }: WidgetRenderProps) {
@@ -66,7 +74,7 @@ export function TableWidget({ widget, dataState }: WidgetRenderProps) {
                             <Table.Row columns={columnItems}>
                                 {(column) => (
                                     <Table.Cell>
-                                        <Cell columnKey={String(column.id)} row={item.row} />
+                                        <Cell column={column} row={item.row} />
                                     </Table.Cell>
                                 )}
                             </Table.Row>

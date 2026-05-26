@@ -18,12 +18,55 @@ import { TextArea } from "@/components/base/textarea/textarea";
 import { SlideoutMenu } from "@/components/application/slideout-menus/slideout-menu";
 import { COLOR_TOKEN_GROUPS } from "@/mip/design-tokens";
 import { useDashboard } from "@/mip/store";
-import { useSettings } from "@/mip/settings/settings-store";
+import { useSettings, type Connection, type ConnectionAuth } from "@/mip/settings/settings-store";
 import { WIDGET_TYPES, type HttpMethod, type MipElementStyle, type MipWidget, type MipWidgetColors, type WidgetType } from "@/mip/schema";
+import { testEndpoint } from "@/mip/api";
+import { CELL_FORMATS } from "@/mip/adapters/untitled/format";
+import { CELL_ANIMATIONS } from "@/mip/adapters/untitled/data";
 import { cx } from "@/utils/cx";
+import { buildHeaders, buildUrl } from "./use-widget-data";
 import { widgetElements } from "./widget-chrome";
 
 const prettyType = (t: string) => t.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
+
+/** Content widgets — static body, no data mapping (markdown / diagrams / image). */
+const DIAGRAM_TYPES = new Set(["flowchart", "sequenceDiagram", "mindmap", "timeline", "ganttChart"]);
+const isDiagramType = (t: string) => DIAGRAM_TYPES.has(t);
+const isContentType = (t: string) => t === "markdown" || t === "image" || isDiagramType(t);
+
+/** Custom one-off auth modes (mirrors the legacy Postman editor). */
+const AUTH_MODES = [
+    { id: "none", label: "No auth" },
+    { id: "bearer", label: "Bearer token" },
+    { id: "apiKeyHeader", label: "API key (header)" },
+    { id: "basic", label: "Basic auth" },
+];
+
+/** Flatten a tested response into JSONPath suggestions: array collections
+ *  ($.path) plus a few leaf field names off the first array element / object,
+ *  so the mapping inputs can offer autocomplete after a Test. */
+function detectFields(data: unknown): { collections: string[]; fields: string[] } {
+    const collections = new Set<string>();
+    const fields = new Set<string>();
+    const walk = (val: unknown, path: string, depth: number) => {
+        if (depth > 4 || val == null) return;
+        if (Array.isArray(val)) {
+            collections.add(path || "$");
+            const first = val[0];
+            if (first && typeof first === "object" && !Array.isArray(first)) for (const k of Object.keys(first)) fields.add(k);
+            return;
+        }
+        if (typeof val === "object") {
+            for (const [k, v] of Object.entries(val as Record<string, unknown>)) {
+                const next = path ? `${path}.${k}` : `$.${k}`;
+                if (v != null && typeof v !== "object") fields.add(next);
+                walk(v, next, depth + 1);
+            }
+        }
+    };
+    walk(data, "$", 0);
+    return { collections: [...collections], fields: [...fields] };
+}
 
 /** Data-bearing widget types — the ones that can bind to a connection + carry a
  *  field mapping. Mirrors the legacy DataConnectionModal's DATA_WIDGET_TYPES. */
@@ -84,6 +127,14 @@ interface KV {
     id: string;
     key: string;
     value: string;
+}
+/** A table/detail column row in the editor. */
+interface ColRow {
+    id: string;
+    key: string;
+    label: string;
+    format: string;
+    animation: string;
 }
 const kvId = () => Math.random().toString(36).slice(2);
 const recordToRows = (rec?: Record<string, unknown>): KV[] =>
@@ -212,7 +263,7 @@ const ALIGNS = ["left", "center", "right"] as const;
 
 function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }) {
     const { updateWidget, removeWidget, addWidget, state, activePage } = useDashboard();
-    const { connections } = useSettings();
+    const { connections, getConnection, addConnection } = useSettings();
     const pages = state.pages;
     const [tab, setTab] = useState<EditorTab>("settings");
 
@@ -224,7 +275,7 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
     const [title, setTitle] = useState(widget.title ?? "");
     const [widgetType, setWidgetType] = useState<WidgetType>(widget.type);
 
-    // Data source / live request. sourceId "" = inline (no connection).
+    // Data source / live request. sourceId "" = inline · "__custom" = ad-hoc REST.
     const boundReq = widget.data?.request;
     const [sourceId, setSourceId] = useState<string>(widget.data?.sourceId ?? "");
     const [method, setMethod] = useState<string>(boundReq?.method ?? "GET");
@@ -232,6 +283,61 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
     const [paramRows, setParamRows] = useState<KV[]>(recordToRows(boundReq?.params as Record<string, unknown> | undefined));
     const [headerRows, setHeaderRows] = useState<KV[]>(recordToRows(boundReq?.headers));
     const [bodyText, setBodyText] = useState(boundReq?.body != null ? JSON.stringify(boundReq.body, null, 2) : "");
+    const isCustom = sourceId === "__custom";
+    const isContent = isContentType(widget.type);
+
+    // Custom one-off REST source — base URL + auth, built into a saved Connection
+    // on save and bound to the widget (mirrors the legacy Postman editor).
+    const [customBaseUrl, setCustomBaseUrl] = useState("");
+    const [customAuthMode, setCustomAuthMode] = useState("none");
+    const [customToken, setCustomToken] = useState("");
+    const [customKeyName, setCustomKeyName] = useState("");
+    const [customKeyValue, setCustomKeyValue] = useState("");
+    const [customUser, setCustomUser] = useState("");
+    const [customPass, setCustomPass] = useState("");
+    const buildCustomAuth = (): ConnectionAuth => {
+        if (customAuthMode === "bearer") return { type: "bearer", token: customToken };
+        if (customAuthMode === "apiKeyHeader") return { type: "apiKeyHeader", keyName: customKeyName, keyValue: customKeyValue };
+        if (customAuthMode === "basic") return { type: "basic", username: customUser, password: customPass };
+        return { type: "none" };
+    };
+
+    // Test / Load fields — run the live request and surface response paths as
+    // autocomplete suggestions (a shared <datalist>) for the mapping inputs.
+    const [detected, setDetected] = useState<string[]>([]);
+    const [testing, setTesting] = useState(false);
+    const [testMsg, setTestMsg] = useState<string | null>(null);
+    const fieldsListId = `wf-${widget.id}`;
+
+    // Content widgets — markdown body / diagram source / image url+alt.
+    const [contentText, setContentText] = useState(() =>
+        isDiagramType(widget.type)
+            ? typeof widget.settings?.source === "string" ? widget.settings.source : ""
+            : typeof widget.settings?.content === "string" ? widget.settings.content : typeof widget.settings?.markdown === "string" ? widget.settings.markdown : "",
+    );
+    const [imageUrl, setImageUrl] = useState(typeof widget.settings?.url === "string" ? widget.settings.url : typeof widget.settings?.src === "string" ? widget.settings.src : "");
+    const [imageAlt, setImageAlt] = useState(typeof widget.settings?.alt === "string" ? widget.settings.alt : "");
+
+    // Table / detail columns — key + label + per-column format + animation.
+    const initialColumns = (Array.isArray(widget.settings?.columns) ? widget.settings.columns : Array.isArray(widget.settings?.fields) ? widget.settings.fields : []) as unknown[];
+    const [columnRows, setColumnRows] = useState<ColRow[]>(() =>
+        initialColumns.map((c) => {
+            if (typeof c === "string") return { id: kvId(), key: c, label: c, format: "auto", animation: "none" };
+            const r = c as Record<string, unknown>;
+            return { id: kvId(), key: String(r.key ?? ""), label: String(r.label ?? r.key ?? ""), format: String(r.format ?? "auto"), animation: String(r.animation ?? "none") };
+        }),
+    );
+
+    /** Settings keys owned by a dedicated editor — excluded from custom/advanced. */
+    const ownedKeys = useMemo(() => {
+        const s = new Set<string>(MAPPING_SETTINGS_KEYS);
+        if (widget.type === "table") s.add("columns");
+        if (widget.type === "detail") { s.add("fields"); s.add("columns"); }
+        if (widget.type === "markdown") { s.add("content"); s.add("markdown"); }
+        if (isDiagramType(widget.type)) s.add("source");
+        if (widget.type === "image") { s.add("url"); s.add("src"); s.add("alt"); }
+        return s;
+    }, [widget.type]);
 
     // Structured field-mapping: one input per slot for the active widget type.
     const slots = MAPPING_SLOTS[widgetType] ?? [];
@@ -251,20 +357,48 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
     // mapping slot. Complex (object/array) settings are preserved untouched.
     const [customRows, setCustomRows] = useState<KV[]>(() =>
         Object.entries(widget.settings ?? {})
-            .filter(([k, v]) => !MAPPING_SETTINGS_KEYS.has(k) && (typeof v === "string" || typeof v === "number" || typeof v === "boolean"))
+            .filter(([k, v]) => !ownedKeys.has(k) && (typeof v === "string" || typeof v === "number" || typeof v === "boolean"))
             .map(([key, value]) => ({ id: kvId(), key, value: String(value) })),
     );
     const [customOpen, setCustomOpen] = useState(false);
-    // Advanced — the COMPLEX (object/array) settings that the key-value editor
-    // can't represent: chart points, table rows/columns, list/detail inline data,
-    // markdown content, featureGrid features. Editable so inline (non-bound) data
-    // widgets aren't read-only.
+    // Advanced — the COMPLEX (object/array) settings not owned by a dedicated
+    // editor (chart points, list inline data, featureGrid features…). Editable so
+    // inline (non-bound) data widgets aren't read-only.
     const [advancedText, setAdvancedText] = useState(() => {
-        const complex = Object.fromEntries(Object.entries(widget.settings ?? {}).filter(([, v]) => v != null && typeof v === "object"));
+        const complex = Object.fromEntries(Object.entries(widget.settings ?? {}).filter(([k, v]) => v != null && typeof v === "object" && !ownedKeys.has(k)));
         return Object.keys(complex).length ? JSON.stringify(complex, null, 2) : "";
     });
     const [advancedOpen, setAdvancedOpen] = useState(false);
     const [targetPageId, setTargetPageId] = useState(currentPage.id);
+
+    // Run the live request now and detect response fields for autocomplete.
+    const runTest = async () => {
+        setTesting(true);
+        setTestMsg(null);
+        const conn: Connection = isCustom
+            ? { id: "__test", name: "test", type: "rest", baseUrl: customBaseUrl, auth: buildCustomAuth(), headers: headerRows.map((r) => ({ key: r.key, value: r.value })) }
+            : getConnection(sourceId) ?? { id: "__test", name: "test", type: "rest" };
+        const url = buildUrl(conn, path, rowsToRecord(paramRows));
+        const headers = buildHeaders(conn, rowsToRecord(headerRows));
+        let body: unknown;
+        try {
+            body = bodyText.trim() ? JSON.parse(bodyText) : undefined;
+        } catch {
+            /* ignore — send no body if it isn't valid JSON */
+        }
+        const res = await testEndpoint({ method, url, headers, body });
+        setTesting(false);
+        if (res.ok) {
+            const det = detectFields(res.body);
+            setDetected([...det.collections, ...det.fields]);
+            setTestMsg(`OK — ${det.collections.length} collection(s), ${det.fields.length} field(s) detected.`);
+            const collSlot = slots.find((s) => s.target === "map" && ["series", "items", "rows", "record"].includes(s.key));
+            if (collSlot && !(slotValues[collSlot.key] ?? "").trim() && det.collections[0]) setSlot(collSlot.key, det.collections[0]);
+        } else {
+            setDetected([]);
+            setTestMsg(typeof res.error === "string" ? res.error : `Request failed (${res.status ?? "?"}).`);
+        }
+    };
 
     const defs = widgetElements(widget.type);
     const [elStyles, setElStyles] = useState<Record<string, ElState>>(() => {
@@ -317,6 +451,35 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
             }
         }
         for (const r of customRows) if (r.key.trim()) settings[r.key.trim()] = r.value;
+        // Dedicated content editors → settings.
+        if (widget.type === "markdown") {
+            if (contentText.trim()) settings.content = contentText;
+            else delete settings.content;
+            delete settings.markdown;
+        } else if (isDiagramType(widget.type)) {
+            if (contentText.trim()) settings.source = contentText;
+            else delete settings.source;
+        } else if (widget.type === "image") {
+            if (imageUrl.trim()) settings.url = imageUrl.trim();
+            else delete settings.url;
+            delete settings.src;
+            if (imageAlt.trim()) settings.alt = imageAlt.trim();
+            else delete settings.alt;
+        }
+        // Table / detail columns (key + label + format + animation).
+        if (widgetType === "table" || widgetType === "detail") {
+            const cols = columnRows
+                .filter((c) => c.key.trim())
+                .map((c) => ({
+                    key: c.key.trim(),
+                    label: c.label.trim() || c.key.trim(),
+                    ...(c.format && c.format !== "auto" ? { format: c.format } : {}),
+                    ...(c.animation && c.animation !== "none" ? { animation: c.animation } : {}),
+                }));
+            const colKey = widgetType === "detail" ? "fields" : "columns";
+            if (cols.length) settings[colKey] = cols;
+            else delete settings[colKey];
+        }
         // Bound request body (only the body field is raw JSON now).
         let body: unknown;
         let map: Record<string, string> | undefined;
@@ -361,11 +524,17 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
         }
         const ms = Number(refreshMs) || 0;
         // Build the live binding from the selected source (or drop it when inline).
+        // A custom one-off becomes a real saved Connection so the widget can read
+        // it live just like any other binding.
         const params = rowsToRecord(paramRows);
         const headers = rowsToRecord(headerRows);
+        const effSourceId =
+            isBound && isCustom
+                ? addConnection({ name: title.trim() || prettyType(widgetType), type: "rest", baseUrl: customBaseUrl.trim() || undefined, auth: buildCustomAuth(), headers: [], endpoints: [] })
+                : sourceId;
         const data = isBound
             ? {
-                  sourceId,
+                  sourceId: effSourceId,
                   request: {
                       method: method as HttpMethod,
                       path: path.trim() || boundReq?.path || "/",
@@ -435,86 +604,184 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
 
                 {tab === "settings" ? (
                     <div className="flex flex-col gap-5">
-                        <Input label="Name" value={title} onChange={setTitle} placeholder="Widget name" />
-
-                        {isDataType(widget.type) ? (
-                            <Select label="Widget" aria-label="Widget type" selectedKey={widgetType} items={DATA_WIDGET_TYPES.map((t) => ({ id: t, label: prettyType(t) }))} onSelectionChange={(k) => setWidgetType(String(k) as WidgetType)}>
-                                {(item) => <Select.Item id={item.id}>{item.label}</Select.Item>}
-                            </Select>
+                        {/* Autocomplete suggestions for mapping/column inputs after a Test. */}
+                        {detected.length ? (
+                            <datalist id={fieldsListId}>
+                                {detected.map((d) => (
+                                    <option key={d} value={d} />
+                                ))}
+                            </datalist>
                         ) : null}
 
-                        <Select
-                            label="Data source"
-                            aria-label="Data source"
-                            selectedKey={sourceId || "__inline"}
-                            items={[{ id: "__inline", label: "Inline (no live data)" }, ...connections.map((c) => ({ id: c.id, label: c.name }))]}
-                            onSelectionChange={(k) => { setSourceId(String(k) === "__inline" ? "" : String(k)); setError(null); }}
-                        >
-                            {(item) => <Select.Item id={item.id}>{item.label}</Select.Item>}
-                        </Select>
+                        <Input label="Name" value={title} onChange={setTitle} placeholder="Widget name" />
 
-                        {isBound ? (
+                        {isContent ? (
+                            /* Content widgets — markdown body / diagram source / image. */
+                            <Section title={widget.type === "image" ? "Image" : isDiagramType(widget.type) ? "Diagram" : "Content"}>
+                                {widget.type === "image" ? (
+                                    <>
+                                        <Input label="Image URL" value={imageUrl} onChange={setImageUrl} placeholder="https://… or data:image/…" />
+                                        <Input label="Alt text" value={imageAlt} onChange={setImageAlt} placeholder="Describe the image for accessibility" />
+                                        {imageUrl.trim() && /^(https?:|data:image\/)/i.test(imageUrl.trim()) ? (
+                                            <img src={imageUrl.trim()} alt={imageAlt || "Preview"} className="max-h-40 w-full rounded-lg object-cover ring-1 ring-secondary" />
+                                        ) : null}
+                                    </>
+                                ) : (
+                                    <TextArea
+                                        label={isDiagramType(widget.type) ? "Diagram source (Mermaid)" : "Content (Markdown)"}
+                                        hint={isDiagramType(widget.type) ? "Mermaid syntax — rendered as a diagram on save." : "Markdown — headings (#), **bold**, and - lists."}
+                                        value={contentText}
+                                        onChange={setContentText}
+                                        rows={12}
+                                        textAreaClassName={cx(isDiagramType(widget.type) && "font-mono text-xs")}
+                                    />
+                                )}
+                            </Section>
+                        ) : (
                             <>
-                                {/* Request — method / path / params / headers / body. */}
-                                <Section title="Request">
-                                    <div className="flex items-end gap-2">
-                                        <div className="w-28 shrink-0">
-                                            <Select label="Method" aria-label="Request method" selectedKey={method} items={METHODS} onSelectionChange={(k) => setMethod(String(k))}>
-                                                {(item) => <Select.Item id={item.id}>{item.label}</Select.Item>}
-                                            </Select>
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <Input label="Path" value={path} onChange={(v) => { setPath(v); setError(null); }} placeholder="/endpoint" />
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-col gap-1.5">
-                                        <span className="text-xs font-medium text-secondary">Query params</span>
-                                        <KeyValueRows rows={paramRows} onChange={setParamRows} keyPlaceholder="param" valuePlaceholder="value" />
-                                    </div>
-                                    <div className="flex flex-col gap-1.5">
-                                        <span className="text-xs font-medium text-secondary">Headers</span>
-                                        <KeyValueRows rows={headerRows} onChange={setHeaderRows} keyPlaceholder="Header" valuePlaceholder="value" />
-                                    </div>
-                                    {method !== "GET" ? (
-                                        <TextArea
-                                            label="Body (JSON)"
-                                            hint="Sent with POST/PUT/PATCH. Leave blank for none."
-                                            value={bodyText}
-                                            onChange={(next) => { setBodyText(next); setError(null); }}
-                                            rows={5}
-                                            textAreaClassName="font-mono text-xs"
-                                        />
-                                    ) : null}
-                                </Section>
+                                {isDataType(widget.type) ? (
+                                    <Select label="Widget" aria-label="Widget type" selectedKey={widgetType} items={DATA_WIDGET_TYPES.map((t) => ({ id: t, label: prettyType(t) }))} onSelectionChange={(k) => setWidgetType(String(k) as WidgetType)}>
+                                        {(item) => <Select.Item id={item.id}>{item.label}</Select.Item>}
+                                    </Select>
+                                ) : null}
 
-                                {/* Field mapping — structured per widget type. */}
-                                {slots.length ? (
-                                    <Section title="Field mapping">
-                                        {slots.map((s) => (
-                                            <Row key={s.key} label={s.label}>
-                                                <input
-                                                    className={inputCls}
-                                                    value={slotValues[s.key] ?? ""}
-                                                    placeholder={s.placeholder}
-                                                    onChange={(e) => { setSlot(s.key, e.target.value); setError(null); }}
-                                                />
-                                            </Row>
-                                        ))}
-                                        <p className="text-xs text-tertiary">
-                                            Paths (e.g. <span className="font-mono">$.data</span>) point into the response; field names (e.g. <span className="font-mono">label</span>) are read off each row.
-                                        </p>
+                                <Select
+                                    label="Data source"
+                                    aria-label="Data source"
+                                    selectedKey={sourceId === "" ? "__inline" : sourceId}
+                                    items={[
+                                        { id: "__inline", label: "Inline (no live data)" },
+                                        { id: "__custom", label: "Custom one-off (REST)" },
+                                        ...connections.map((c) => ({ id: c.id, label: c.name })),
+                                        ...(sourceId && sourceId !== "__custom" && !connections.some((c) => c.id === sourceId) ? [{ id: sourceId, label: `${sourceId} (current)` }] : []),
+                                    ]}
+                                    onSelectionChange={(k) => { const v = String(k); setSourceId(v === "__inline" ? "" : v); setDetected([]); setTestMsg(null); setError(null); }}
+                                >
+                                    {(item) => <Select.Item id={item.id}>{item.label}</Select.Item>}
+                                </Select>
+
+                                {isCustom ? (
+                                    <Section title="Custom source">
+                                        <Input label="Base URL" value={customBaseUrl} onChange={setCustomBaseUrl} placeholder="https://api.example.com" />
+                                        <Select label="Auth" aria-label="Auth mode" selectedKey={customAuthMode} items={AUTH_MODES} onSelectionChange={(k) => setCustomAuthMode(String(k))}>
+                                            {(item) => <Select.Item id={item.id}>{item.label}</Select.Item>}
+                                        </Select>
+                                        {customAuthMode === "bearer" ? <Input label="Token" value={customToken} onChange={setCustomToken} placeholder="Bearer token" /> : null}
+                                        {customAuthMode === "apiKeyHeader" ? (
+                                            <>
+                                                <Input label="Header name" value={customKeyName} onChange={setCustomKeyName} placeholder="X-API-Key" />
+                                                <Input label="Header value" value={customKeyValue} onChange={setCustomKeyValue} placeholder="key…" />
+                                            </>
+                                        ) : null}
+                                        {customAuthMode === "basic" ? (
+                                            <>
+                                                <Input label="Username" value={customUser} onChange={setCustomUser} />
+                                                <Input label="Password" value={customPass} onChange={setCustomPass} />
+                                            </>
+                                        ) : null}
                                     </Section>
                                 ) : null}
 
-                                <div className="flex flex-col gap-1.5">
-                                    <span className="text-sm font-medium text-secondary">Auto-refresh</span>
-                                    <Select aria-label="Auto-refresh interval" selectedKey={refreshMs} items={REFRESH_OPTIONS} onSelectionChange={(k) => setRefreshMs(String(k))}>
-                                        {(item) => <Select.Item id={item.id}>{item.label}</Select.Item>}
-                                    </Select>
-                                    <span className="text-xs text-tertiary">Re-fetch this widget's live data on an interval. Off by default.</span>
-                                </div>
+                                {isBound ? (
+                                    <>
+                                        {/* Request — method / path / params / headers / body / test. */}
+                                        <Section title="Request">
+                                            <div className="flex items-end gap-2">
+                                                <div className="w-28 shrink-0">
+                                                    <Select label="Method" aria-label="Request method" selectedKey={method} items={METHODS} onSelectionChange={(k) => setMethod(String(k))}>
+                                                        {(item) => <Select.Item id={item.id}>{item.label}</Select.Item>}
+                                                    </Select>
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <Input label="Path" value={path} onChange={(v) => { setPath(v); setError(null); }} placeholder="/endpoint" />
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col gap-1.5">
+                                                <span className="text-xs font-medium text-secondary">Query params</span>
+                                                <KeyValueRows rows={paramRows} onChange={setParamRows} keyPlaceholder="param" valuePlaceholder="value" />
+                                            </div>
+                                            <div className="flex flex-col gap-1.5">
+                                                <span className="text-xs font-medium text-secondary">Headers</span>
+                                                <KeyValueRows rows={headerRows} onChange={setHeaderRows} keyPlaceholder="Header" valuePlaceholder="value" />
+                                            </div>
+                                            {method !== "GET" ? (
+                                                <TextArea
+                                                    label="Body (JSON)"
+                                                    hint="Sent with POST/PUT/PATCH. Leave blank for none."
+                                                    value={bodyText}
+                                                    onChange={(next) => { setBodyText(next); setError(null); }}
+                                                    rows={5}
+                                                    textAreaClassName="font-mono text-xs"
+                                                />
+                                            ) : null}
+                                            <div className="flex items-center gap-2">
+                                                <Button color="secondary" size="sm" onClick={runTest} isLoading={testing} isDisabled={testing}>
+                                                    Test / Load fields
+                                                </Button>
+                                                {testMsg ? <span className="text-xs text-tertiary">{testMsg}</span> : null}
+                                            </div>
+                                        </Section>
+
+                                        {/* Field mapping — structured per widget type. */}
+                                        {slots.length ? (
+                                            <Section title="Field mapping">
+                                                {slots.map((s) => (
+                                                    <Row key={s.key} label={s.label}>
+                                                        <input
+                                                            className={inputCls}
+                                                            list={fieldsListId}
+                                                            value={slotValues[s.key] ?? ""}
+                                                            placeholder={s.placeholder}
+                                                            onChange={(e) => { setSlot(s.key, e.target.value); setError(null); }}
+                                                        />
+                                                    </Row>
+                                                ))}
+                                                <p className="text-xs text-tertiary">
+                                                    Paths (e.g. <span className="font-mono">$.data</span>) point into the response; field names (e.g. <span className="font-mono">label</span>) are read off each row.
+                                                </p>
+                                            </Section>
+                                        ) : null}
+
+                                        <div className="flex flex-col gap-1.5">
+                                            <span className="text-sm font-medium text-secondary">Auto-refresh</span>
+                                            <Select aria-label="Auto-refresh interval" selectedKey={refreshMs} items={REFRESH_OPTIONS} onSelectionChange={(k) => setRefreshMs(String(k))}>
+                                                {(item) => <Select.Item id={item.id}>{item.label}</Select.Item>}
+                                            </Select>
+                                            <span className="text-xs text-tertiary">Re-fetch this widget's live data on an interval. Off by default.</span>
+                                        </div>
+                                    </>
+                                ) : null}
+
+                                {/* Columns — table & detail (key · label · format · animation). */}
+                                {widgetType === "table" || widgetType === "detail" ? (
+                                    <Section title={widgetType === "detail" ? "Fields" : "Columns"}>
+                                        {columnRows.map((c) => (
+                                            <div key={c.id} className="flex flex-col gap-1.5 rounded-md bg-secondary p-2 ring-1 ring-secondary">
+                                                <div className="flex items-center gap-1.5">
+                                                    <input className={inputCls} list={fieldsListId} value={c.key} placeholder="field key" onChange={(e) => setColumnRows((rows) => rows.map((r) => (r.id === c.id ? { ...r, key: e.target.value } : r)))} />
+                                                    <input className={inputCls} value={c.label} placeholder="Label" onChange={(e) => setColumnRows((rows) => rows.map((r) => (r.id === c.id ? { ...r, label: e.target.value } : r)))} />
+                                                    <button type="button" aria-label="Remove column" onClick={() => setColumnRows((rows) => rows.filter((r) => r.id !== c.id))} className="shrink-0 rounded-md p-1.5 text-tertiary hover:text-error-primary">
+                                                        <Minus className="size-3.5" />
+                                                    </button>
+                                                </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <select className={inputCls} aria-label="Format" value={c.format} onChange={(e) => setColumnRows((rows) => rows.map((r) => (r.id === c.id ? { ...r, format: e.target.value } : r)))}>
+                                                        {CELL_FORMATS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+                                                    </select>
+                                                    <select className={inputCls} aria-label="Animation" value={c.animation} onChange={(e) => setColumnRows((rows) => rows.map((r) => (r.id === c.id ? { ...r, animation: e.target.value } : r)))}>
+                                                        {CELL_ANIMATIONS.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        <button type="button" onClick={() => setColumnRows((rows) => [...rows, { id: kvId(), key: "", label: "", format: "auto", animation: "none" }])} className="flex w-fit items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-tertiary ring-1 ring-dashed ring-secondary hover:text-secondary">
+                                            <Plus className="size-3" /> Add column
+                                        </button>
+                                        <p className="text-xs text-tertiary">Leave empty to auto-infer columns from the data.</p>
+                                    </Section>
+                                ) : null}
                             </>
-                        ) : null}
+                        )}
 
                         {/* Widget custom settings — collapsible key/value (legacy parity). */}
                         <div className="rounded-lg ring-1 ring-secondary">

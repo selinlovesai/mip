@@ -15,7 +15,7 @@ import { testEndpoint } from "@/mip/api";
 import type { MipWidget } from "@/mip/schema";
 import { useSettings, type Connection } from "@/mip/settings/settings-store";
 
-function buildUrl(conn: Connection, path: string, params?: Record<string, unknown>): string {
+export function buildUrl(conn: Connection, path: string, params?: Record<string, unknown>): string {
     const base = (conn.baseUrl ?? "").replace(/\/$/, "");
     let url = /^https?:\/\//.test(path) ? path : base + (path.startsWith("/") ? path : `/${path}`);
     if (params && Object.keys(params).length) {
@@ -25,7 +25,7 @@ function buildUrl(conn: Connection, path: string, params?: Record<string, unknow
     return url;
 }
 
-function buildHeaders(conn: Connection, extra?: Record<string, string>): Record<string, string> {
+export function buildHeaders(conn: Connection, extra?: Record<string, string>): Record<string, string> {
     const headers: Record<string, string> = { ...extra };
     for (const h of conn.headers ?? []) if (h.key) headers[h.key] = h.value;
     const auth = conn.auth;
