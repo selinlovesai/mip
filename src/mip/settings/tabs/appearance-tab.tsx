@@ -581,7 +581,7 @@ export function AppearanceTab() {
                         <div className="flex flex-col gap-2">
                             {textTokens.map((name) => (
                                 <div key={name} className="flex items-center justify-between gap-4 rounded-lg p-3 ring-1 ring-secondary">
-                                    <span className="w-12 shrink-0 truncate font-semibold text-primary" style={{ fontSize: `var(${name})` }}>Ag</span>
+                                    <span className="w-50 shrink-0 truncate font-semibold text-primary" style={{ fontSize: `var(${name})` }}>Ag</span>
                                     <span className="flex shrink-0 flex-col items-end gap-1">
                                         <TokenName name={name} />
                                         <ValueInput value={storedValue(name)} disabled={!dbReady} onCommit={(v) => void saveToken(name, v, "Typography", "typography")} className="w-56" />
