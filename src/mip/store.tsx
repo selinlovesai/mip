@@ -157,6 +157,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     // the pages that actually changed (debounced), deleting removed ones.
     const dbEnabled = useRef(false);
     const syncedPages = useRef(new Map<string, string>()); // page id -> last-synced JSON
+    // Did this device already have a local working set at startup? If so, LOCAL
+    // is authoritative — we push it up to the DB and NEVER replace it with DB
+    // contents (so a freshly-seeded DB can't clobber the user's dashboards).
+    const hadLocal = useRef(typeof localStorage !== "undefined" && localStorage.getItem(STORAGE_KEY) != null);
 
     useEffect(() => {
         let alive = true;
@@ -164,15 +168,26 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
             if (!(await dbAvailable())) return; // DB off → stay on localStorage cache
             dbEnabled.current = true;
             const records = await dbList<DashboardPage>("dashboards");
-            if (!alive || !records.length) return; // empty DB → push local pages up via the sync effect
+            if (!alive) return;
+            // Seed the synced map so unchanged DB pages aren't re-pushed.
             for (const r of records) syncedPages.current.set(r.id, JSON.stringify(r.data));
-            const pages = migrateRowHeight({ pages: records.map((r) => r.data), activePageId: "" }).pages;
-            setState((s) => ({ pages, activePageId: pages.some((p) => p.id === s.activePageId) ? s.activePageId : pages[0]!.id }));
+            // Adopt DB pages ONLY on a fresh device (no local pages). When the
+            // user already has local pages they win and are uploaded by the sync
+            // effect below — hydration must not delete or overwrite them.
+            if (!hadLocal.current && records.length) {
+                const pages = migrateRowHeight({ pages: records.map((r) => r.data), activePageId: "" }).pages;
+                setState((s) => ({ pages, activePageId: pages.some((p) => p.id === s.activePageId) ? s.activePageId : pages[0]!.id }));
+            }
         })();
         return () => {
             alive = false;
         };
     }, []);
+
+    // Ids that have been present in LOCAL state during this session. We only
+    // delete a DB record when an id we actually had locally is later removed —
+    // never a DB-only page from another device (which would cross-delete it).
+    const localKnownIds = useRef<Set<string>>(new Set());
 
     useEffect(() => {
         if (!dbEnabled.current) return;
@@ -186,12 +201,14 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
                     void dbPut("dashboards", page.id, page);
                 }
             }
-            for (const id of [...syncedPages.current.keys()]) {
+            // Delete only ids we previously held locally and that are now gone.
+            for (const id of localKnownIds.current) {
                 if (!present.has(id)) {
                     syncedPages.current.delete(id);
                     void dbDelete("dashboards", id);
                 }
             }
+            localKnownIds.current = present;
         }, 600);
         return () => clearTimeout(t);
     }, [state.pages]);
