@@ -341,7 +341,10 @@ export function AppearanceTab() {
     // Typography / shadow / radius: DB set when available, else static fallback.
     const fontTokens = useMemo(() => (tokens.length ? namesOfKind(tokens, "typography", (n) => n.startsWith("--font-")).sort() : FONT_TOKENS), [tokens]);
     const textTokens = useMemo(
-        () => (tokens.length ? namesOfKind(tokens, "typography", (n) => n.startsWith("--text-") && !n.endsWith("--line-height") && !n.endsWith("--letter-spacing")).sort() : DISPLAY_SCALE),
+        () =>
+            tokens.length
+                ? namesOfKind(tokens, "typography", (n) => n.startsWith("--text-") && !n.startsWith("--text-color-") && !n.endsWith("--line-height") && !n.endsWith("--letter-spacing")).sort()
+                : DISPLAY_SCALE,
         [tokens],
     );
     const shadowTokens = useMemo(() => (tokens.length ? namesOfKind(tokens, "shadow").sort() : SHADOW_TOKENS), [tokens]);

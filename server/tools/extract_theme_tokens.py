@@ -41,6 +41,11 @@ VAR_RE = re.compile(r"^\s*(--[A-Za-z0-9_-]+)\s*:\s*([^;]+);", re.MULTILINE)
 
 
 def _kind(name: str) -> str | None:
+    # `--text-color-*` is a Tailwind text-color UTILITY ALIAS (mirrors
+    # --color-text-*), NOT a type-scale token — exclude it so it doesn't pollute
+    # Typography. The real color tokens live under --color-text-* (kind color).
+    if name.startswith("--text-color-"):
+        return None
     for prefix, kind in KIND_BY_PREFIX.items():
         if name.startswith(prefix):
             return kind
