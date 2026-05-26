@@ -17,6 +17,7 @@ import { CanvasSurface } from "./canvas-surface";
 import { ChatPanel } from "./chat-panel";
 import { DashboardGrid } from "./dashboard-grid";
 import { DashboardSettingsModal } from "./dashboard-settings-modal";
+import { LoginScreen } from "./login-screen";
 import { Sidebar } from "./sidebar";
 import { TemplatesModal } from "./templates-modal";
 import { Topbar } from "./topbar";
@@ -41,15 +42,41 @@ export const AppShell = () => {
     const [settingsTab, setSettingsTab] = useState<SettingsTabId>("profile");
     const [dashboardSettingsOpen, setDashboardSettingsOpen] = useState(false);
     const [templatesOpen, setTemplatesOpen] = useState(false);
+    // Lightweight auth gate (no real auth yet): Sign out flips this + a flag so
+    // a reload stays signed out; "Sign in" clears it and remounts the app.
+    const [signedOut, setSignedOut] = useState(() => typeof localStorage !== "undefined" && localStorage.getItem("mip:signed-out") === "1");
 
     const openSettings = (tab: SettingsTabId = "profile") => {
         setSettingsTab(tab);
         setSettingsOpen(true);
     };
 
+    const signOut = () => {
+        try {
+            localStorage.setItem("mip:signed-out", "1");
+        } catch {
+            /* ignore */
+        }
+        setSignedOut(true);
+    };
+
     useEffect(() => {
         applyAccent(getSavedAccent());
     }, []);
+
+    if (signedOut)
+        return (
+            <LoginScreen
+                onSignIn={() => {
+                    try {
+                        localStorage.removeItem("mip:signed-out");
+                    } catch {
+                        /* ignore */
+                    }
+                    setSignedOut(false);
+                }}
+            />
+        );
 
     return (
         <UiKitProvider adapter={untitledAdapter}>
@@ -57,7 +84,7 @@ export const AppShell = () => {
                 <DashboardProvider>
                     <div className="flex h-dvh overflow-hidden bg-secondary">
                         <div className={`shrink-0 overflow-hidden transition-[width] duration-200 ease-in-out ${sidebarCollapsed ? "w-0" : "w-64"}`}>
-                            <Sidebar onToggle={() => setSidebarCollapsed(true)} onOpenSettings={openSettings} onNavigate={() => setSettingsOpen(false)} />
+                            <Sidebar onToggle={() => setSidebarCollapsed(true)} onOpenSettings={openSettings} onNavigate={() => setSettingsOpen(false)} onSignOut={signOut} />
                         </div>
                         <div className="flex min-w-0 flex-1 flex-col">
                             <Topbar

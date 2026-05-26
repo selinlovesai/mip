@@ -28,7 +28,7 @@ function initialsOf(name: string): string {
     return (parts[0]![0]! + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
-export function Sidebar({ onToggle, onOpenSettings, onNavigate }: { onToggle: () => void; onOpenSettings: (tab?: SettingsTabId) => void; onNavigate?: () => void }) {
+export function Sidebar({ onToggle, onOpenSettings, onNavigate, onSignOut }: { onToggle: () => void; onOpenSettings: (tab?: SettingsTabId) => void; onNavigate?: () => void; onSignOut?: () => void }) {
     const { state, activePage, setActivePage, addPage, addCanvas, renamePage, deletePage, duplicatePage } = useDashboard();
     const { profile, canvasConsented, setCanvasConsented } = useSettings();
     const [adding, setAdding] = useState(false);
@@ -170,7 +170,7 @@ export function Sidebar({ onToggle, onOpenSettings, onNavigate }: { onToggle: ()
                     <Dropdown.Popover placement="top end">
                         <Dropdown.Menu>
                             <Dropdown.Item icon={Settings01} label="Settings" onAction={() => onOpenSettings()} />
-                            <Dropdown.Item icon={LogOut01} label="Sign out" onAction={() => window.location.reload()} />
+                            <Dropdown.Item icon={LogOut01} label="Sign out" onAction={() => (onSignOut ? onSignOut() : window.location.reload())} />
                         </Dropdown.Menu>
                     </Dropdown.Popover>
                 </Dropdown.Root>
