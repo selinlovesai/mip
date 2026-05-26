@@ -63,6 +63,7 @@ const UI_SETTINGS: Array<{ section: string; target: string; label: string; hint:
     // Surfaces & actions
     { section: "Surfaces & actions", target: "--color-bg-brand-solid", label: "Primary button", hint: "Solid brand background" },
     { section: "Surfaces & actions", target: "--color-bg-primary", label: "Page background", hint: "App & card surface" },
+    { section: "Surfaces & actions", target: "--color-bg-secondary_hover", label: "Hover background", hint: "Mode toggle, menu items & buttons" },
     { section: "Surfaces & actions", target: "--color-border-secondary", label: "Border color", hint: "Cards, dividers, inputs" },
     // Charts
     { section: "Charts", target: "--color-chart-1", label: "Chart color 1", hint: "Primary series / first slice" },
@@ -327,7 +328,7 @@ export function AppearanceTab() {
                         <span className="text-sm font-medium text-secondary">Mode</span>
                         <div className="flex max-w-md gap-2">
                             {MODES.map((mode) => (
-                                <button key={mode} onClick={() => setTheme(mode)} className={cx("flex-1 rounded-lg px-3 py-2 text-sm font-medium capitalize ring-1 transition-colors", theme === mode ? "bg-brand-50 text-brand-secondary ring-brand" : "bg-primary text-secondary ring-secondary hover:bg-secondary")}>
+                                <button key={mode} onClick={() => setTheme(mode)} className={cx("flex-1 rounded-lg px-3 py-2 text-sm font-medium capitalize ring-1 transition-colors", theme === mode ? "bg-brand-50 text-brand-secondary ring-brand" : "bg-primary text-secondary ring-secondary hover:bg-secondary_hover")}>
                                     {mode}
                                 </button>
                             ))}
