@@ -9,7 +9,7 @@
  */
 
 export { runAgent, type Brain, type RunAgentOptions } from "./agent";
-export { buildSystemPrompt, describeDashboard, type PromptContext, type DashboardFacts } from "./prompt";
+export { buildSystemPrompt, describeDashboard, DEFAULT_PAGE_CONTEXT, type PromptContext, type DashboardFacts } from "./prompt";
 export { parseAgentReply, coerceReply, claimsAction } from "./reply";
 export { ALL_TOOLS, toolsFor, catalogFor, isMutating, dispatch } from "./tools";
 export { resolveSkills, type PageAgentConfig } from "./config";

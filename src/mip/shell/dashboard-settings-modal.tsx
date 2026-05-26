@@ -22,7 +22,7 @@ import { dbAvailable, dbGet } from "@/mip/api";
 import { useDashboard, type DashboardPage, type PageAccessLevel, type PageVariable } from "@/mip/store";
 import { useSettings } from "@/mip/settings/settings-store";
 import { ModelField } from "@/mip/settings/model-field";
-import type { PageAgentConfig } from "@/mip/agent";
+import { DEFAULT_PAGE_CONTEXT, type PageAgentConfig } from "@/mip/agent";
 import { cx } from "@/utils/cx";
 
 type TabId = "general" | "agent" | "access" | "variables";
@@ -285,11 +285,11 @@ export function DashboardSettingsModal({ open, onClose }: { open: boolean; onClo
 
                                         <TextArea
                                             label="AI assistant context (system prompt)"
-                                            hint="Injected at the top of this dashboard's agent prompt."
+                                            hint="Injected at the top of this dashboard's agent prompt. Leave blank to use the default shown below."
                                             value={draft.systemPrompt ?? ""}
                                             onChange={(v) => setDraftField("systemPrompt", v)}
-                                            rows={4}
-                                            placeholder="e.g. This page tracks SEO metrics; prefer concise, data-backed answers."
+                                            rows={5}
+                                            placeholder={DEFAULT_PAGE_CONTEXT}
                                         />
 
                                         <div className="flex flex-col gap-2">

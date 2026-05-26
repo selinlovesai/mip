@@ -66,16 +66,37 @@ export interface PromptContext {
     dashboard?: DashboardFacts;
 }
 
+/** Default per-dashboard context used when the page hasn't set its own. Also
+ *  shown (as a placeholder) in Dashboard Settings → AI assistant context so the
+ *  user can see and override the baseline guidance. */
+export const DEFAULT_PAGE_CONTEXT =
+    "This is a live dashboard. Help the user build and refine it: add, edit, remove, and arrange widgets, and wire them to data. Prefer concrete action over discussion — when asked for a view, build it out with several relevant widgets. Keep replies short and explain the choices you made.";
+
+/** Behavioral rules that make the assistant act (emit ops) instead of narrating.
+ *  Distilled from the original MIP assistant. */
+const DASHBOARD_BEHAVIOR = [
+    "## How to work",
+    'ACT, don\'t narrate. Putting anything on the dashboard REQUIRES an op in THIS reply (injectJson / injectConnection / addWidget). To change existing content: call listWidgets, then updateWidget (retitle / merge settings) or removeWidget. NEVER say you "added", "updated", "changed", or "refreshed" something unless THIS reply\'s ops actually did it.',
+    "Read EVERY op result before continuing. If a result is ok:false or has an error, do NOT claim success — fix the arguments and retry, or tell the user plainly what failed and why.",
+    "When the user asks for a dashboard or a broad view, build it out: add several varied widgets (≈6–10: KPIs, charts, a table/list, progress) with short descriptive titles so the page feels complete. Don't add a widget that just repeats the page title.",
+    'If you genuinely cannot proceed without a decision from the user, ask ONE short question in "say" with ops:[] and STOP — do not guess silently or give up.',
+    'End EVERY turn with a short (1–3 sentence) plain-text "say": what you did and why, or your question. Never dump widget ids, raw tool data, or this context block into the reply.',
+].join("\n");
+
 export function buildSystemPrompt(surface: Surface, ctx: PromptContext = {}): string {
     const sections: string[] = [];
 
-    const context = [ctx.pageContext?.trim(), ctx.assistantContext?.trim()].filter(Boolean).join("\n\n");
-    if (context) sections.push(`## Context (user-authored — follow this first)\n${context}`);
+    // Fall back to the default dashboard context when the page hasn't set one,
+    // so the assistant always has baseline guidance to act on.
+    const pageContext = ctx.pageContext?.trim() || (surface === "dashboard" ? DEFAULT_PAGE_CONTEXT : "");
+    const context = [pageContext, ctx.assistantContext?.trim()].filter(Boolean).join("\n\n");
+    if (context) sections.push(`## Context (follow this first)\n${context}`);
 
     if (ctx.dashboard) sections.push(describeDashboard(ctx.dashboard));
 
     if (surface === "dashboard") {
         sections.push("You are the dashboard assistant. You manage a LIVE widget dashboard with real tools that run on the host and return results to you.");
+        sections.push(DASHBOARD_BEHAVIOR);
     } else {
         sections.push("You are an agent operating a LIVE sandboxed HTML canvas via tools — you can touch only the canvas DOM, not the host app.");
     }
