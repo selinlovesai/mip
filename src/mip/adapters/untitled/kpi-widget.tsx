@@ -21,6 +21,7 @@ export function KpiWidget({ widget, dataState }: WidgetRenderProps) {
     // settings. When a data `map` is present, resolve value/delta via JSONPath
     // (e.g. value: "$.lastPrice"); otherwise read top-level keys.
     const fetched = dataState.status === "success" && dataState.data != null ? dataState.data : undefined;
+    const isBound = !!widget.data?.sourceId;
     const map = widget.data?.map;
     const mapped = (key: string): unknown =>
         fetched == null ? undefined : map?.[key] != null ? readJsonPath(fetched, map[key]) : (fetched as Record<string, unknown>)[key];
@@ -33,7 +34,9 @@ export function KpiWidget({ widget, dataState }: WidgetRenderProps) {
     // Delta may arrive as a number (5.2) OR a string ("+5.2%", "-3%"). Show it in
     // either case — parse a leading number for the trend arrow, fall back to the
     // sign in the string.
-    const rawDelta = mapped("delta") ?? settings.delta;
+    // For a bound widget, only show a delta that actually came from the data —
+    // don't fall back to the inline placeholder (which looks like stale mock).
+    const rawDelta = mapped("delta") ?? (isBound ? undefined : settings.delta);
     const deltaStr = rawDelta == null ? "" : String(rawDelta).trim();
     const deltaNum = typeof rawDelta === "number" ? rawDelta : parseFloat(deltaStr.replace(/[^0-9.+-]/g, ""));
     const hasDelta = deltaStr !== "";
