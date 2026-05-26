@@ -656,6 +656,9 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
     );
 
     // ---- Mode toolbar (shared by every footer) ----
+    // Active toggle look — matches the topbar utility icons (transparent fill +
+    // brand ring/text, reads in light AND dark).
+    const activeClass = "bg-transparent text-brand-secondary ring-1 ring-brand hover:text-brand-secondary";
     const modeToolbar = (
         <div className="flex items-center gap-1">
             <ButtonUtility
@@ -664,7 +667,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                 icon={LayoutRight}
                 tooltip="Sidebar"
                 onClick={() => setMode("sidebar")}
-                className={cx(mode === "sidebar" && "bg-active text-fg-brand-primary")}
+                className={cx(mode === "sidebar" && activeClass)}
             />
             <ButtonUtility
                 size="xs"
@@ -672,7 +675,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                 icon={MessageChatCircle}
                 tooltip="Floating chat"
                 onClick={() => setMode("chat")}
-                className={cx(mode === "chat" && "bg-active text-fg-brand-primary")}
+                className={cx(mode === "chat" && activeClass)}
             />
             <ButtonUtility
                 size="xs"
@@ -680,7 +683,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                 icon={mode === "compact" ? Expand01 : Minimize01}
                 tooltip={mode === "compact" ? "Expand" : "Compact"}
                 onClick={() => setMode(mode === "compact" ? "sidebar" : "compact")}
-                className={cx(mode === "compact" && "bg-active text-fg-brand-primary")}
+                className={cx(mode === "compact" && activeClass)}
             />
         </div>
     );
