@@ -18,6 +18,25 @@ interface Beam {
     end: { x: number; y: number };
 }
 
+/** Where the comet starts: over a visible "Get started" button (or an explicit
+ *  [data-intro-start]) when present, else the screen center. Robust across
+ *  screens that may not have such a button. */
+function findStart(): { x: number; y: number } {
+    if (typeof document !== "undefined") {
+        const inView = (el: Element) => {
+            const r = el.getBoundingClientRect();
+            return r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0 && r.top < window.innerHeight && r.left < window.innerWidth;
+        };
+        const explicit = document.querySelector<HTMLElement>("[data-intro-start]");
+        const cta = explicit ?? Array.from(document.querySelectorAll<HTMLElement>("button, a")).find((el) => /get\s*started/i.test(el.textContent ?? "") && inView(el));
+        if (cta && inView(cta)) {
+            const r = cta.getBoundingClientRect();
+            return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+        }
+    }
+    return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+}
+
 // appear · grown · end-of-hold · ARRIVED at icon · faded out (in place over icon)
 const TIMES = [0, 0.16, 0.42, 0.9, 1];
 const DURATION = 2.0;
@@ -35,7 +54,7 @@ export function IntroBeam() {
             requestAnimationFrame(() => {
             const r = el.getBoundingClientRect();
             const end = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-            const start = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+            const start = findStart();
             const dx = end.x - start.x;
             const dy = end.y - start.y;
             const dist = Math.hypot(dx, dy) || 1;
