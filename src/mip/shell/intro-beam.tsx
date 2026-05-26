@@ -85,8 +85,10 @@ export function IntroBeam() {
             const r = t.getBoundingClientRect();
             launch({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
         };
-        document.addEventListener("click", onClick);
-        return () => document.removeEventListener("click", onClick);
+        // Capture phase: React Aria buttons/links stop click propagation, so a
+        // bubble-phase listener never fires — capture sees it first regardless.
+        document.addEventListener("click", onClick, true);
+        return () => document.removeEventListener("click", onClick, true);
     }, [launch]);
 
     // Clear the overlay after the run finishes (re-armed on each launch via id).
