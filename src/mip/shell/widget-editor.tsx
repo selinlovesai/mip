@@ -18,7 +18,8 @@ import { TextArea } from "@/components/base/textarea/textarea";
 import { SlideoutMenu } from "@/components/application/slideout-menus/slideout-menu";
 import { COLOR_TOKEN_GROUPS } from "@/mip/design-tokens";
 import { useDashboard } from "@/mip/store";
-import type { MipElementStyle, MipWidget, MipWidgetColors } from "@/mip/schema";
+import { useSettings } from "@/mip/settings/settings-store";
+import type { HttpMethod, MipElementStyle, MipWidget, MipWidgetColors } from "@/mip/schema";
 import { cx } from "@/utils/cx";
 import { widgetElements } from "./widget-chrome";
 
@@ -37,6 +38,8 @@ const REFRESH_OPTIONS = [
     { id: "30000", label: "Every 30s" },
     { id: "60000", label: "Every 60s" },
 ];
+
+const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"].map((m) => ({ id: m, label: m }));
 
 const inputCls = "h-7 w-full min-w-0 rounded-md bg-primary px-2 text-xs text-primary ring-1 ring-secondary outline-none focus:ring-2 focus:ring-brand";
 
@@ -116,9 +119,19 @@ const ALIGNS = ["left", "center", "right"] as const;
 
 function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }) {
     const { updateWidget } = useDashboard();
+    const { getConnection } = useSettings();
     const [tab, setTab] = useState<EditorTab>("settings");
     const [title, setTitle] = useState(widget.title ?? "");
     const [settingsText, setSettingsText] = useState(JSON.stringify(widget.settings ?? {}, null, 2));
+
+    // For API-bound widgets: edit the actual live request + response mapping
+    // (the source of the data), not the inline placeholder settings.
+    const boundReq = widget.data?.request;
+    const source = widget.data ? getConnection(widget.data.sourceId) : undefined;
+    const [method, setMethod] = useState<string>(boundReq?.method ?? "GET");
+    const [path, setPath] = useState<string>(boundReq?.path ?? "");
+    const [bodyText, setBodyText] = useState(boundReq?.body != null ? JSON.stringify(boundReq.body, null, 2) : "");
+    const [mapText, setMapText] = useState(widget.data?.map ? JSON.stringify(widget.data.map, null, 2) : "");
 
     const defs = widgetElements(widget.type);
     const [elStyles, setElStyles] = useState<Record<string, ElState>>(() => {
@@ -160,9 +173,28 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
         try {
             settings = settingsText.trim() ? JSON.parse(settingsText) : {};
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Invalid JSON");
+            setError(`Display settings: ${err instanceof Error ? err.message : "Invalid JSON"}`);
             setTab("settings");
             return;
+        }
+        // Parse the bound request body + mapping (when this widget reads live data).
+        let body: unknown;
+        let map: Record<string, string> | undefined;
+        if (isBound) {
+            try {
+                body = bodyText.trim() ? JSON.parse(bodyText) : undefined;
+            } catch (err) {
+                setError(`Request body: ${err instanceof Error ? err.message : "Invalid JSON"}`);
+                setTab("settings");
+                return;
+            }
+            try {
+                map = mapText.trim() ? (JSON.parse(mapText) as Record<string, string>) : undefined;
+            } catch (err) {
+                setError(`Response mapping: ${err instanceof Error ? err.message : "Invalid JSON"}`);
+                setTab("settings");
+                return;
+            }
         }
         const cleanColors = (src: MipWidgetColors) => {
             const out: MipWidgetColors = {};
@@ -199,7 +231,16 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
                 customCss: card.customCss.trim() || undefined,
                 elements: Object.keys(elements).length ? elements : undefined,
             },
-            ...(widget.data ? { data: { ...widget.data, refreshMs: ms || undefined } } : {}),
+            ...(widget.data
+                ? {
+                      data: {
+                          ...widget.data,
+                          request: { ...widget.data.request, method: method as HttpMethod, path: path.trim() || widget.data.request.path, body },
+                          map,
+                          refreshMs: ms || undefined,
+                      },
+                  }
+                : {}),
         });
         close();
     };
@@ -233,24 +274,69 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
                 {tab === "settings" ? (
                     <div className="flex flex-col gap-4">
                         <Input label="Title" value={title} onChange={setTitle} placeholder="Widget title" />
-                        <TextArea
-                            label="Settings (JSON)"
-                            hint="The widget's data/configuration. Must be valid JSON."
-                            value={settingsText}
-                            onChange={(next) => { setSettingsText(next); setError(null); }}
-                            rows={12}
-                            textAreaClassName="font-mono text-xs"
-                        />
-                        {error ? <p className="text-sm text-error-primary">{error}</p> : null}
+
                         {isBound ? (
-                            <div className="flex flex-col gap-1.5 border-t border-secondary pt-4">
-                                <span className="text-sm font-medium text-secondary">Auto-refresh</span>
-                                <Select aria-label="Auto-refresh interval" selectedKey={refreshMs} items={REFRESH_OPTIONS} onSelectionChange={(k) => setRefreshMs(String(k))}>
-                                    {(item) => <Select.Item id={item.id}>{item.label}</Select.Item>}
-                                </Select>
-                                <span className="text-xs text-tertiary">Re-fetch this widget's live data on an interval. Off by default.</span>
-                            </div>
-                        ) : null}
+                            <>
+                                {/* Live data: edit the actual request + mapping, not the inline placeholder. */}
+                                <div className="rounded-lg bg-secondary px-3 py-2 text-xs text-tertiary ring-1 ring-secondary">
+                                    Live data from <span className="font-medium text-secondary">{source?.name ?? widget.data!.sourceId}</span>
+                                </div>
+                                <div className="flex items-end gap-2">
+                                    <div className="w-28 shrink-0">
+                                        <Select label="Method" aria-label="Request method" selectedKey={method} items={METHODS} onSelectionChange={(k) => setMethod(String(k))}>
+                                            {(item) => <Select.Item id={item.id}>{item.label}</Select.Item>}
+                                        </Select>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <Input label="Path" value={path} onChange={(v) => { setPath(v); setError(null); }} placeholder="/endpoint" />
+                                    </div>
+                                </div>
+                                <TextArea
+                                    label="Request body (JSON)"
+                                    hint="Sent with POST/PUT/PATCH. Leave blank for none."
+                                    value={bodyText}
+                                    onChange={(next) => { setBodyText(next); setError(null); }}
+                                    rows={6}
+                                    textAreaClassName="font-mono text-xs"
+                                />
+                                <TextArea
+                                    label="Response mapping (JSONPath)"
+                                    hint={'How the response maps to the widget, e.g. {"value":"$.count","delta":"$.change"}.'}
+                                    value={mapText}
+                                    onChange={(next) => { setMapText(next); setError(null); }}
+                                    rows={5}
+                                    textAreaClassName="font-mono text-xs"
+                                />
+                                <TextArea
+                                    label="Display settings (JSON)"
+                                    hint="Formatting & labels (not data) — e.g. valueFormat, labelKey. Must be valid JSON."
+                                    value={settingsText}
+                                    onChange={(next) => { setSettingsText(next); setError(null); }}
+                                    rows={6}
+                                    textAreaClassName="font-mono text-xs"
+                                />
+                                {error ? <p className="text-sm text-error-primary">{error}</p> : null}
+                                <div className="flex flex-col gap-1.5 border-t border-secondary pt-4">
+                                    <span className="text-sm font-medium text-secondary">Auto-refresh</span>
+                                    <Select aria-label="Auto-refresh interval" selectedKey={refreshMs} items={REFRESH_OPTIONS} onSelectionChange={(k) => setRefreshMs(String(k))}>
+                                        {(item) => <Select.Item id={item.id}>{item.label}</Select.Item>}
+                                    </Select>
+                                    <span className="text-xs text-tertiary">Re-fetch this widget's live data on an interval. Off by default.</span>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <TextArea
+                                    label="Settings (JSON)"
+                                    hint="The widget's data/configuration. Must be valid JSON."
+                                    value={settingsText}
+                                    onChange={(next) => { setSettingsText(next); setError(null); }}
+                                    rows={12}
+                                    textAreaClassName="font-mono text-xs"
+                                />
+                                {error ? <p className="text-sm text-error-primary">{error}</p> : null}
+                            </>
+                        )}
                     </div>
                 ) : (
                     /* ---- Figma-style inspector (per-element) ---- */
