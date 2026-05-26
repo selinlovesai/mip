@@ -49,14 +49,37 @@ const MODES = ["light", "dark", "system"] as const;
  *  semantic token at the chosen color (stored as `var(--…)`), so every element
  *  using it updates at once — e.g. "Icon color" drives icons across buttons,
  *  inputs, and nav. These are friendlier than editing the raw token grid. */
-const UI_SETTINGS: Array<{ target: string; label: string; hint: string }> = [
-    { target: "--color-fg-primary", label: "Icon color (primary)", hint: "High-contrast icons" },
-    { target: "--color-fg-quaternary", label: "Icon color (muted)", hint: "Input, help & button icons" },
-    { target: "--color-fg-brand-primary", label: "Accent color", hint: "Featured icons, progress, active states" },
-    { target: "--color-bg-brand-solid", label: "Primary button", hint: "Solid brand background" },
-    { target: "--color-text-brand-secondary", label: "Link color", hint: "Links & brand text" },
-    { target: "--color-focus-ring", label: "Focus ring", hint: "Keyboard-focus outline" },
+const UI_SETTINGS: Array<{ section: string; target: string; label: string; hint: string }> = [
+    // Icons & accents
+    { section: "Icons & accents", target: "--color-fg-primary", label: "Icon color (primary)", hint: "High-contrast icons" },
+    { section: "Icons & accents", target: "--color-fg-quaternary", label: "Icon color (muted)", hint: "Input, help & button icons" },
+    { section: "Icons & accents", target: "--color-fg-brand-primary", label: "Accent color", hint: "Featured icons, progress, active states" },
+    { section: "Icons & accents", target: "--color-focus-ring", label: "Focus ring", hint: "Keyboard-focus outline" },
+    // Text & navigation
+    { section: "Text & navigation", target: "--color-text-primary", label: "Heading & widget title", hint: "Primary text (titles, headings)" },
+    { section: "Text & navigation", target: "--color-text-secondary", label: "Menu item text", hint: "Sidebar nav & labels" },
+    { section: "Text & navigation", target: "--color-bg-active", label: "Menu active background", hint: "Selected nav item" },
+    { section: "Text & navigation", target: "--color-text-brand-secondary", label: "Link color", hint: "Links & brand text" },
+    // Surfaces & actions
+    { section: "Surfaces & actions", target: "--color-bg-brand-solid", label: "Primary button", hint: "Solid brand background" },
+    { section: "Surfaces & actions", target: "--color-bg-primary", label: "Page background", hint: "App & card surface" },
+    { section: "Surfaces & actions", target: "--color-border-secondary", label: "Border color", hint: "Cards, dividers, inputs" },
+    // Charts
+    { section: "Charts", target: "--color-chart-1", label: "Chart color 1", hint: "Primary series / first slice" },
+    { section: "Charts", target: "--color-chart-2", label: "Chart color 2", hint: "Second series / slice" },
+    { section: "Charts", target: "--color-chart-3", label: "Chart color 3", hint: "Third series / slice" },
+    { section: "Charts", target: "--color-chart-4", label: "Chart color 4", hint: "Fourth series / slice" },
+    { section: "Charts", target: "--color-chart-5", label: "Chart color 5", hint: "Fifth series / slice" },
+    { section: "Charts", target: "--color-chart-6", label: "Chart color 6", hint: "Sixth series / slice" },
 ];
+
+/** UI_SETTINGS grouped into their sub-sections, preserving order. */
+const UI_SETTING_SECTIONS = UI_SETTINGS.reduce<Array<{ section: string; items: typeof UI_SETTINGS }>>((acc, s) => {
+    const last = acc[acc.length - 1];
+    if (last && last.section === s.section) last.items.push(s);
+    else acc.push({ section: s.section, items: [s] });
+    return acc;
+}, []);
 
 function readVar(name: string): string {
     if (typeof window === "undefined") return "";
@@ -329,20 +352,25 @@ export function AppearanceTab() {
                                 {dbReady ? `Point a UI element at any token. Applies to ${resolvedMode()} mode.` : "Connect the backend to customize and persist these."}
                             </span>
                         </div>
-                        <div className="flex flex-col gap-2">
-                            {UI_SETTINGS.map((s) => {
-                                const ref = currentRef(s.target);
-                                return (
-                                    <div key={s.target} className="flex items-center gap-3 rounded-lg p-3 ring-1 ring-secondary">
-                                        <span className="size-8 shrink-0 rounded-md ring-1 ring-inset ring-black/10" style={{ backgroundColor: `var(${s.target})` }} aria-hidden="true" />
-                                        <span className="flex min-w-0 flex-1 flex-col">
-                                            <span className="truncate text-sm font-medium text-secondary">{s.label}</span>
-                                            <span className="truncate text-xs text-tertiary">{s.hint}</span>
-                                        </span>
-                                        <TokenSelect value={ref} groups={colorGroups} disabled={!dbReady} onChange={(name) => pickToken(s.target, name)} />
-                                    </div>
-                                );
-                            })}
+                        <div className="flex flex-col gap-5">
+                            {UI_SETTING_SECTIONS.map(({ section: sub, items }) => (
+                                <div key={sub} className="flex flex-col gap-2">
+                                    <span className="text-xs font-semibold uppercase tracking-wide text-quaternary">{sub}</span>
+                                    {items.map((s) => {
+                                        const ref = currentRef(s.target);
+                                        return (
+                                            <div key={s.target} className="flex items-center gap-3 rounded-lg p-3 ring-1 ring-secondary">
+                                                <span className="size-8 shrink-0 rounded-md ring-1 ring-inset ring-black/10" style={{ backgroundColor: `var(${s.target})` }} aria-hidden="true" />
+                                                <span className="flex min-w-0 flex-1 flex-col">
+                                                    <span className="truncate text-sm font-medium text-secondary">{s.label}</span>
+                                                    <span className="truncate text-xs text-tertiary">{s.hint}</span>
+                                                </span>
+                                                <TokenSelect value={ref} groups={colorGroups} disabled={!dbReady} onChange={(name) => pickToken(s.target, name)} />
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ))}
                         </div>
                     </section>
                 </div>

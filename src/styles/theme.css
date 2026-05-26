@@ -133,6 +133,15 @@
     --color-brand-900: rgb(66 48 125);
     --color-brand-950: rgb(44 28 95);
 
+    /* CHART COLORS — default series/segment palette (charts read these). They
+       reference utility tokens, so they follow light/dark automatically. */
+    --color-chart-1: var(--color-utility-brand-600);
+    --color-chart-2: var(--color-utility-blue-500);
+    --color-chart-3: var(--color-utility-pink-500);
+    --color-chart-4: var(--color-utility-indigo-500);
+    --color-chart-5: var(--color-utility-orange-500);
+    --color-chart-6: var(--color-utility-green-500);
+
     /* LIGHT MODE VARIABLES */
 
     --color-alpha-white: rgb(255 255 255);

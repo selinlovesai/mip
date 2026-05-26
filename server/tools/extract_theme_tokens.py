@@ -71,6 +71,7 @@ def _group(name: str, kind: str) -> str:
     body = name[len("--color-") :]
     for prefix, group in (
         ("brand-", "Brand"),
+        ("chart-", "Chart"),
         ("text-", "Text"),
         ("bg-", "Background"),
         ("border-", "Border"),

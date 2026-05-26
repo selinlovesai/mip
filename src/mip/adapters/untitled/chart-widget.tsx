@@ -37,15 +37,10 @@ function useSize<T extends HTMLElement>() {
     return { ref, size };
 }
 
-const SERIES_COLOR = "var(--color-utility-brand-600)";
-const SLICE_COLORS = [
-    "var(--color-utility-brand-600)",
-    "var(--color-utility-blue-500)",
-    "var(--color-utility-pink-500)",
-    "var(--color-utility-indigo-500)",
-    "var(--color-utility-orange-500)",
-    "var(--color-utility-green-500)",
-];
+// Default series/segment colors are first-class tokens (--color-chart-*), so
+// they're editable in Settings → Appearance and overridable via the DB overlay.
+const SERIES_COLOR = "var(--color-chart-1)";
+const SLICE_COLORS = ["var(--color-chart-1)", "var(--color-chart-2)", "var(--color-chart-3)", "var(--color-chart-4)", "var(--color-chart-5)", "var(--color-chart-6)"];
 
 function EmptyState() {
     return <div className="flex flex-1 items-center justify-center text-sm text-tertiary">No chart data.</div>;

@@ -371,6 +371,48 @@
     "group": "Brand"
   },
   {
+    "name": "--color-chart-1",
+    "mode": "light",
+    "value": "var(--color-utility-brand-600)",
+    "kind": "color",
+    "group": "Chart"
+  },
+  {
+    "name": "--color-chart-2",
+    "mode": "light",
+    "value": "var(--color-utility-blue-500)",
+    "kind": "color",
+    "group": "Chart"
+  },
+  {
+    "name": "--color-chart-3",
+    "mode": "light",
+    "value": "var(--color-utility-pink-500)",
+    "kind": "color",
+    "group": "Chart"
+  },
+  {
+    "name": "--color-chart-4",
+    "mode": "light",
+    "value": "var(--color-utility-indigo-500)",
+    "kind": "color",
+    "group": "Chart"
+  },
+  {
+    "name": "--color-chart-5",
+    "mode": "light",
+    "value": "var(--color-utility-orange-500)",
+    "kind": "color",
+    "group": "Chart"
+  },
+  {
+    "name": "--color-chart-6",
+    "mode": "light",
+    "value": "var(--color-utility-green-500)",
+    "kind": "color",
+    "group": "Chart"
+  },
+  {
     "name": "--color-featured-icon-light-fg-brand",
     "mode": "light",
     "value": "var(--color-brand-600)",
