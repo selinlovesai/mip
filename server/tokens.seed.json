@@ -623,11 +623,88 @@
     "group": "Base"
   },
   {
+    "name": "--color-nav-item-bg-active",
+    "mode": "light",
+    "value": "var(--color-bg-secondary)",
+    "kind": "color",
+    "group": "Navigation"
+  },
+  {
+    "name": "--color-nav-item-bg-hover",
+    "mode": "light",
+    "value": "var(--color-bg-secondary_hover)",
+    "kind": "color",
+    "group": "Navigation"
+  },
+  {
+    "name": "--color-nav-item-text",
+    "mode": "light",
+    "value": "var(--color-text-secondary)",
+    "kind": "color",
+    "group": "Navigation"
+  },
+  {
+    "name": "--color-nav-item-text-active",
+    "mode": "light",
+    "value": "var(--color-text-secondary_hover)",
+    "kind": "color",
+    "group": "Navigation"
+  },
+  {
     "name": "--color-screen-mockup-border",
     "mode": "light",
     "value": "var(--color-neutral-900)",
     "kind": "color",
     "group": "Base"
+  },
+  {
+    "name": "--color-segment-bg",
+    "mode": "light",
+    "value": "var(--color-bg-primary)",
+    "kind": "color",
+    "group": "Controls"
+  },
+  {
+    "name": "--color-segment-bg-active",
+    "mode": "light",
+    "value": "var(--color-bg-brand-primary)",
+    "kind": "color",
+    "group": "Controls"
+  },
+  {
+    "name": "--color-segment-bg-hover",
+    "mode": "light",
+    "value": "var(--color-bg-secondary_hover)",
+    "kind": "color",
+    "group": "Controls"
+  },
+  {
+    "name": "--color-segment-border",
+    "mode": "light",
+    "value": "var(--color-border-secondary)",
+    "kind": "color",
+    "group": "Controls"
+  },
+  {
+    "name": "--color-segment-border-active",
+    "mode": "light",
+    "value": "var(--color-border-brand)",
+    "kind": "color",
+    "group": "Controls"
+  },
+  {
+    "name": "--color-segment-text",
+    "mode": "light",
+    "value": "var(--color-text-secondary)",
+    "kind": "color",
+    "group": "Controls"
+  },
+  {
+    "name": "--color-segment-text-active",
+    "mode": "light",
+    "value": "var(--color-text-brand-secondary)",
+    "kind": "color",
+    "group": "Controls"
   },
   {
     "name": "--color-slider-handle-bg",

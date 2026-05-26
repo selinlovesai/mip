@@ -142,6 +142,23 @@
     --color-chart-5: var(--color-utility-orange-500);
     --color-chart-6: var(--color-utility-green-500);
 
+    /* NAVIGATION ITEMS — dedicated so they can be themed independently of the
+       generic surface tokens. Default to the shared values (follow dark mode). */
+    --color-nav-item-text: var(--color-text-secondary);
+    --color-nav-item-text-active: var(--color-text-secondary_hover);
+    --color-nav-item-bg-active: var(--color-bg-secondary);
+    --color-nav-item-bg-hover: var(--color-bg-secondary_hover);
+
+    /* SEGMENTED TOGGLE (e.g. the Mode switch) — bg / text / border + hover and
+       selected variants, all independently editable. */
+    --color-segment-text: var(--color-text-secondary);
+    --color-segment-bg: var(--color-bg-primary);
+    --color-segment-border: var(--color-border-secondary);
+    --color-segment-bg-hover: var(--color-bg-secondary_hover);
+    --color-segment-text-active: var(--color-text-brand-secondary);
+    --color-segment-bg-active: var(--color-bg-brand-primary);
+    --color-segment-border-active: var(--color-border-brand);
+
     /* LIGHT MODE VARIABLES */
 
     --color-alpha-white: rgb(255 255 255);

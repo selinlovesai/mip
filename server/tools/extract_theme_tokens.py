@@ -72,6 +72,8 @@ def _group(name: str, kind: str) -> str:
     for prefix, group in (
         ("brand-", "Brand"),
         ("chart-", "Chart"),
+        ("nav-item-", "Navigation"),
+        ("segment-", "Controls"),
         ("text-", "Text"),
         ("bg-", "Background"),
         ("border-", "Border"),

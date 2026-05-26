@@ -56,16 +56,26 @@ const UI_SETTINGS: Array<{ section: string; target: string; label: string; hint:
     { section: "Icons & accents", target: "--color-fg-quaternary", label: "Icon color (muted)", hint: "Input, help & button icons" },
     { section: "Icons & accents", target: "--color-fg-brand-primary", label: "Accent color", hint: "Featured icons, progress, active states" },
     { section: "Icons & accents", target: "--color-focus-ring", label: "Focus ring", hint: "Keyboard-focus outline" },
-    // Text & navigation
+    // Text & navigation (menu uses dedicated --color-nav-item-* tokens, so these
+    // are isolated from page background and other surfaces)
     { section: "Text & navigation", target: "--color-text-primary", label: "Heading & widget title", hint: "Primary text (titles, headings)" },
-    { section: "Text & navigation", target: "--color-text-secondary", label: "Menu item text", hint: "Sidebar nav & labels" },
-    { section: "Text & navigation", target: "--color-bg-active", label: "Menu active background", hint: "Selected nav item" },
+    { section: "Text & navigation", target: "--color-nav-item-text", label: "Menu item text", hint: "Sidebar nav labels" },
+    { section: "Text & navigation", target: "--color-nav-item-text-active", label: "Menu active text", hint: "Selected nav item text" },
+    { section: "Text & navigation", target: "--color-nav-item-bg-active", label: "Menu active background", hint: "Selected nav item" },
+    { section: "Text & navigation", target: "--color-nav-item-bg-hover", label: "Menu hover background", hint: "Nav item on hover" },
     { section: "Text & navigation", target: "--color-text-brand-secondary", label: "Link color", hint: "Links & brand text" },
     // Surfaces & actions
     { section: "Surfaces & actions", target: "--color-bg-brand-solid", label: "Primary button", hint: "Solid brand background" },
     { section: "Surfaces & actions", target: "--color-bg-primary", label: "Page background", hint: "App & card surface" },
-    { section: "Surfaces & actions", target: "--color-bg-secondary_hover", label: "Hover background", hint: "Mode toggle, menu items & buttons" },
     { section: "Surfaces & actions", target: "--color-border-secondary", label: "Border color", hint: "Cards, dividers, inputs" },
+    // Mode toggle (segmented control) — dedicated, fully independent
+    { section: "Mode toggle", target: "--color-segment-bg", label: "Background", hint: "Unselected button" },
+    { section: "Mode toggle", target: "--color-segment-text", label: "Text", hint: "Unselected label" },
+    { section: "Mode toggle", target: "--color-segment-border", label: "Border", hint: "Unselected ring" },
+    { section: "Mode toggle", target: "--color-segment-bg-hover", label: "Hover background", hint: "On hover" },
+    { section: "Mode toggle", target: "--color-segment-bg-active", label: "Selected background", hint: "Active button" },
+    { section: "Mode toggle", target: "--color-segment-text-active", label: "Selected text", hint: "Active label" },
+    { section: "Mode toggle", target: "--color-segment-border-active", label: "Selected border", hint: "Active ring" },
     // Charts
     { section: "Charts", target: "--color-chart-1", label: "Chart color 1", hint: "Primary series / first slice" },
     { section: "Charts", target: "--color-chart-2", label: "Chart color 2", hint: "Second series / slice" },
@@ -401,7 +411,17 @@ export function AppearanceTab() {
                         <span className="text-sm font-medium text-secondary">Mode</span>
                         <div className="flex max-w-md gap-2">
                             {MODES.map((mode) => (
-                                <button key={mode} onClick={() => setTheme(mode)} className={cx("flex-1 rounded-lg px-3 py-2 text-sm font-medium capitalize ring-1 transition-colors", theme === mode ? "bg-brand-50 text-brand-secondary ring-brand" : "bg-primary text-secondary ring-secondary hover:bg-secondary_hover")}>
+                                <button
+                                    key={mode}
+                                    onClick={() => setTheme(mode)}
+                                    className={cx(
+                                        "flex-1 rounded-lg px-3 py-2 text-sm font-medium capitalize ring-1 transition-colors",
+                                        theme === mode
+                                            ? "bg-[var(--color-segment-bg-active)] text-[var(--color-segment-text-active)] ring-[var(--color-segment-border-active)]"
+                                            : "bg-[var(--color-segment-bg)] text-[var(--color-segment-text)] ring-[var(--color-segment-border)] hover:bg-[var(--color-segment-bg-hover)]",
+                                    )}
+                                >
+
                                     {mode}
                                 </button>
                             ))}
