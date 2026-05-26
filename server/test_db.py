@@ -33,6 +33,7 @@ async def fresh_db():
     engine = db._require_engine()
     async with engine.begin() as conn:
         await conn.execute(text("TRUNCATE records"))
+        await conn.execute(text("TRUNCATE tokens"))
         await conn.execute(text("TRUNCATE schema_migrations"))
         await migrations.apply_migrations(conn)  # repopulate the ledger
     yield engine
@@ -90,3 +91,37 @@ async def test_seed_files_reference_known_collections():
     # Guards against a seed file for a collection the allowlist doesn't permit.
     for collection in seed._load_seed_files():
         assert collection in db.COLLECTIONS
+
+
+async def test_tokens_crud_roundtrip(fresh_db):
+    assert await db.count_tokens() == 0
+    await db.upsert_token("--color-brand-600", "light", "rgb(127 86 217)", "color", "Brand")
+    await db.upsert_token("--color-brand-600", "dark", "rgb(158 119 237)", "color", "Brand")
+
+    rows = await db.list_tokens(kind="color")
+    assert len(rows) == 2
+    light = next(r for r in rows if r["mode"] == "light")
+    assert light["value"] == "rgb(127 86 217)" and light["group"] == "Brand"
+
+    # Editing keeps (name, mode) identity — no duplicate row.
+    await db.upsert_token("--color-brand-600", "light", "rgb(0 0 0)", "color", "Brand")
+    rows = await db.list_tokens()
+    assert len(rows) == 2
+    assert next(r for r in rows if r["mode"] == "light")["value"] == "rgb(0 0 0)"
+
+
+async def test_tokens_seed_then_noop(fresh_db):
+    n = await seed.seed_tokens_if_empty(fresh_db)
+    assert n > 0  # populated from tokens.seed.json (generated from theme.css)
+    total = await db.count_tokens()
+    assert total == n
+
+    # A known token resolved from the seed.
+    brand = [r for r in await db.list_tokens() if r["name"] == "--color-brand-600" and r["mode"] == "light"]
+    assert brand and brand[0]["value"].startswith("rgb(")
+
+    # Re-seeding a populated table is a no-op (doesn't clobber edits).
+    await db.upsert_token("--color-brand-600", "light", "rgb(1 2 3)", "color", "Brand")
+    assert await seed.seed_tokens_if_empty(fresh_db) == 0
+    edited = [r for r in await db.list_tokens() if r["name"] == "--color-brand-600" and r["mode"] == "light"]
+    assert edited[0]["value"] == "rgb(1 2 3)"

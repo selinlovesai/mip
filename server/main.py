@@ -434,3 +434,33 @@ async def db_delete(collection: str, rid: str) -> dict[str, Any]:
     if (early := _check(collection)) is not None:
         return early
     return {"ok": True, "db": True, "deleted": await db.delete_record(collection, rid)}
+
+
+# ---------------------------------------------------------------------------
+# Typed design tokens (directive #2) — the Appearance browser reads these and
+# (next) edits them. Falls back to db:false so the frontend keeps its defaults.
+#   GET /api/tokens?kind=color   -> list tokens (optionally by kind)
+#   PUT /api/tokens/{name}/{mode}-> upsert one token value ({value, kind?, group?})
+# ---------------------------------------------------------------------------
+
+class TokenUpsert(BaseModel):
+    value: str
+    kind: str = "color"
+    group: str = ""
+
+
+@app.get("/api/tokens")
+async def tokens_list(kind: str | None = None) -> dict[str, Any]:
+    if not db.is_enabled():
+        return {"ok": False, "db": False, "error": "database not configured"}
+    return {"ok": True, "db": True, "tokens": await db.list_tokens(kind)}
+
+
+@app.put("/api/tokens/{name}/{mode}")
+async def tokens_put(name: str, mode: str, body: TokenUpsert) -> dict[str, Any]:
+    if not db.is_enabled():
+        return {"ok": False, "db": False, "error": "database not configured"}
+    if mode not in ("light", "dark"):
+        raise HTTPException(status_code=400, detail="mode must be 'light' or 'dark'")
+    token = await db.upsert_token(name, mode, body.value, body.kind, body.group)
+    return {"ok": True, "db": True, "token": token}

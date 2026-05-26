@@ -28,6 +28,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 import db
 
 SEED_DIR = Path(__file__).parent / "seed"
+# Typed-token seed lives OUTSIDE SEED_DIR so the generic records seeder never
+# tries to load it. Generated from theme.css by tools/extract_theme_tokens.py.
+TOKENS_SEED = Path(__file__).parent / "tokens.seed.json"
 
 
 def _load_seed_files() -> dict[str, list[dict[str, Any]]]:
@@ -79,3 +82,27 @@ async def seed_if_empty(engine: AsyncEngine) -> dict[str, int]:
             seeded[collection] = n
             print(f"[seed] {collection}: seeded {n} record(s)")
     return seeded
+
+
+async def seed_tokens_if_empty(engine: AsyncEngine) -> int:
+    """Seed the typed `tokens` table from tokens.seed.json, but only when it's
+    empty (never clobbers edited tokens). Returns the number of rows seeded."""
+    if not TOKENS_SEED.is_file():
+        return 0
+    if await db.count_tokens():
+        return 0  # already populated — leave user edits alone
+    try:
+        rows = json.loads(TOKENS_SEED.read_text())
+    except Exception as exc:  # noqa: BLE001
+        print(f"[seed] tokens skipped: invalid {TOKENS_SEED.name} ({exc})")
+        return 0
+    n = 0
+    for r in rows:
+        name, mode, value = r.get("name"), r.get("mode"), r.get("value")
+        if not (name and mode and value is not None):
+            continue
+        await db.upsert_token(str(name), str(mode), str(value), r.get("kind", "color"), r.get("group", ""))
+        n += 1
+    if n:
+        print(f"[seed] tokens: seeded {n} token row(s)")
+    return n

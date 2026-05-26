@@ -57,6 +57,19 @@ records = Table(
     Column("updated_at", DateTime(timezone=True), nullable=False),
 )
 
+# First typed table (directive #2) — design tokens. Created by migration 0003,
+# defined here so the CRUD accessors below can query it via SQLAlchemy core.
+tokens = Table(
+    "tokens",
+    metadata,
+    Column("name", String, primary_key=True),
+    Column("mode", String, primary_key=True),  # 'light' | 'dark'
+    Column("value", String, nullable=False),
+    Column("kind", String, nullable=False, default="color"),
+    Column("token_group", String, nullable=False, default=""),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+)
+
 _engine: AsyncEngine | None = None
 
 
@@ -92,6 +105,7 @@ async def init_db() -> bool:
         # Seed AFTER the engine is published (seed.py uses the module-level CRUD).
         try:
             await seed.seed_if_empty(engine)
+            await seed.seed_tokens_if_empty(engine)
         except Exception as exc:  # noqa: BLE001 - seeding is best-effort
             print(f"[db] seed skipped ({exc.__class__.__name__}: {exc})")
         return True
@@ -156,3 +170,48 @@ async def delete_record(collection: str, rid: str) -> bool:
             delete(records).where(records.c.collection == collection, records.c.id == rid)
         )
     return (result.rowcount or 0) > 0
+
+
+# ---------------------------------------------------------------------------
+# Typed tokens table (directive #2)
+# ---------------------------------------------------------------------------
+
+def _token_row(r: Any) -> dict[str, Any]:
+    return {"name": r.name, "mode": r.mode, "value": r.value, "kind": r.kind, "group": r.token_group, "updatedAt": r.updated_at.isoformat()}
+
+
+async def list_tokens(kind: str | None = None) -> list[dict[str, Any]]:
+    """All tokens, optionally filtered by kind (e.g. 'color'), ordered for stable
+    rendering (group, then name, then mode)."""
+    engine = _require_engine()
+    stmt = select(tokens)
+    if kind:
+        stmt = stmt.where(tokens.c.kind == kind)
+    stmt = stmt.order_by(tokens.c.token_group, tokens.c.name, tokens.c.mode)
+    async with engine.connect() as conn:
+        rows = (await conn.execute(stmt)).all()
+    return [_token_row(r) for r in rows]
+
+
+async def count_tokens() -> int:
+    engine = _require_engine()
+    from sqlalchemy import func
+
+    async with engine.connect() as conn:
+        return (await conn.execute(select(func.count()).select_from(tokens))).scalar_one()
+
+
+async def upsert_token(name: str, mode: str, value: str, kind: str = "color", group: str = "") -> dict[str, Any]:
+    engine = _require_engine()
+    now = datetime.now(timezone.utc)
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    stmt = pg_insert(tokens).values(name=name, mode=mode, value=value, kind=kind, token_group=group, updated_at=now)
+    # On edit, update the value/kind/group but keep the (name, mode) identity.
+    stmt = stmt.on_conflict_do_update(
+        index_elements=[tokens.c.name, tokens.c.mode],
+        set_={"value": value, "kind": kind, "token_group": group, "updated_at": now},
+    )
+    async with engine.begin() as conn:
+        await conn.execute(stmt)
+    return {"name": name, "mode": mode, "value": value, "kind": kind, "group": group, "updatedAt": now.isoformat()}

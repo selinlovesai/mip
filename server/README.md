@@ -15,6 +15,8 @@ blocked by CORS.
 | `GET /api/db/{collection}/{id}` | Get one record. |
 | `PUT /api/db/{collection}/{id}` | Upsert (body = the document JSON). |
 | `DELETE /api/db/{collection}/{id}` | Delete a record. |
+| `GET /api/tokens?kind=color` | List typed design tokens (Appearance browser). |
+| `PUT /api/tokens/{name}/{mode}` | Upsert one token value. Body: `{ value, kind?, group? }`; `mode` ∈ `light`/`dark`. |
 
 Works with OpenAI, DeepSeek, Mistral, Perplexity, Anthropic, and any
 OpenAI-compatible local server (Ollama, LM Studio, llama.cpp, vLLM).
@@ -39,6 +41,16 @@ collection is empty** — giving a fresh database the starter content (e.g. the
 Overview / Marketing dashboards in `seed/dashboards.json`) without ever
 clobbering data a user already created. Seed files are JSON arrays of
 `{ "id": "…", "data": { … } }` and the collection must be in `db.COLLECTIONS`.
+
+**Typed `tokens` table (directive #2).** The first typed table: every design
+token is a row keyed by `(name, mode)` with a verbatim CSS `value`, `kind`, and
+`token_group`. It's seeded (empty-only) from `tokens.seed.json`, which is
+generated from the frontend's source of truth — regenerate after editing
+theme.css colors:
+
+```bash
+.venv/bin/python tools/extract_theme_tokens.py   # → tokens.seed.json
+```
 
 **Graceful degradation:** if `DATABASE_URL` is unset or the DB is unreachable,
 the service still runs — `/api/health` reports `db: false` and the CRUD routes

@@ -43,6 +43,28 @@ MIGRATIONS: list[tuple[str, str]] = [
         "0002_records_collection_idx",
         "CREATE INDEX IF NOT EXISTS records_collection_idx ON records (collection);",
     ),
+    (
+        # First typed table (directive #2): every design token is a first-class
+        # row. (name, mode) is unique — a token has at most one light + one dark
+        # value. `value` is verbatim CSS (literal color or a var(--…) reference);
+        # `kind` ('color' for now) + `token_group` drive the Appearance browser.
+        "0003_tokens",
+        """
+        CREATE TABLE IF NOT EXISTS tokens (
+            name        TEXT NOT NULL,
+            mode        TEXT NOT NULL,
+            value       TEXT NOT NULL,
+            kind        TEXT NOT NULL DEFAULT 'color',
+            token_group TEXT NOT NULL DEFAULT '',
+            updated_at  TIMESTAMPTZ NOT NULL,
+            PRIMARY KEY (name, mode)
+        );
+        """,
+    ),
+    (
+        "0004_tokens_kind_idx",
+        "CREATE INDEX IF NOT EXISTS tokens_kind_idx ON tokens (kind);",
+    ),
 ]
 
 
