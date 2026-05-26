@@ -33,14 +33,25 @@ function buildWidget(op: AgentOp, ctx: ToolContext): MipWidget | { error: string
     // Fall back to schema defaults for size/label/settings when uncatalogued.
     const base = WIDGET_CATALOG.find((c) => c.type === type);
     const size = ctx.widgetSize(type);
-    const defaults = { ...(base?.settings ?? {}), ...(DEFAULT_WIDGET_SETTINGS[type] ?? {}) };
+    // The catalog's `settings` are SAMPLE display values (e.g. kpi value:1234,
+    // delta:5.2) meant for the widget-browser preview only. DEFAULT_WIDGET_SETTINGS
+    // are STRUCTURAL (legend position, diagram source skeletons, etc.).
+    //  · AI supplied settings → merge structural defaults only, NEVER the sample
+    //    data — otherwise an omitted field (e.g. delta) silently inherits the mock
+    //    5.2 in every widget.
+    //  · AI supplied nothing  → fall back to the full sample so a bare add still
+    //    renders something illustrative.
+    const structural = DEFAULT_WIDGET_SETTINGS[type] ?? {};
+    const sample = { ...(base?.settings ?? {}), ...structural };
+    const hasOpSettings = op.settings != null && typeof op.settings === "object";
+    const settings = hasOpSettings ? { ...structural, ...(op.settings as Record<string, unknown>) } : sample;
     return makeWidget({
         type,
         group: base?.group ?? "",
         label: typeof op.title === "string" ? op.title : (base?.label ?? prettyType(type)),
         w: typeof op.w === "number" ? op.w : size.w,
         h: typeof op.h === "number" ? op.h : size.h,
-        ...(op.settings && typeof op.settings === "object" ? { settings: { ...defaults, ...(op.settings as Record<string, unknown>) } } : Object.keys(defaults).length ? { settings: defaults } : {}),
+        ...(Object.keys(settings).length ? { settings } : {}),
         ...(base?.fields ? { fields: base.fields } : {}),
     });
 }
