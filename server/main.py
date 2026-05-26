@@ -31,7 +31,7 @@ import httpx
 from fastapi import Body, FastAPI, File, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 import db
@@ -464,3 +464,25 @@ async def tokens_put(name: str, mode: str, body: TokenUpsert) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="mode must be 'light' or 'dark'")
     token = await db.upsert_token(name, mode, body.value, body.kind, body.group)
     return {"ok": True, "db": True, "token": token}
+
+
+@app.get("/api/tokens.json")
+async def tokens_json() -> dict[str, Any]:
+    """Emit the DB tokens as a compact { light, dark } value map (cache-friendly)."""
+    import emit
+
+    if not db.is_enabled():
+        return {"ok": False, "db": False, "error": "database not configured"}
+    return {"ok": True, "db": True, "tokens": emit.emit_json(await db.list_tokens())}
+
+
+@app.get("/api/tokens.css")
+async def tokens_css() -> Response:
+    """Emit the DB tokens as a Tailwind-compatible stylesheet (`@theme` +
+    `.dark-mode`). 503 when the DB is off so the app keeps its bundled theme.css."""
+    import emit
+
+    if not db.is_enabled():
+        raise HTTPException(status_code=503, detail="database not configured")
+    css = emit.emit_css(await db.list_tokens())
+    return Response(content=css, media_type="text/css", headers={"Cache-Control": "no-cache"})

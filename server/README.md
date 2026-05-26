@@ -17,6 +17,8 @@ blocked by CORS.
 | `DELETE /api/db/{collection}/{id}` | Delete a record. |
 | `GET /api/tokens?kind=color` | List typed design tokens (Appearance browser). |
 | `PUT /api/tokens/{name}/{mode}` | Upsert one token value. Body: `{ value, kind?, group? }`; `mode` ∈ `light`/`dark`. |
+| `GET /api/tokens.json` | Emit tokens as a `{ light, dark }` value map (cache-friendly). |
+| `GET /api/tokens.css` | Emit tokens as a Tailwind `@theme` + `.dark-mode` stylesheet (503 when DB off). |
 
 Works with OpenAI, DeepSeek, Mistral, Perplexity, Anthropic, and any
 OpenAI-compatible local server (Ollama, LM Studio, llama.cpp, vLLM).
@@ -43,14 +45,21 @@ clobbering data a user already created. Seed files are JSON arrays of
 `{ "id": "…", "data": { … } }` and the collection must be in `db.COLLECTIONS`.
 
 **Typed `tokens` table (directive #2).** The first typed table: every design
-token is a row keyed by `(name, mode)` with a verbatim CSS `value`, `kind`, and
-`token_group`. It's seeded (empty-only) from `tokens.seed.json`, which is
-generated from the frontend's source of truth — regenerate after editing
-theme.css colors:
+token (color, typography, radius, shadow) is a row keyed by `(name, mode)` with
+a verbatim CSS `value`, `kind`, and `token_group`. It's seeded (empty-only) from
+`tokens.seed.json`, generated from the frontend's source of truth — regenerate
+after editing theme.css:
 
 ```bash
 .venv/bin/python tools/extract_theme_tokens.py   # → tokens.seed.json
 ```
+
+**Emit pipeline (`emit.py`).** Pure functions compile the `tokens` table into
+the two artifacts the app + Tailwind consume — `emit_json` → `{ light, dark }`
+value map, `emit_css` → a Tailwind-compatible `@theme` + `.dark-mode` stylesheet
+mirroring theme.css — served at `/api/tokens.json` and `/api/tokens.css`. The
+frontend can load the emitted CSS at boot instead of the bundled theme.css once
+token editing lands.
 
 **Graceful degradation:** if `DATABASE_URL` is unset or the DB is unreachable,
 the service still runs — `/api/health` reports `db: false` and the CRUD routes

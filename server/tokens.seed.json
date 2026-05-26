@@ -1743,6 +1743,538 @@
     "group": "Base"
   },
   {
+    "name": "--font-body",
+    "mode": "light",
+    "value": "var(--font-inter, \"Inter\"), -apple-system, \"Segoe UI\", Roboto, Arial, sans-serif",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--font-display",
+    "mode": "light",
+    "value": "var(--font-inter, \"Inter\"), -apple-system, \"Segoe UI\", Roboto, Arial, sans-serif",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--font-mono",
+    "mode": "light",
+    "value": "ui-monospace, \"Roboto Mono\", SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--radius-2xl",
+    "mode": "light",
+    "value": "1rem",
+    "kind": "radius",
+    "group": "Radius"
+  },
+  {
+    "name": "--radius-3xl",
+    "mode": "light",
+    "value": "1.5rem",
+    "kind": "radius",
+    "group": "Radius"
+  },
+  {
+    "name": "--radius-DEFAULT",
+    "mode": "light",
+    "value": "0.25rem",
+    "kind": "radius",
+    "group": "Radius"
+  },
+  {
+    "name": "--radius-full",
+    "mode": "light",
+    "value": "9999px",
+    "kind": "radius",
+    "group": "Radius"
+  },
+  {
+    "name": "--radius-lg",
+    "mode": "light",
+    "value": "0.5rem",
+    "kind": "radius",
+    "group": "Radius"
+  },
+  {
+    "name": "--radius-md",
+    "mode": "light",
+    "value": "0.375rem",
+    "kind": "radius",
+    "group": "Radius"
+  },
+  {
+    "name": "--radius-none",
+    "mode": "light",
+    "value": "0px",
+    "kind": "radius",
+    "group": "Radius"
+  },
+  {
+    "name": "--radius-sm",
+    "mode": "light",
+    "value": "0.25rem",
+    "kind": "radius",
+    "group": "Radius"
+  },
+  {
+    "name": "--radius-xl",
+    "mode": "light",
+    "value": "0.75rem",
+    "kind": "radius",
+    "group": "Radius"
+  },
+  {
+    "name": "--radius-xs",
+    "mode": "light",
+    "value": "0.125rem",
+    "kind": "radius",
+    "group": "Radius"
+  },
+  {
+    "name": "--shadow-2xl",
+    "mode": "light",
+    "value": "0px 24px 48px -12px rgba(0, 0, 0, 0.18), 0px 4px 4px -2px rgba(0, 0, 0, 0.04)",
+    "kind": "shadow",
+    "group": "Shadow"
+  },
+  {
+    "name": "--shadow-3xl",
+    "mode": "light",
+    "value": "0px 32px 64px -12px rgba(0, 0, 0, 0.14), 0px 5px 5px -2.5px rgba(0, 0, 0, 0.04)",
+    "kind": "shadow",
+    "group": "Shadow"
+  },
+  {
+    "name": "--shadow-lg",
+    "mode": "light",
+    "value": "0px 12px 16px -4px rgba(0, 0, 0, 0.08), 0px 4px 6px -2px rgba(0, 0, 0, 0.03), 0px 2px 2px -1px rgba(0, 0, 0, 0.04)",
+    "kind": "shadow",
+    "group": "Shadow"
+  },
+  {
+    "name": "--shadow-md",
+    "mode": "light",
+    "value": "0px 4px 6px -1px rgba(0, 0, 0, 0.1), 0px 2px 4px -2px rgba(0, 0, 0, 0.06)",
+    "kind": "shadow",
+    "group": "Shadow"
+  },
+  {
+    "name": "--shadow-modern-mockup-inner-lg",
+    "mode": "light",
+    "value": "0px 0px 3.765px 1.255px rgba(10, 13, 18, 0.08) inset, 0px 0px 2.51px 1.255px rgba(10, 13, 18, 0.03) inset",
+    "kind": "shadow",
+    "group": "Shadow"
+  },
+  {
+    "name": "--shadow-modern-mockup-inner-md",
+    "mode": "light",
+    "value": "0px 0px 1.692px 0.564px rgba(10, 13, 18, 0.08) inset, 0px 0px 1.128px 0.564px rgba(10, 13, 18, 0.03) inset",
+    "kind": "shadow",
+    "group": "Shadow"
+  },
+  {
+    "name": "--shadow-modern-mockup-inner-sm",
+    "mode": "light",
+    "value": "0px 0px 4.48px 1.493px rgba(10, 13, 18, 0.08) inset, 0px 0px 2.987px 1.493px rgba(10, 13, 18, 0.03) inset",
+    "kind": "shadow",
+    "group": "Shadow"
+  },
+  {
+    "name": "--shadow-modern-mockup-outer-lg",
+    "mode": "light",
+    "value": "0px 7.529px 10.039px -2.51px rgba(10, 13, 18, 0.08), 0px 2.51px 3.765px -1.255px rgba(10, 13, 18, 0.03), 0px 1.255px 1.255px -0.627px rgba(10, 13, 18, 0.04)",
+    "kind": "shadow",
+    "group": "Shadow"
+  },
+  {
+    "name": "--shadow-modern-mockup-outer-md",
+    "mode": "light",
+    "value": "0px 3.385px 4.513px -1.128px rgba(10, 13, 18, 0.08), 0px 1.128px 1.692px -0.564px rgba(10, 13, 18, 0.03), 0px 0.564px 0.564px -0.282px rgba(10, 13, 18, 0.04)",
+    "kind": "shadow",
+    "group": "Shadow"
+  },
+  {
+    "name": "--shadow-skeuomorphic",
+    "mode": "light",
+    "value": "0px 0px 0px 1px rgba(0, 0, 0, 0.18) inset, 0px -2px 0px 0px rgba(0, 0, 0, 0.05) inset",
+    "kind": "shadow",
+    "group": "Shadow"
+  },
+  {
+    "name": "--shadow-sm",
+    "mode": "light",
+    "value": "0px 1px 3px rgba(0, 0, 0, 0.1), 0px 1px 2px -1px rgba(0, 0, 0, 0.1)",
+    "kind": "shadow",
+    "group": "Shadow"
+  },
+  {
+    "name": "--shadow-xl",
+    "mode": "light",
+    "value": "0px 20px 24px -4px rgba(0, 0, 0, 0.08), 0px 8px 8px -4px rgba(0, 0, 0, 0.03), 0px 3px 3px -1.5px rgba(0, 0, 0, 0.04)",
+    "kind": "shadow",
+    "group": "Shadow"
+  },
+  {
+    "name": "--shadow-xs",
+    "mode": "light",
+    "value": "0px 1px 2px rgba(0, 0, 0, 0.05)",
+    "kind": "shadow",
+    "group": "Shadow"
+  },
+  {
+    "name": "--shadow-xs-skeuomorphic",
+    "mode": "light",
+    "value": "var(--shadow-skeuomorphic), var(--shadow-xs)",
+    "kind": "shadow",
+    "group": "Shadow"
+  },
+  {
+    "name": "--text-color-brand-primary",
+    "mode": "light",
+    "value": "var(--color-text-brand-primary)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-brand-secondary",
+    "mode": "light",
+    "value": "var(--color-text-brand-secondary)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-brand-secondary_hover",
+    "mode": "light",
+    "value": "var(--color-text-brand-secondary_hover)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-brand-tertiary",
+    "mode": "light",
+    "value": "var(--color-text-brand-tertiary)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-brand-tertiary_alt",
+    "mode": "light",
+    "value": "var(--color-text-brand-tertiary_alt)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-editor-icon-fg",
+    "mode": "light",
+    "value": "var(--color-text-editor-icon-fg)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-editor-icon-fg_active",
+    "mode": "light",
+    "value": "var(--color-text-editor-icon-fg_active)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-error-primary",
+    "mode": "light",
+    "value": "var(--color-text-error-primary)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-error-primary_hover",
+    "mode": "light",
+    "value": "var(--color-text-error-primary_hover)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-placeholder",
+    "mode": "light",
+    "value": "var(--color-text-placeholder)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-primary",
+    "mode": "light",
+    "value": "var(--color-text-primary)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-primary_on-brand",
+    "mode": "light",
+    "value": "var(--color-text-primary_on-brand)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-quaternary",
+    "mode": "light",
+    "value": "var(--color-text-quaternary)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-quaternary_on-brand",
+    "mode": "light",
+    "value": "var(--color-text-quaternary_on-brand)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-secondary",
+    "mode": "light",
+    "value": "var(--color-text-secondary)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-secondary_hover",
+    "mode": "light",
+    "value": "var(--color-text-secondary_hover)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-secondary_on-brand",
+    "mode": "light",
+    "value": "var(--color-text-secondary_on-brand)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-success-primary",
+    "mode": "light",
+    "value": "var(--color-text-success-primary)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-tertiary",
+    "mode": "light",
+    "value": "var(--color-text-tertiary)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-tertiary_hover",
+    "mode": "light",
+    "value": "var(--color-text-tertiary_hover)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-tertiary_on-brand",
+    "mode": "light",
+    "value": "var(--color-text-tertiary_on-brand)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-tooltip-supporting-text",
+    "mode": "light",
+    "value": "var(--color-tooltip-supporting-text)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-warning-primary",
+    "mode": "light",
+    "value": "var(--color-text-warning-primary)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-display-2xl",
+    "mode": "light",
+    "value": "calc(var(--spacing) * 18)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-display-2xl--letter-spacing",
+    "mode": "light",
+    "value": "-1.44px",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-display-2xl--line-height",
+    "mode": "light",
+    "value": "calc(var(--spacing) * 22.5)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-display-lg",
+    "mode": "light",
+    "value": "calc(var(--spacing) * 12)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-display-lg--letter-spacing",
+    "mode": "light",
+    "value": "-0.96px",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-display-lg--line-height",
+    "mode": "light",
+    "value": "calc(var(--spacing) * 15)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-display-md",
+    "mode": "light",
+    "value": "calc(var(--spacing) * 9)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-display-md--letter-spacing",
+    "mode": "light",
+    "value": "-0.72px",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-display-md--line-height",
+    "mode": "light",
+    "value": "calc(var(--spacing) * 11)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-display-sm",
+    "mode": "light",
+    "value": "calc(var(--spacing) * 7.5)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-display-sm--line-height",
+    "mode": "light",
+    "value": "calc(var(--spacing) * 9.5)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-display-xl",
+    "mode": "light",
+    "value": "calc(var(--spacing) * 15)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-display-xl--letter-spacing",
+    "mode": "light",
+    "value": "-1.2px",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-display-xl--line-height",
+    "mode": "light",
+    "value": "calc(var(--spacing) * 18)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-display-xs",
+    "mode": "light",
+    "value": "calc(var(--spacing) * 6)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-display-xs--line-height",
+    "mode": "light",
+    "value": "calc(var(--spacing) * 8)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-lg",
+    "mode": "light",
+    "value": "calc(var(--spacing) * 4.5)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-lg--line-height",
+    "mode": "light",
+    "value": "calc(var(--spacing) * 7)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-md",
+    "mode": "light",
+    "value": "calc(var(--spacing) * 4)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-md--line-height",
+    "mode": "light",
+    "value": "calc(var(--spacing) * 6)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-sm",
+    "mode": "light",
+    "value": "calc(var(--spacing) * 3.5)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-sm--line-height",
+    "mode": "light",
+    "value": "calc(var(--spacing) * 5)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-xl",
+    "mode": "light",
+    "value": "calc(var(--spacing) * 5)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-xl--line-height",
+    "mode": "light",
+    "value": "calc(var(--spacing) * 7.5)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-xs",
+    "mode": "light",
+    "value": "calc(var(--spacing) * 3)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-xs--line-height",
+    "mode": "light",
+    "value": "calc(var(--spacing) * 4.5)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
     "name": "--color-alpha-black",
     "mode": "dark",
     "value": "rgb(255 255 255)",
@@ -3386,5 +3918,173 @@
     "value": "var(--color-yellow-300)",
     "kind": "color",
     "group": "Utility"
+  },
+  {
+    "name": "--text-color-brand-primary",
+    "mode": "dark",
+    "value": "var(--color-text-brand-primary)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-brand-secondary",
+    "mode": "dark",
+    "value": "var(--color-text-brand-secondary)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-brand-secondary_hover",
+    "mode": "dark",
+    "value": "var(--color-text-brand-secondary_hover)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-brand-tertiary",
+    "mode": "dark",
+    "value": "var(--color-text-brand-tertiary)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-brand-tertiary_alt",
+    "mode": "dark",
+    "value": "var(--color-text-brand-tertiary_alt)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-editor-icon-fg",
+    "mode": "dark",
+    "value": "var(--color-text-editor-icon-fg)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-editor-icon-fg_active",
+    "mode": "dark",
+    "value": "var(--color-text-editor-icon-fg_active)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-error-primary",
+    "mode": "dark",
+    "value": "var(--color-text-error-primary)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-error-primary_hover",
+    "mode": "dark",
+    "value": "var(--color-text-error-primary_hover)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-placeholder",
+    "mode": "dark",
+    "value": "var(--color-text-placeholder)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-primary",
+    "mode": "dark",
+    "value": "var(--color-text-primary)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-primary_on-brand",
+    "mode": "dark",
+    "value": "var(--color-text-primary_on-brand)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-quaternary",
+    "mode": "dark",
+    "value": "var(--color-text-quaternary)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-quaternary_on-brand",
+    "mode": "dark",
+    "value": "var(--color-text-quaternary_on-brand)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-secondary",
+    "mode": "dark",
+    "value": "var(--color-text-secondary)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-secondary_hover",
+    "mode": "dark",
+    "value": "var(--color-text-secondary_hover)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-secondary_on-brand",
+    "mode": "dark",
+    "value": "var(--color-text-secondary_on-brand)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-success-primary",
+    "mode": "dark",
+    "value": "var(--color-text-success-primary)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-tertiary",
+    "mode": "dark",
+    "value": "var(--color-text-tertiary)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-tertiary_hover",
+    "mode": "dark",
+    "value": "var(--color-text-tertiary_hover)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-tertiary_on-brand",
+    "mode": "dark",
+    "value": "var(--color-text-tertiary_on-brand)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-tooltip-supporting-text",
+    "mode": "dark",
+    "value": "var(--color-tooltip-supporting-text)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-warning-primary",
+    "mode": "dark",
+    "value": "var(--color-text-warning-primary)",
+    "kind": "typography",
+    "group": "Typography"
+  },
+  {
+    "name": "--text-color-white",
+    "mode": "dark",
+    "value": "var(--color-text-white)",
+    "kind": "typography",
+    "group": "Typography"
   }
 ]

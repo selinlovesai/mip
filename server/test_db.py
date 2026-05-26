@@ -18,6 +18,7 @@ import pytest
 from sqlalchemy import text
 
 import db
+import emit
 import migrations
 import seed
 
@@ -85,6 +86,38 @@ async def test_seed_seeds_empty_then_is_noop(fresh_db):
     assert "dashboards" not in second  # non-empty → skipped, not clobbered
     edited = await db.get_record("dashboards", "overview")
     assert edited is not None and edited["data"]["title"] == "My Overview"
+
+
+def test_emit_json_and_css_are_pure():
+    rows = [
+        {"name": "--color-brand-600", "mode": "light", "value": "rgb(127 86 217)", "kind": "color", "group": "Brand"},
+        {"name": "--color-brand-600", "mode": "dark", "value": "rgb(158 119 237)", "kind": "color", "group": "Brand"},
+        {"name": "--radius-md", "mode": "light", "value": "0.375rem", "kind": "radius", "group": "Radius"},
+    ]
+    j = emit.emit_json(rows)
+    assert j["light"]["--color-brand-600"] == "rgb(127 86 217)"
+    assert j["light"]["--radius-md"] == "0.375rem"
+    assert j["dark"]["--color-brand-600"] == "rgb(158 119 237)"
+
+    css = emit.emit_css(rows)
+    assert "@theme {" in css
+    assert "--color-brand-600: rgb(127 86 217);" in css
+    assert ".dark-mode {" in css
+    assert "--color-brand-600: rgb(158 119 237);" in css
+    # A mode with no rows emits no dark block.
+    assert ".dark-mode" not in emit.emit_css([rows[2]])
+
+
+async def test_emit_roundtrips_seeded_tokens(fresh_db):
+    await seed.seed_tokens_if_empty(fresh_db)
+    rows = await db.list_tokens()
+    css = emit.emit_css(rows)
+    assert "--color-brand-600:" in css
+    j = emit.emit_json(rows)
+    # Every kind we seed shows up in the light map.
+    kinds = {r["kind"] for r in rows}
+    assert {"color", "radius", "shadow", "typography"} <= kinds
+    assert "--shadow-md" in j["light"] or "--shadow-md" in j["dark"]
 
 
 async def test_seed_files_reference_known_collections():
