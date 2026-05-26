@@ -10,10 +10,11 @@
  * user prefers reduced motion; pointer-events-none so it never blocks input.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion } from "motion/react";
 
 interface Beam {
+    id: number; // bumped per launch so particles remount and replay
     path: string; // SVG path() in viewport px: M start Q control end
     end: { x: number; y: number };
 }
@@ -44,37 +45,51 @@ const DURATION = 2.0;
 export function IntroBeam() {
     const [beam, setBeam] = useState<Beam | null>(null);
 
-    useEffect(() => {
+    // Launch the comet from `start` to the current AI icon position.
+    const launch = useCallback((start: { x: number; y: number }) => {
         if (typeof window === "undefined") return;
         if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-        const t = setTimeout(() => {
-            const el = document.querySelector<HTMLElement>("[data-ai-icon]");
-            if (!el) return;
-            // Measure after a frame so the topbar has settled (accurate icon center).
-            requestAnimationFrame(() => {
-            const r = el.getBoundingClientRect();
-            const end = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-            const start = findStart();
-            const dx = end.x - start.x;
-            const dy = end.y - start.y;
-            const dist = Math.hypot(dx, dy) || 1;
-            // Control point: midpoint pushed along the upward perpendicular → a bow.
-            let px = -dy / dist;
-            let py = dx / dist;
-            if (py > 0) {
-                px = -px;
-                py = -py;
-            }
-            const bow = Math.min(Math.max(dist * 0.35, 80), 220);
-            const cx = start.x + dx * 0.5 + px * bow;
-            const cy = start.y + dy * 0.5 + py * bow;
-            const path = `path("M ${start.x} ${start.y} Q ${cx} ${cy} ${end.x} ${end.y}")`;
-            setBeam({ path, end });
-            });
-        }, 180);
-        return () => clearTimeout(t);
+        const el = document.querySelector<HTMLElement>("[data-ai-icon]");
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        const end = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        // Control point: midpoint pushed along the upward perpendicular → a bow.
+        let px = -dy / dist;
+        let py = dx / dist;
+        if (py > 0) {
+            px = -px;
+            py = -py;
+        }
+        const bow = Math.min(Math.max(dist * 0.35, 80), 220);
+        const cx = start.x + dx * 0.5 + px * bow;
+        const cy = start.y + dy * 0.5 + py * bow;
+        const path = `path("M ${start.x} ${start.y} Q ${cx} ${cy} ${end.x} ${end.y}")`;
+        setBeam({ id: Date.now(), path, end });
     }, []);
 
+    // On page load: play once from the "Get started" button (or center).
+    useEffect(() => {
+        const t = setTimeout(() => requestAnimationFrame(() => launch(findStart())), 180);
+        return () => clearTimeout(t);
+    }, [launch]);
+
+    // Replay whenever a "Get started" button is clicked — starting from it.
+    useEffect(() => {
+        const onClick = (e: MouseEvent) => {
+            const t = (e.target as HTMLElement | null)?.closest?.("button, a, [data-intro-start]");
+            if (!t) return;
+            if (!(t.matches("[data-intro-start]") || /get\s*started/i.test(t.textContent ?? ""))) return;
+            const r = t.getBoundingClientRect();
+            launch({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+        };
+        document.addEventListener("click", onClick);
+        return () => document.removeEventListener("click", onClick);
+    }, [launch]);
+
+    // Clear the overlay after the run finishes (re-armed on each launch via id).
     useEffect(() => {
         if (!beam) return;
         const t = setTimeout(() => setBeam(null), 2800);
@@ -93,7 +108,7 @@ export function IntroBeam() {
                 const delay = i * 0.05;
                 return (
                     <motion.div
-                        key={i}
+                        key={`${beam.id}-${i}`}
                         style={{
                             position: "absolute",
                             left: 0,
@@ -124,6 +139,7 @@ export function IntroBeam() {
 
             {/* Arrival pop, timed to when the head reaches the icon. */}
             <motion.div
+                key={`pop-${beam.id}`}
                 style={{
                     position: "absolute",
                     left: end.x,
