@@ -10,7 +10,7 @@
  * user prefers reduced motion; pointer-events-none so it never blocks input.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 
 interface Beam {
@@ -44,6 +44,12 @@ const DURATION = 2.0;
 
 export function IntroBeam({ onOpenChat }: { onOpenChat?: () => void } = {}) {
     const [beam, setBeam] = useState<Beam | null>(null);
+    // Keep the callback in a ref so `launch` stays STABLE — otherwise a new
+    // inline onOpenChat each render would re-create launch and re-fire the
+    // on-load effect (replaying the animation on every re-render, e.g. sidebar
+    // toggles).
+    const onOpenChatRef = useRef(onOpenChat);
+    onOpenChatRef.current = onOpenChat;
 
     // Launch the comet from `start` to the current AI icon position. When
     // `openOnEnd` is set, open the AI chat once the comet lands on the icon.
@@ -51,7 +57,7 @@ export function IntroBeam({ onOpenChat }: { onOpenChat?: () => void } = {}) {
         (start: { x: number; y: number }, openOnEnd = false) => {
             if (typeof window === "undefined") return;
             if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-                if (openOnEnd) onOpenChat?.(); // honor the intent without animating
+                if (openOnEnd) onOpenChatRef.current?.(); // honor the intent without animating
                 return;
             }
             const el = document.querySelector<HTMLElement>("[data-ai-icon]");
@@ -74,9 +80,9 @@ export function IntroBeam({ onOpenChat }: { onOpenChat?: () => void } = {}) {
             const path = `path("M ${start.x} ${start.y} Q ${cx} ${cy} ${end.x} ${end.y}")`;
             setBeam({ id: Date.now(), path, end });
             // Open the AI chat as the comet lands on the icon.
-            if (openOnEnd) setTimeout(() => onOpenChat?.(), DURATION * 1000);
+            if (openOnEnd) setTimeout(() => onOpenChatRef.current?.(), DURATION * 1000);
         },
-        [onOpenChat],
+        [],
     );
 
     // On page load: play once from the "Get started" button (or center).
