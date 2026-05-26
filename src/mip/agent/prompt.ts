@@ -40,6 +40,7 @@ const DASHBOARD_PROTOCOL = [
     "## Protocol",
     'EVERY reply is ONE JSON object with EXACTLY two keys: "say" (string) and "ops" (array). Put EVERY action inside "ops" as {"kind":"…", …}. Do NOT invent other top-level keys and do NOT return data/widgets at the top level.',
     "You receive each op's result and may continue. When the dashboard matches the request (or you've answered a question), reply with {\"say\":\"…\",\"ops\":[]} and STOP. Describing an action in prose does NOTHING — only ops change the dashboard.",
+    '"say" is the message shown to the USER — write it for them, not as internal reasoning. ALWAYS end a turn with a non-empty "say". If you need a decision before you can proceed (e.g. which region/option), ASK the user that question directly in "say" with ops:[] and STOP — do not say "let me ask" without asking.',
     'CRITICAL: reading data (fetch / search / callApi / listConnections) does NOT create anything. To put a widget on the dashboard you MUST emit an injectJson / injectConnection (or addWidget) op. NEVER say "I added a widget" unless your CURRENT ops array contains one.',
     "## Examples",
     'Pie chart from the open web → Round 1 {"say":"Fetching population data…","ops":[{"kind":"fetch","url":"https://restcountries.com/v3.1/all?fields=name,population"}]}',

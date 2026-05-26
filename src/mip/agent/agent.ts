@@ -123,9 +123,14 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
         }
 
         if (!parsed.ops.length) {
+            // If the model is ASKING the user something, that IS the final
+            // message — show it and stop (don't mistake it for a false claim and
+            // nudge it away, which would swallow the question).
+            const say = parsed.say?.trim() ?? "";
+            const asksUser = /\?\s*$/.test(say) || /\b(which|would you like|do you want|let me know|please (?:specify|choose|confirm|provide)|should i|could you)\b/i.test(say);
             // Model ended the turn. If it CLAIMS a change but nothing mutating ran,
             // it only read data — make it actually act.
-            if (claimsAction(parsed.say) && !mutated && !actNudged && userRequestedChange) {
+            if (!asksUser && claimsAction(parsed.say) && !mutated && !actNudged && userRequestedChange) {
                 actNudged = true;
                 opts.onStreamClear?.();
                 msgs = [

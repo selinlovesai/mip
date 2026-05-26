@@ -36,8 +36,11 @@ const fetchTool: Tool = {
     mutating: false,
     validate: (op) => (typeof op.url === "string" && op.url.trim() ? null : "fetch needs a `url`."),
     run: async (op: AgentOp, ctx: ToolContext): Promise<OpResult> => {
-        const r = await ctx.fetchPage(String(op.url ?? ""));
-        return { kind: "fetch", url: op.url, ok: r.ok, title: r.title, text: (r.text ?? "").slice(0, 4000), ...(r.error ? { error: String(r.error) } : {}) };
+        // Pull a generous amount of page text so figures/tables aren't cut off
+        // mid-content (the old 4000-char clip dropped real data, making pages
+        // look "empty"/paywalled to the model).
+        const r = await ctx.fetchPage(String(op.url ?? ""), 16000);
+        return { kind: "fetch", url: op.url, ok: r.ok, title: r.title, text: (r.text ?? "").slice(0, 16000), ...(r.error ? { error: String(r.error) } : {}) };
     },
 };
 
