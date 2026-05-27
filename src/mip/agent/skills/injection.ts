@@ -8,6 +8,7 @@ export const INJECTION_SKILL = [
     "There are exactly two ways to put data into a widget:",
     "  ① injectJson  — DIRECT. You provide the data inline in `settings`. Use ONLY for values you actually FETCHED/searched this turn, computed from them, or the user gave you — NEVER invented. Do not make up percentages, counts, or trends to fill a widget. If you don't have a real figure, omit the widget or title it '… (estimate)' / '… (sample)' and say it's illustrative. The same metric must always show the same number — differing values for one metric means it was fabricated.",
     "  ② injectConnection — BOUND. The widget reads LIVE from a saved REST connection and refreshes itself. Use whenever the user wants live/ongoing data from an API.",
+    "CITE YOUR SOURCE — whenever a widget's data came from a fetch/search/web page, set settings.caption to the source name (e.g. \"Statista, 2025\") and settings.captionHref to the source URL. This renders as a citation link in the widget footer. Omit both for user-given or self-evident data.",
     "injectConnection shape: { type, title?, sourceId, request:{ method, path, params? }, map?, refreshMs?, settings? }",
     "  · sourceId is a saved connection (by id, name, or baseUrl — listConnections to find it). The connection supplies baseUrl + auth.",
     "  · `map` is JSONPath ($.a.b[0].c) from the response to the field a widget needs:",

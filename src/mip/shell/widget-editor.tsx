@@ -331,6 +331,11 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
     /** Settings keys owned by a dedicated editor — excluded from custom/advanced. */
     const ownedKeys = useMemo(() => {
         const s = new Set<string>(MAPPING_SETTINGS_KEYS);
+        // Footer citation fields are edited by dedicated inputs.
+        s.add("caption");
+        s.add("captionHref");
+        s.add("description");
+        s.add("source");
         if (widget.type === "table") s.add("columns");
         if (widget.type === "detail") { s.add("fields"); s.add("columns"); }
         if (widget.type === "markdown") { s.add("content"); s.add("markdown"); }
@@ -370,6 +375,16 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
     });
     const [advancedOpen, setAdvancedOpen] = useState(false);
     const [targetPageId, setTargetPageId] = useState(currentPage.id);
+
+    // Footer — citation (source) text + link, and a "Link to page" that shows a
+    // Read-more pointing at another dashboard (stored as details.route = page id).
+    const [captionText, setCaptionText] = useState(() => {
+        const c = widget.settings?.caption ?? widget.settings?.description ?? widget.settings?.source;
+        return typeof c === "string" ? c : "";
+    });
+    const [captionHref, setCaptionHref] = useState(typeof widget.settings?.captionHref === "string" ? widget.settings.captionHref : "");
+    const [linkPageId, setLinkPageId] = useState(typeof widget.details?.route === "string" ? widget.details.route : "");
+    const linkablePages = useMemo(() => dashboardPages.filter((p) => p.id !== currentPage.id), [dashboardPages, currentPage.id]);
 
     // Run the live request now and detect response fields for autocomplete.
     const runTest = async () => {
@@ -500,6 +515,13 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
             }
             if (!Object.keys(map).length) map = undefined;
         }
+        // Footer citation (source) — write the dedicated fields; clear stale aliases.
+        delete settings.description;
+        delete settings.source;
+        if (captionText.trim()) settings.caption = captionText.trim();
+        else delete settings.caption;
+        if (captionHref.trim()) settings.captionHref = captionHref.trim();
+        else delete settings.captionHref;
         const cleanColors = (src: MipWidgetColors) => {
             const out: MipWidgetColors = {};
             (Object.keys(src) as Array<keyof MipWidgetColors>).forEach((k) => { if (src[k]?.trim()) out[k] = src[k]; });
@@ -546,11 +568,14 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
                   ...(ms ? { refreshMs: ms } : {}),
               }
             : undefined;
+        // Link to page → details.route (target page id) for the footer's Read more.
+        const details = linkPageId ? { ...widget.details, route: linkPageId } : undefined;
         const patch: Partial<MipWidget> = {
             title: title.trim() || undefined,
             type: widgetType,
             settings,
             data,
+            details,
             style: {
                 ...widget.style,
                 borderColor: undefined,
@@ -828,6 +853,22 @@ function EditorPanel({ widget, close }: { widget: MipWidget; close: () => void }
                                 </div>
                             ) : null}
                         </div>
+
+                        {/* Footer — source citation + Read-more page link. */}
+                        <Section title="Footer">
+                            <Input label="Source / citation" value={captionText} onChange={setCaptionText} placeholder="e.g. Statista, 2025" />
+                            <Input label="Source link (URL)" value={captionHref} onChange={setCaptionHref} placeholder="https://… (shown as a citation link)" />
+                            <Select
+                                label="Link to page (Read more)"
+                                aria-label="Link to page"
+                                selectedKey={linkPageId || "__none"}
+                                items={[{ id: "__none", label: "No linked page" }, ...linkablePages.map((p) => ({ id: p.id, label: p.title }))]}
+                                onSelectionChange={(k) => setLinkPageId(String(k) === "__none" ? "" : String(k))}
+                            >
+                                {(item) => <Select.Item id={item.id}>{item.label}</Select.Item>}
+                            </Select>
+                            <p className="text-xs text-tertiary">The footer shows only when a source or a linked page is set.</p>
+                        </Section>
 
                         {/* Page settings. */}
                         {dashboardPages.length > 1 ? (

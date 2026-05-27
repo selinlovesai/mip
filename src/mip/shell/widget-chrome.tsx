@@ -7,13 +7,16 @@
  */
 
 import type { CSSProperties } from "react";
-import { DotsGrid, Trash01 } from "@untitledui/icons";
+import { ArrowRight, DotsGrid, LinkExternal01, Trash01 } from "@untitledui/icons";
 import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { WidgetView } from "@/mip/adapter/registry";
 import type { MipElementStyle, MipWidget, WidgetType } from "@/mip/schema";
+import { useDashboard } from "@/mip/store";
 import { cx } from "@/utils/cx";
 import { useWidgetData } from "./use-widget-data";
 import { WidgetEditorButton } from "./widget-editor";
+
+const isSafeHttpUrl = (v: string) => /^https?:\/\//i.test(v.trim());
 
 export interface WidgetElementDef {
     key: string;
@@ -157,6 +160,22 @@ export function widgetScopedCss(widget: MipWidget): string {
 export function WidgetChrome({ widget, editMode, onDelete }: { widget: MipWidget; editMode: boolean; onDelete: (id: string) => void }) {
     const dataState = useWidgetData(widget);
     const scopedCss = widgetScopedCss(widget);
+    const { state, activePage, setActivePage } = useDashboard();
+
+    // --- Footer: a citation (source) link on the left + a "Read more" page link
+    // on the right. Hidden entirely when the widget has neither. Mirrors the
+    // legacy WidgetChrome footer (settings.caption / captionHref + details.route).
+    const settings = (widget.settings ?? {}) as Record<string, unknown>;
+    const captionRaw = settings.caption ?? settings.description ?? settings.source;
+    const caption = typeof captionRaw === "string" ? captionRaw.trim() : "";
+    const explicitHref = typeof settings.captionHref === "string" ? settings.captionHref.trim() : "";
+    const captionHref = isSafeHttpUrl(explicitHref) ? explicitHref : isSafeHttpUrl(caption) ? caption : "";
+    // "Read more" → another dashboard page, by id in details.route.
+    const detailsRoute = typeof widget.details?.route === "string" ? widget.details.route.trim() : "";
+    const linkPage = detailsRoute ? state.pages.find((p) => p.id === detailsRoute && p.id !== activePage.id) : undefined;
+    const detailsLabel = (typeof widget.details?.label === "string" && widget.details.label.trim()) || "Read more";
+    const showFooter = !!(caption || captionHref || linkPage);
+
     return (
         <div className={cx("group relative h-full", editMode && "rounded-xl ring-1 ring-transparent transition-shadow hover:ring-brand")}>
             {scopedCss ? <style>{scopedCss}</style> : null}
@@ -172,12 +191,50 @@ export function WidgetChrome({ widget, editMode, onDelete }: { widget: MipWidget
             {/* The chrome owns the card surface (border + background from the
                 Design tab). Neutralize the inner WidgetCard's own bg/ring/radius
                 so the chosen colors are the ones actually shown. The
-                `mip-w-<id>` class is the scope target for custom CSS. */}
+                `mip-w-<id>` class is the scope target for custom CSS. The card is
+                a flex column so the footer pins to the bottom and the widget body
+                fills the rest. */}
             <div
-                className={cx("mip-w-" + widget.id, "h-full overflow-hidden rounded-xl [&>section]:!rounded-none [&>section]:!bg-transparent [&>section]:!ring-0")}
+                className={cx(
+                    "mip-w-" + widget.id,
+                    "flex h-full flex-col overflow-hidden rounded-xl [&>section]:!rounded-none [&>section]:!bg-transparent [&>section]:!ring-0 [&>section]:min-h-0 [&>section]:flex-1",
+                )}
                 style={widgetCardStyle(widget)}
             >
                 <WidgetView widget={widget} dataState={dataState} />
+                {showFooter ? (
+                    <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-secondary px-3.5 py-1.5 text-xs">
+                        <span className="min-w-0 flex-1 truncate text-tertiary">
+                            {captionHref ? (
+                                <a
+                                    href={captionHref}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title={caption ? `${caption} — ${captionHref}` : captionHref}
+                                    className="inline-flex max-w-full items-center gap-1 truncate text-brand-secondary hover:underline"
+                                >
+                                    <LinkExternal01 className="size-3 shrink-0" />
+                                    <span className="truncate">{caption || captionHref}</span>
+                                </a>
+                            ) : caption ? (
+                                <span className="truncate" title={caption}>
+                                    {caption}
+                                </span>
+                            ) : null}
+                        </span>
+                        {linkPage ? (
+                            <button
+                                type="button"
+                                onClick={() => setActivePage(linkPage.id)}
+                                title={`Go to ${linkPage.title}`}
+                                className="inline-flex shrink-0 items-center gap-1 font-medium text-brand-secondary hover:underline"
+                            >
+                                {detailsLabel}
+                                <ArrowRight className="size-3" />
+                            </button>
+                        ) : null}
+                    </footer>
+                ) : null}
             </div>
             {/* Resize affordance: a corner grip in the SE corner during edit mode.
                 Purely visual (pointer-events-none) — react-grid-layout's own
