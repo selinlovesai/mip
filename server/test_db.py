@@ -92,7 +92,7 @@ async def test_widget_types_catalog_seeds(fresh_db):
     # The widget-type registry catalog seeds one row per type (id = the type)
     # from the canonical frontend JSON — display + data-binding metadata the
     # picker/AI read. Seed-if-empty: re-running is a no-op.
-    assert await seed.seed_widget_types(fresh_db) == 33
+    assert await seed.seed_widget_types(fresh_db) == 34
     assert await seed.seed_widget_types(fresh_db) == 0
     rows = await db.list_records("widget_types")
     by_id = {r["id"]: r["data"] for r in rows}
@@ -103,6 +103,33 @@ async def test_widget_types_catalog_seeds(fresh_db):
     # Charts map their array under `series` (mip-tailwind renderers), not `slices`.
     assert by_id["pieChart"]["dataMap"]["key"] == "series" and by_id["pieChart"]["isChart"] is True
     assert by_id["hero"]["isDesignBlock"] is True
+    # Structural defaults moved into the catalog (no hardcoded schema map).
+    assert by_id["lineChart"]["defaultSettings"]["legendPosition"] == "bottom"
+
+
+async def test_apps_and_templates_catalogs_seed(fresh_db):
+    # Apps + templates catalogs seed from the canonical frontend JSON, one row
+    # per item, seed-if-empty (re-run = no-op).
+    assert await seed.seed_apps(fresh_db) > 0
+    assert await seed.seed_apps(fresh_db) == 0
+    apps = {r["id"] for r in await db.list_records("apps")}
+    assert {"anthropic", "openai"} <= apps
+
+    assert await seed.seed_templates(fresh_db) > 0
+    assert await seed.seed_templates(fresh_db) == 0
+    tpls = await db.list_records("templates")
+    assert tpls and all("widgets" in r["data"] for r in tpls)
+
+
+async def test_components_catalog_seeds(fresh_db):
+    # Design-system component catalog seeds from the canonical frontend JSON,
+    # one row per component (id), seed-if-empty (re-run = no-op).
+    assert await seed.seed_components(fresh_db) > 0
+    assert await seed.seed_components(fresh_db) == 0
+    rows = {r["id"]: r["data"] for r in await db.list_records("components")}
+    assert {"button", "input", "badge", "kpiCard"} <= set(rows)
+    assert rows["button"]["kind"] == "atom" and "primary" in rows["button"]["variants"]
+    assert rows["kpiCard"]["kind"] == "molecule"
 
 
 def test_emit_json_and_css_are_pure():

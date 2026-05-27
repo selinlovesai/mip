@@ -12,7 +12,7 @@
  * connecting only records which apps are linked (client demo).
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CheckCircle, SearchMd } from "@untitledui/icons";
 import { Dialog, Modal, ModalOverlay } from "@/components/application/modals/modal";
 import { Badge } from "@/components/base/badges/badges";
@@ -20,7 +20,7 @@ import { Button } from "@/components/base/buttons/button";
 import { CloseButton } from "@/components/base/buttons/close-button";
 import { Input } from "@/components/base/input/input";
 import { cx } from "@/utils/cx";
-import { APP_CATALOG, APP_CATEGORIES, appInitials, type AppConnector, type AuthMethod } from "../apps-catalog";
+import { APP_CATALOG, appInitials, loadApps, type AppConnector, type AuthMethod } from "../apps-catalog";
 import { connectionFromApp, useSettings } from "../settings-store";
 
 const METHOD_LABEL: Record<AuthMethod, string> = {
@@ -46,22 +46,34 @@ export function AppsTab() {
     const { isAppConnected, connectApp, disconnectApp, addConnection, setAssistant, connections } = useSettings();
     const [query, setQuery] = useState("");
     const [active, setActive] = useState<AppConnector | null>(null);
+    // Connector catalog from the DB (overlaid on the JSON), degrade-safe.
+    const [apps, setApps] = useState<AppConnector[]>(APP_CATALOG);
+    useEffect(() => {
+        let alive = true;
+        void loadApps().then((a) => alive && setApps(a));
+        return () => {
+            alive = false;
+        };
+    }, []);
 
     const groups = useMemo(() => {
         const q = query.trim().toLowerCase();
         const filtered = q
-            ? APP_CATALOG.filter(
+            ? apps.filter(
                   (app) =>
                       app.name.toLowerCase().includes(q) ||
                       app.category.toLowerCase().includes(q) ||
                       app.description.toLowerCase().includes(q),
               )
-            : APP_CATALOG;
-        return APP_CATEGORIES.map((category) => ({
-            category,
-            apps: filtered.filter((app) => app.category === category),
-        })).filter((group) => group.apps.length > 0);
-    }, [query]);
+            : apps;
+        const categories = [...new Set(apps.map((a) => a.category))];
+        return categories
+            .map((category) => ({
+                category,
+                apps: filtered.filter((app) => app.category === category),
+            }))
+            .filter((group) => group.apps.length > 0);
+    }, [query, apps]);
 
     return (
         <div className="flex flex-col gap-6">

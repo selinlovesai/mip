@@ -9,7 +9,7 @@
  *   Set Up in Connections   → close + jump to Settings → Connections
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowLeft, CheckCircle, SearchMd } from "@untitledui/icons";
 import { Dialog, Modal, ModalOverlay } from "@/components/application/modals/modal";
 import { Badge } from "@/components/base/badges/badges";
@@ -19,7 +19,7 @@ import { Input } from "@/components/base/input/input";
 import { useSettings } from "@/mip/settings/settings-store";
 import { useDashboard } from "@/mip/store";
 import { cx } from "@/utils/cx";
-import { TEMPLATES, TEMPLATE_CATEGORIES, cloneTemplateWidgets, type DashboardTemplate } from "./templates-catalog";
+import { TEMPLATES, TEMPLATE_CATEGORIES, cloneTemplateWidgets, loadTemplates, type DashboardTemplate } from "./templates-catalog";
 
 export function TemplatesModal({ open, onClose, onOpenConnections }: { open: boolean; onClose: () => void; onOpenConnections?: () => void }) {
     const { importTemplate } = useDashboard();
@@ -27,16 +27,26 @@ export function TemplatesModal({ open, onClose, onOpenConnections }: { open: boo
     const [query, setQuery] = useState("");
     const [category, setCategory] = useState<(typeof TEMPLATE_CATEGORIES)[number]>("All");
     const [selected, setSelected] = useState<DashboardTemplate | null>(null);
+    // Template catalog from the DB (overlaid on the JSON), degrade-safe.
+    const [templates, setTemplates] = useState<DashboardTemplate[]>(TEMPLATES);
+    useEffect(() => {
+        if (!open) return;
+        let alive = true;
+        void loadTemplates().then((t) => alive && setTemplates(t));
+        return () => {
+            alive = false;
+        };
+    }, [open]);
 
     const results = useMemo(
         () =>
-            TEMPLATES.filter((t) => {
+            templates.filter((t) => {
                 const matchesCat = category === "All" || t.category === category;
                 const q = query.toLowerCase();
                 const matchesQuery = !q || t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q);
                 return matchesCat && matchesQuery;
             }),
-        [query, category],
+        [query, category, templates],
     );
 
     const close = () => {

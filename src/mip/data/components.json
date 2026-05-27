@@ -1,0 +1,163 @@
+{
+  "_comment": "Canonical design-system component catalog (directive #2/#3). Source of truth for src/mip/components-catalog.ts AND the DB seed (server seed_components). Each entry is a reusable building block (atom/molecule/pattern) that widgets compose/reference by id, with its variants/sizes and the design tokens it consumes. Edit here.",
+  "components": [
+    {
+      "id": "button",
+      "kind": "atom",
+      "label": "Button",
+      "group": "Elements",
+      "description": "Action trigger with color + size variants and optional icons.",
+      "variants": ["primary", "secondary", "tertiary", "link-gray", "link-color", "primary-destructive", "secondary-destructive", "tertiary-destructive", "link-destructive"],
+      "sizes": ["xs", "sm", "md", "lg", "xl"],
+      "tokenRefs": ["--color-bg-brand-solid", "--color-bg-brand-solid_hover", "--color-text-primary_on-brand", "--color-border-primary", "--radius-md", "--shadow-xs"],
+      "order": 0
+    },
+    {
+      "id": "input",
+      "kind": "atom",
+      "label": "Input",
+      "group": "Elements",
+      "description": "Single-line text entry with label, hint, icon, and validation states.",
+      "sizes": ["sm", "md", "lg"],
+      "tokenRefs": ["--color-bg-primary", "--color-border-primary", "--color-border-brand", "--color-text-primary", "--color-text-placeholder", "--radius-md"],
+      "order": 1
+    },
+    {
+      "id": "textarea",
+      "kind": "atom",
+      "label": "Textarea",
+      "group": "Elements",
+      "description": "Multi-line text entry.",
+      "sizes": ["sm", "md", "lg"],
+      "tokenRefs": ["--color-bg-primary", "--color-border-primary", "--color-text-primary", "--radius-md"],
+      "order": 2
+    },
+    {
+      "id": "select",
+      "kind": "atom",
+      "label": "Select",
+      "group": "Elements",
+      "description": "Dropdown selection (single/multi, searchable combobox).",
+      "sizes": ["sm", "md", "lg"],
+      "tokenRefs": ["--color-bg-primary", "--color-border-primary", "--color-bg-active", "--radius-md"],
+      "order": 3
+    },
+    {
+      "id": "checkbox",
+      "kind": "atom",
+      "label": "Checkbox",
+      "group": "Elements",
+      "description": "Boolean selection with label and hint.",
+      "sizes": ["sm", "md"],
+      "tokenRefs": ["--color-bg-brand-solid", "--color-border-primary", "--radius-xs"],
+      "order": 4
+    },
+    {
+      "id": "toggle",
+      "kind": "atom",
+      "label": "Toggle",
+      "group": "Elements",
+      "description": "On/off switch.",
+      "sizes": ["sm", "md"],
+      "tokenRefs": ["--color-bg-brand-solid", "--color-bg-tertiary", "--radius-full"],
+      "order": 5
+    },
+    {
+      "id": "radio",
+      "kind": "atom",
+      "label": "Radio",
+      "group": "Elements",
+      "description": "Single choice from a group.",
+      "sizes": ["sm", "md"],
+      "tokenRefs": ["--color-bg-brand-solid", "--color-border-primary", "--radius-full"],
+      "order": 6
+    },
+    {
+      "id": "badge",
+      "kind": "atom",
+      "label": "Badge",
+      "group": "Elements",
+      "description": "Status/label chip (optionally with a dot or icon).",
+      "variants": ["pill-color", "color", "modern"],
+      "sizes": ["sm", "md", "lg"],
+      "tokenRefs": ["--color-bg-brand-primary", "--color-text-brand-secondary", "--radius-full"],
+      "order": 7
+    },
+    {
+      "id": "avatar",
+      "kind": "atom",
+      "label": "Avatar",
+      "group": "Elements",
+      "description": "User image/initials with optional status + badge.",
+      "sizes": ["xs", "sm", "md", "lg", "xl", "2xl"],
+      "tokenRefs": ["--color-bg-secondary", "--color-fg-secondary", "--radius-full"],
+      "order": 8
+    },
+    {
+      "id": "tooltip",
+      "kind": "atom",
+      "label": "Tooltip",
+      "group": "Elements",
+      "description": "Hover/focus hint bubble.",
+      "tokenRefs": ["--color-bg-primary-solid", "--color-text-white", "--radius-md", "--shadow-lg"],
+      "order": 9
+    },
+    {
+      "id": "featuredIcon",
+      "kind": "atom",
+      "label": "Featured icon",
+      "group": "Elements",
+      "description": "Emphasized icon tile with themed background.",
+      "variants": ["light", "gradient", "dark", "modern", "outline"],
+      "sizes": ["sm", "md", "lg", "xl"],
+      "tokenRefs": ["--color-bg-brand-secondary", "--color-fg-brand-primary", "--radius-lg"],
+      "order": 10
+    },
+    {
+      "id": "progressBar",
+      "kind": "atom",
+      "label": "Progress bar",
+      "group": "Elements",
+      "description": "Linear progress indicator.",
+      "tokenRefs": ["--color-bg-brand-solid", "--color-bg-quaternary", "--radius-full"],
+      "order": 11
+    },
+    {
+      "id": "kpiCard",
+      "kind": "molecule",
+      "label": "KPI card",
+      "group": "Components",
+      "description": "Label + value + delta badge (composes text + badge).",
+      "tokenRefs": ["--color-bg-primary", "--color-text-primary", "--color-text-tertiary", "--color-border-secondary", "--radius-xl"],
+      "order": 12
+    },
+    {
+      "id": "formField",
+      "kind": "molecule",
+      "label": "Form field",
+      "group": "Components",
+      "description": "Label + control + hint (composes input/select + label).",
+      "tokenRefs": ["--color-text-secondary", "--color-text-error-primary"],
+      "order": 13
+    },
+    {
+      "id": "searchBar",
+      "kind": "molecule",
+      "label": "Search bar",
+      "group": "Components",
+      "description": "Icon + input + optional filters.",
+      "tokenRefs": ["--color-bg-primary", "--color-border-primary", "--radius-md"],
+      "order": 14
+    },
+    {
+      "id": "avatarLabelGroup",
+      "kind": "molecule",
+      "label": "Avatar + label",
+      "group": "Components",
+      "description": "Avatar with title + subtitle (composes avatar + text).",
+      "sizes": ["sm", "md", "lg"],
+      "tokenRefs": ["--color-text-primary", "--color-text-tertiary"],
+      "order": 15
+    }
+  ]
+}

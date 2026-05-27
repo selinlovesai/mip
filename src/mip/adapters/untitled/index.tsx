@@ -14,6 +14,7 @@ import { CtaWidget, ContentSectionWidget, FaqWidget, FeatureGridWidget, HeroWidg
 import { DetailWidget } from "./detail-widget";
 import { DiagramWidget } from "./diagram-widget";
 import { FormWidget } from "./form-widget";
+import { ElementWidget } from "./element-widget";
 import { KpiWidget } from "./kpi-widget";
 import { ListWidget } from "./list-widget";
 import { GoogleMapWidget } from "./map-widget";
@@ -76,6 +77,8 @@ export const untitledAdapter: UiKitAdapter = {
         ganttChart: DiagramWidget,
         // Integrations
         googleMap: GoogleMapWidget,
+        // Design-system atom resolved from the components catalog
+        element: ElementWidget,
     },
     fallback: ComingSoon,
 };

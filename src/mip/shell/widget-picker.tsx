@@ -12,6 +12,7 @@ import { Input } from "@/components/base/input/input";
 import { useDashboard } from "@/mip/store";
 import { useSettings } from "@/mip/settings/settings-store";
 import { WIDGET_TYPE_CATALOG, loadWidgetTypes, type WidgetTypeMeta } from "@/mip/widget-types";
+import { COMPONENT_LIST, loadComponents, type ComponentDef } from "@/mip/components-catalog";
 import type { WidgetType } from "@/mip/schema";
 import { cx } from "@/utils/cx";
 import { WIDGET_CATALOG, makeWidget, type CatalogEntry } from "./widget-catalog";
@@ -24,6 +25,18 @@ const ACCENT_DOT: Record<string, string> = {
     error: "bg-fg-error-secondary",
 };
 
+/** A flattened, renderable picker card — covers both widget-type entries and
+ *  design-system atoms (which all create the generic `element` widget). */
+interface PickerEntry {
+    key: string;
+    label: string;
+    group: string;
+    description?: string;
+    accent?: string;
+    /** The catalog entry handed to makeWidget on pick. */
+    base: CatalogEntry;
+}
+
 export function WidgetPicker({ open, onClose }: { open: boolean; onClose: () => void }) {
     const { addWidget } = useDashboard();
     const { widgetDefaults } = useSettings();
@@ -31,44 +44,66 @@ export function WidgetPicker({ open, onClose }: { open: boolean; onClose: () => 
     // Per-type metadata (label/description/accent) — DB-backed catalog overlaid
     // on the static one; degrade-safe to the static catalog.
     const [meta, setMeta] = useState<Record<WidgetType, WidgetTypeMeta>>(WIDGET_TYPE_CATALOG);
+    const [components, setComponents] = useState<ComponentDef[]>(COMPONENT_LIST);
     useEffect(() => {
         if (!open) return;
         let alive = true;
         void loadWidgetTypes().then((m) => alive && setMeta(m));
+        void loadComponents().then((c) => alive && setComponents(c));
         return () => {
             alive = false;
         };
     }, [open]);
 
+    // All cards: the widget-type catalog + the design-system atoms (each atom
+    // becomes a generic `element` widget carrying its componentId).
+    const allEntries = useMemo<PickerEntry[]>(() => {
+        const fromTypes: PickerEntry[] = WIDGET_CATALOG.map((entry) => {
+            const m = meta[entry.type];
+            return { key: entry.type, label: m?.label ?? entry.label, group: m?.group ?? entry.group, description: m?.description, accent: m?.accent, base: entry };
+        });
+        const elMeta = meta["element"];
+        const fromAtoms: PickerEntry[] = components
+            .filter((c) => c.kind === "atom")
+            .map((c) => ({
+                key: `element:${c.id}`,
+                label: c.label,
+                group: c.group,
+                description: c.description,
+                base: { type: "element" as WidgetType, label: c.label, group: c.group, w: elMeta?.layout.w ?? 3, h: elMeta?.layout.h ?? 2, settings: { componentId: c.id, label: c.label } },
+            }));
+        return [...fromTypes, ...fromAtoms];
+    }, [meta, components]);
+
     const groups = useMemo(() => {
         const q = query.toLowerCase();
-        const filtered = WIDGET_CATALOG.filter((entry) => {
-            const m = meta[entry.type];
-            return (m?.label ?? entry.label).toLowerCase().includes(q) || entry.type.toLowerCase().includes(q) || (m?.description ?? "").toLowerCase().includes(q);
-        });
-        const map = new Map<string, CatalogEntry[]>();
+        const filtered = allEntries.filter((e) => e.label.toLowerCase().includes(q) || e.base.type.toLowerCase().includes(q) || (e.description ?? "").toLowerCase().includes(q));
+        const map = new Map<string, PickerEntry[]>();
         for (const entry of filtered) {
-            const group = meta[entry.type]?.group ?? entry.group;
-            const list = map.get(group) ?? [];
+            const list = map.get(entry.group) ?? [];
             list.push(entry);
-            map.set(group, list);
+            map.set(entry.group, list);
         }
         return [...map.entries()];
-    }, [query, meta]);
+    }, [query, allEntries]);
 
-    const pick = (entry: CatalogEntry) => {
+    const pick = (entry: PickerEntry) => {
         // Use the user's customized default config for this type (Settings → Widgets):
         // name + JSON config holding w/h and optional seed settings/fields.
-        const def = widgetDefaults[entry.type];
+        const base = entry.base;
+        const def = widgetDefaults[base.type];
         const c = (def?.config ?? {}) as { w?: number; h?: number; settings?: Record<string, unknown>; fields?: CatalogEntry["fields"] };
+        // For element atoms, keep the atom's own settings (componentId); only fall
+        // back to the type default config for plain widget types.
+        const isElement = base.type === "element";
         addWidget(
             makeWidget({
-                ...entry,
-                label: def?.name ?? entry.label,
-                w: typeof c.w === "number" ? c.w : entry.w,
-                h: typeof c.h === "number" ? c.h : entry.h,
-                ...(c.settings ? { settings: c.settings } : {}),
-                ...(c.fields ? { fields: c.fields } : {}),
+                ...base,
+                label: isElement ? base.label : def?.name ?? base.label,
+                w: !isElement && typeof c.w === "number" ? c.w : base.w,
+                h: !isElement && typeof c.h === "number" ? c.h : base.h,
+                ...(!isElement && c.settings ? { settings: c.settings } : base.settings ? { settings: base.settings } : {}),
+                ...(!isElement && c.fields ? { fields: c.fields } : {}),
             }),
         );
         onClose();
@@ -91,23 +126,20 @@ export function WidgetPicker({ open, onClose }: { open: boolean; onClose: () => 
                                 <div key={group} className="mb-5 last:mb-0">
                                     <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-quaternary">{group}</h3>
                                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                                        {entries.map((entry) => {
-                                            const m = meta[entry.type];
-                                            return (
-                                                <button
-                                                    key={entry.type}
-                                                    onClick={() => pick(entry)}
-                                                    title={m?.description || undefined}
-                                                    className={cx("rounded-lg px-3 py-2.5 text-left text-sm font-medium text-secondary ring-1 ring-secondary transition-colors hover:bg-secondary hover:ring-brand")}
-                                                >
-                                                    <span className="flex items-center gap-1.5">
-                                                        {m?.accent ? <span className={cx("size-1.5 shrink-0 rounded-full", ACCENT_DOT[m.accent] ?? "bg-fg-quaternary")} aria-hidden /> : null}
-                                                        <span className="truncate">{m?.label ?? entry.label}</span>
-                                                    </span>
-                                                    <span className="mt-0.5 block truncate text-xs text-tertiary">{m?.description || entry.type}</span>
-                                                </button>
-                                            );
-                                        })}
+                                        {entries.map((entry) => (
+                                            <button
+                                                key={entry.key}
+                                                onClick={() => pick(entry)}
+                                                title={entry.description || undefined}
+                                                className={cx("rounded-lg px-3 py-2.5 text-left text-sm font-medium text-secondary ring-1 ring-secondary transition-colors hover:bg-secondary hover:ring-brand")}
+                                            >
+                                                <span className="flex items-center gap-1.5">
+                                                    {entry.accent ? <span className={cx("size-1.5 shrink-0 rounded-full", ACCENT_DOT[entry.accent] ?? "bg-fg-quaternary")} aria-hidden /> : null}
+                                                    <span className="truncate">{entry.label}</span>
+                                                </span>
+                                                <span className="mt-0.5 block truncate text-xs text-tertiary">{entry.description || entry.base.type}</span>
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
                             ))}

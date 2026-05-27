@@ -38,10 +38,14 @@ SEED_DIR = Path(__file__).parent / "seed"
 # Typed-token seed lives OUTSIDE SEED_DIR so the generic records seeder never
 # tries to load it. Generated from theme.css by tools/extract_theme_tokens.py.
 TOKENS_SEED = Path(__file__).parent / "tokens.seed.json"
-# Widget-type registry catalog — the SAME canonical JSON the frontend imports
-# (src/mip/data/widget-types.json), so the DB seed and the app share one source
-# of truth (no regenerated copy). Lives outside SEED_DIR for the same reason.
-WIDGET_TYPES_SEED = Path(__file__).parent.parent / "src" / "mip" / "data" / "widget-types.json"
+# Catalogs whose canonical JSON lives in the frontend data dir (the SAME files
+# the app imports), so the DB seed and the app share one source of truth — no
+# regenerated copies. Each is a { "<key>": [ {id-bearing object}, … ] } doc.
+DATA_DIR = Path(__file__).parent.parent / "src" / "mip" / "data"
+WIDGET_TYPES_SEED = DATA_DIR / "widget-types.json"
+APPS_SEED = DATA_DIR / "apps.json"
+TEMPLATES_SEED = DATA_DIR / "templates.json"
+COMPONENTS_SEED = DATA_DIR / "components.json"
 
 
 def _load_seed_files() -> dict[str, list[dict[str, Any]]]:
@@ -123,36 +127,50 @@ async def seed_tokens(engine: AsyncEngine) -> int:
     return n
 
 
-async def seed_widget_types(engine: AsyncEngine) -> int:
-    """Seed the `widget_types` registry catalog from the canonical frontend JSON
-    (src/mip/data/widget-types.json) — one record per type, keyed by `type`.
-    Seed-if-empty: never clobbers edits. Returns rows seeded this run."""
-    if not WIDGET_TYPES_SEED.is_file():
+async def _seed_catalog(engine: AsyncEngine, collection: str, path: Path, key: str, id_field: str) -> int:
+    """Seed a frontend-canonical catalog JSON ({ "<key>": [ … ] }) into a records
+    collection, one row per item keyed by `id_field`. Seed-if-empty: never
+    clobbers edits. Returns rows seeded this run."""
+    if not path.is_file():
         return 0
     async with engine.connect() as conn:
         count = (
-            await conn.execute(
-                select(func.count()).select_from(db.records).where(db.records.c.collection == "widget_types")
-            )
+            await conn.execute(select(func.count()).select_from(db.records).where(db.records.c.collection == collection))
         ).scalar_one()
     if count:
         return 0  # already populated — don't clobber
     try:
-        doc = json.loads(WIDGET_TYPES_SEED.read_text())
+        doc = json.loads(path.read_text())
     except Exception as exc:  # noqa: BLE001
-        print(f"[seed] widget_types skipped: invalid {WIDGET_TYPES_SEED.name} ({exc})")
+        print(f"[seed] {collection} skipped: invalid {path.name} ({exc})")
         return 0
-    types = doc.get("types") if isinstance(doc, dict) else doc
-    if not isinstance(types, list):
-        print("[seed] widget_types skipped: expected a {types:[…]} object or array")
+    items = doc.get(key) if isinstance(doc, dict) else doc
+    if not isinstance(items, list):
+        print(f"[seed] {collection} skipped: expected a {{{key}:[…]}} object or array")
         return 0
     n = 0
-    for entry in types:
-        t = entry.get("type") if isinstance(entry, dict) else None
-        if not t:
+    for entry in items:
+        rid = entry.get(id_field) if isinstance(entry, dict) else None
+        if not rid:
             continue
-        await db.upsert_record("widget_types", str(t), entry)
+        await db.upsert_record(collection, str(rid), entry)
         n += 1
     if n:
-        print(f"[seed] widget_types: seeded {n} type(s)")
+        print(f"[seed] {collection}: seeded {n} row(s)")
     return n
+
+
+async def seed_widget_types(engine: AsyncEngine) -> int:
+    return await _seed_catalog(engine, "widget_types", WIDGET_TYPES_SEED, "types", "type")
+
+
+async def seed_apps(engine: AsyncEngine) -> int:
+    return await _seed_catalog(engine, "apps", APPS_SEED, "apps", "id")
+
+
+async def seed_templates(engine: AsyncEngine) -> int:
+    return await _seed_catalog(engine, "templates", TEMPLATES_SEED, "templates", "id")
+
+
+async def seed_components(engine: AsyncEngine) -> int:
+    return await _seed_catalog(engine, "components", COMPONENTS_SEED, "components", "id")
