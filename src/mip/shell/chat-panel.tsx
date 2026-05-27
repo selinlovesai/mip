@@ -20,7 +20,70 @@ import { markdownToHtml } from "@/mip/adapters/untitled/markdown";
 import { useSettings, type Connection } from "@/mip/settings/settings-store";
 import { useDashboard } from "@/mip/store";
 import { buildSystemPrompt, resolveSkills, runAgent, type ApiMsg, type Brain, type ToolContext } from "@/mip/agent";
+import type { MipWidget } from "@/mip/schema";
 import { cx } from "@/utils/cx";
+
+/** A compact, one-line digest of what a widget actually SHOWS — fed into the
+ *  agent's dashboard facts so it knows existing content (values/labels/binding)
+ *  and can add new insights instead of rewording what's already there. */
+function summarizeWidget(w: MipWidget): string | undefined {
+    const s = (w.settings ?? {}) as Record<string, unknown>;
+    const clip = (v: unknown, n = 40) => {
+        const str = typeof v === "string" ? v : v == null ? "" : JSON.stringify(v);
+        return str.length > n ? str.slice(0, n) + "…" : str;
+    };
+    const parts: string[] = [];
+    if (w.data?.sourceId) parts.push(`live:${w.data.sourceId}${w.data.request?.path ? ` ${w.data.request.path}` : ""}`);
+    const arr = (v: unknown) => (Array.isArray(v) ? (v as unknown[]) : undefined);
+    switch (w.type) {
+        case "kpi":
+            if (s.value != null) parts.push(`value ${clip(s.value, 20)}${s.unit ? ` ${s.unit}` : ""}${s.delta != null ? `, Δ ${clip(s.delta, 12)}` : ""}`);
+            break;
+        case "progress":
+            if (s.value != null) parts.push(`${clip(s.value, 12)} / ${clip(s.target ?? s.max, 12)}`);
+            break;
+        case "lineChart":
+        case "barChart":
+        case "areaChart":
+        case "pieChart":
+        case "donutChart": {
+            const pts = arr(s.points);
+            if (pts) parts.push(`${pts.length} pts: ${pts.slice(0, 4).map((p) => (p as Record<string, unknown>)?.label).filter(Boolean).join(", ")}${pts.length > 4 ? "…" : ""}`);
+            break;
+        }
+        case "table": {
+            const cols = arr(s.columns);
+            const rows = arr(s.rows);
+            if (cols) parts.push(`cols: ${cols.slice(0, 6).map((c) => (typeof c === "string" ? c : (c as Record<string, unknown>)?.label ?? (c as Record<string, unknown>)?.key)).filter(Boolean).join(", ")}`);
+            if (rows) parts.push(`${rows.length} rows`);
+            break;
+        }
+        case "list": {
+            const items = arr(s.items);
+            const pk = String(s.primaryKey ?? "name");
+            if (items) parts.push(`${items.length} items: ${items.slice(0, 3).map((i) => (i as Record<string, unknown>)?.[pk] ?? (i as Record<string, unknown>)?.name).filter(Boolean).join(", ")}${items.length > 3 ? "…" : ""}`);
+            break;
+        }
+        case "detail": {
+            const rec = s.record;
+            if (rec && typeof rec === "object") parts.push(`fields: ${Object.keys(rec as Record<string, unknown>).slice(0, 6).join(", ")}`);
+            break;
+        }
+        case "markdown": {
+            const c = typeof s.content === "string" ? s.content : typeof s.markdown === "string" ? s.markdown : "";
+            if (c) parts.push(clip(c.replace(/[#*`>\n]+/g, " ").trim(), 60));
+            break;
+        }
+        case "image":
+            if (s.url || s.src) parts.push("image");
+            break;
+        default: {
+            const heading = s.heading ?? s.title ?? s.label ?? s.body;
+            if (heading) parts.push(clip(heading, 40));
+        }
+    }
+    return parts.length ? parts.join("; ") : undefined;
+}
 
 type ChatMode = "sidebar" | "chat" | "compact";
 
@@ -464,7 +527,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
                     pageContext: page.systemPrompt,
                     assistantContext: assistant.systemPrompt,
                     skills: active,
-                    dashboard: { title: page.title, description: page.description, kind: page.kind, widgets: page.widgets.map((w) => ({ id: w.id, type: w.type, title: w.title })) },
+                    dashboard: { title: page.title, description: page.description, kind: page.kind, widgets: page.widgets.map((w) => ({ id: w.id, type: w.type, title: w.title, summary: summarizeWidget(w) })) },
                 }) + injectionDirective
             );
         };

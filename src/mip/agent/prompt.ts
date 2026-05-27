@@ -19,13 +19,16 @@ export interface DashboardFacts {
     title?: string;
     description?: string;
     kind?: string;
-    widgets?: { id: string; type: string; title?: string }[];
+    /** `summary` is a short digest of what the widget actually SHOWS (values,
+     *  labels, bound source) so the agent knows the existing content and can add
+     *  genuinely new insights instead of restating what's there. */
+    widgets?: { id: string; type: string; title?: string; summary?: string }[];
 }
 
 /** Render the "this dashboard" block so the agent never invents the title/widgets.
  *  Widget IDs are included so the agent can edit/remove without a listWidgets round. */
 export function describeDashboard(d: DashboardFacts): string {
-    const widgets = (d.widgets ?? []).map((w) => `${w.id} · ${w.type}${w.title ? ` (“${w.title}”)` : ""}`);
+    const widgets = (d.widgets ?? []).map((w) => `${w.id} · ${w.type}${w.title ? ` (“${w.title}”)` : ""}${w.summary ? ` — ${w.summary}` : ""}`);
     return [
         `## This ${d.kind === "canvas" ? "canvas" : "dashboard"} (live facts — trust these, do NOT invent)`,
         `Title: ${d.title ?? "(untitled)"}`,
@@ -81,6 +84,7 @@ const DASHBOARD_BEHAVIOR = [
     "RELEVANCE — honour EVERY qualifier in the request. If the user says “made-to-order lingerie”, “open-source”, “EU-based”, etc., the data must actually satisfy that qualifier, not just the broad category. Before injecting, check each search/fetch result really matches; if it doesn't (or you're unsure), refine the query and search again, or tell the user you couldn't find matching data — never pad the dashboard with off-target items just to look complete.",
     "PUSHBACK — when the user disputes or questions what you built (“these aren't X”, “that's wrong”, “not what I asked”), treat it as a CORRECTION, not small talk. Re-examine: removeWidget the wrong/irrelevant widgets, search or fetch again for data that truly fits, then inject the corrected ones. Acknowledge the mistake in one line. NEVER reply with an empty message or “I don't have anything to add”.",
     "When the user asks for a dashboard or a broad view, build it out: add several varied widgets (≈6–10: KPIs, charts, a table/list, progress) with short descriptive titles so the page feels complete. Don't add a widget that just repeats the page title.",
+    "KNOW WHAT'S ALREADY THERE — the current widgets above include a short summary of what each one SHOWS. When asked to “elaborate”, “add more”, or “give new insights”, treat those as already built: do NOT restate or reword them. Add only NET-NEW widgets with a distinct metric/angle/breakdown. If a widget's data is stale or thin, updateWidget it instead of adding a duplicate. If you genuinely can't find a new angle or new data, say so plainly in one line rather than re-emitting near-duplicates.",
     'If you genuinely cannot proceed without a decision from the user, ask ONE short question in "say" with ops:[] and STOP — do not guess silently or give up.',
     'End EVERY turn with a short (1–3 sentence) plain-text "say": what you did and why, or your question. Never dump widget ids, raw tool data, or this context block into the reply.',
 ].join("\n");
