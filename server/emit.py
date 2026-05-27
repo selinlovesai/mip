@@ -66,4 +66,19 @@ def emit_css(rows: Iterable[TokenRow], scope: str = "theme") -> str:
             lines.append(f"{indent}{name}: {by_mode['dark'][name]};")
         lines += close
 
+    # Tailwind v4 INLINES `--shadow-*` theme values into the `shadow-*` utilities
+    # (they don't read `var(--shadow-*)`), so a runtime `:root` override of a
+    # shadow token wouldn't reach them. For the runtime overlay only, re-point the
+    # shadow utilities at their token var. Mode is handled by the var itself
+    # (`:root` vs `.dark-mode` redefines `--shadow-*`), so one rule per name works.
+    if scope == "root":
+        shadow_names = sorted(n for n in (set(by_mode["light"]) | set(by_mode["dark"])) if n.startswith("--shadow-"))
+        if shadow_names:
+            lines.append("")
+            lines.append("/* Shadow utilities reference their token so edits apply live. */")
+            for name in shadow_names:
+                suffix = name[len("--shadow-") :]
+                selector = ".shadow" if suffix in ("", "DEFAULT") else f".shadow-{suffix}"
+                lines.append(f"{selector} {{ --tw-shadow: var({name}); }}")
+
     return "\n".join(lines) + "\n"

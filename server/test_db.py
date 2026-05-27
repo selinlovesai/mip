@@ -112,6 +112,13 @@ def test_emit_json_and_css_are_pure():
     assert ":root {" in root_css and "@theme" not in root_css
     assert "--color-brand-600: rgb(127 86 217);" in root_css and ".dark-mode {" in root_css
 
+    # Runtime scope also re-points the shadow utilities at their token var
+    # (Tailwind inlines --shadow-* otherwise), so shadow edits apply live.
+    shadow_rows = [{"name": "--shadow-md", "mode": "light", "value": "0 4px 6px #0001", "kind": "shadow", "group": "Shadow"}]
+    assert ".shadow-md { --tw-shadow: var(--shadow-md); }" in emit.emit_css(shadow_rows, scope="root")
+    # …but NOT in the build-time @theme scope (utilities are generated there).
+    assert ".shadow-md {" not in emit.emit_css(shadow_rows, scope="theme")
+
 
 async def test_emit_roundtrips_seeded_tokens(fresh_db):
     await seed.seed_tokens(fresh_db)
