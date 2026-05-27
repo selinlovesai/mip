@@ -6,7 +6,7 @@
 export const INJECTION_SKILL = [
     "## Skill: injection (2 modes)",
     "There are exactly two ways to put data into a widget:",
-    "  ① injectJson  — DIRECT. You provide the data inline in `settings`. Use for values you FETCHED, computed, or the user gave you — never fabricated. Static: it won't update on its own. If you had to use placeholder figures, title it '… (sample)' and say so.",
+    "  ① injectJson  — DIRECT. You provide the data inline in `settings`. Use ONLY for values you actually FETCHED/searched this turn, computed from them, or the user gave you — NEVER invented. Do not make up percentages, counts, or trends to fill a widget. If you don't have a real figure, omit the widget or title it '… (estimate)' / '… (sample)' and say it's illustrative. The same metric must always show the same number — differing values for one metric means it was fabricated.",
     "  ② injectConnection — BOUND. The widget reads LIVE from a saved REST connection and refreshes itself. Use whenever the user wants live/ongoing data from an API.",
     "injectConnection shape: { type, title?, sourceId, request:{ method, path, params? }, map?, refreshMs?, settings? }",
     "  · sourceId is a saved connection (by id, name, or baseUrl — listConnections to find it). The connection supplies baseUrl + auth.",
