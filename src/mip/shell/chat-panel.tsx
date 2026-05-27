@@ -253,9 +253,12 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         if (!text || !text.trim()) return; // never render an empty bubble
         const id = streamRef.current;
         if (id) {
-            // Finalize the streaming preview into this committed message.
+            // Finalize the streaming preview into this committed message. Give it a
+            // committed `a-` id — the persistence layer strips every `stream-` id,
+            // so keeping the preview id would drop the reply on refresh.
             streamRef.current = null;
-            setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, text } : m)));
+            const committedId = `a-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+            setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, id: committedId, text } : m)));
             return;
         }
         setMessages((prev) => [...prev, { id: `a-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "assistant", text }]);

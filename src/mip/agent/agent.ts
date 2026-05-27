@@ -77,6 +77,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
     let nudged = false; // recovered a non-JSON / refusal reply
     let actNudged = false; // recovered a false "I did it" claim
     let emptyNudged = false; // recovered an empty {say:"",ops:[]} reply
+    let intentNudged = false; // recovered a "let me search…" promise with no ops
     let mutated = false; // did any mutating op run this turn?
     let failStreak = 0; // consecutive rounds where every op failed
     let said = false; // emitted any non-blank assistant text?
@@ -156,6 +157,22 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
                     ...msgs,
                     { role: "assistant", content: text },
                     { role: "user", content: `You have not changed the ${surface} yet — reading data (fetch/search/callApi/listConnections) does not count. Emit the op that actually performs the change NOW, then summarize. Do not claim success without the op.` },
+                ];
+                continue;
+            }
+            // Model PROMISED an action ("let me search…", "I'll fetch…", "now
+            // looking up…") but emitted no ops — a dangling intent. Nudge once to
+            // actually run that op this turn instead of ending on the promise.
+            const promisesAction =
+                /\b(let me|i'?ll|i will|let'?s|i'?m going to|going to|now i'?ll|next,? i'?ll)\b/i.test(say) ||
+                /\b(search|searching|fetch|fetching|look(?:ing)? up|check|checking|retriev|gather|pull|query|add|build|creat)\w*\s*[….]*\s*$/i.test(say);
+            if (!asksUser && promisesAction && !intentNudged && userRequestedChange) {
+                intentNudged = true;
+                opts.onStreamClear?.();
+                msgs = [
+                    ...msgs,
+                    { role: "assistant", content: text },
+                    { role: "user", content: `You described what you're about to do but emitted NO ops, so nothing happened. Emit that op (e.g. search / fetch / callApi / injectJson / injectConnection) in THIS reply now — don't just narrate the intent.` },
                 ];
                 continue;
             }
