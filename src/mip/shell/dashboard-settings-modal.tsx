@@ -18,7 +18,7 @@ import { Checkbox } from "@/components/base/checkbox/checkbox";
 import { Input } from "@/components/base/input/input";
 import { Select } from "@/components/base/select/select";
 import { TextArea } from "@/components/base/textarea/textarea";
-import { dbAvailable, dbGet } from "@/mip/api";
+import { chat, dbAvailable, dbGet } from "@/mip/api";
 import { useDashboard, type DashboardPage, type PageAccessLevel, type PageVariable } from "@/mip/store";
 import { useSettings } from "@/mip/settings/settings-store";
 import { ModelField } from "@/mip/settings/model-field";
@@ -111,6 +111,47 @@ export function DashboardSettingsModal({ open, onClose }: { open: boolean; onClo
     // The connection whose models to list: this dashboard's override, else the
     // global default, else the first AI connection.
     const effectiveConn = getConnection(agent.connectionId ?? assistant.connectionId ?? aiConnections[0]?.id ?? "");
+
+    // --- Generate a system prompt with the AI (the sparkle button on the
+    // context textarea). Sends the dashboard title + whatever is already in the
+    // box as guidance, and the model writes a polished assistant context. ---
+    const [generatingPrompt, setGeneratingPrompt] = useState(false);
+    const [promptError, setPromptError] = useState<string | null>(null);
+    const generateSystemPrompt = async () => {
+        if (generatingPrompt) return;
+        const conn = effectiveConn;
+        if (!conn) {
+            setPromptError("Connect an AI model first (Settings → Assistant).");
+            return;
+        }
+        setGeneratingPrompt(true);
+        setPromptError(null);
+        const widgetList = draft.widgets.map((w) => `${w.type}${w.title ? ` (${w.title})` : ""}`).join(", ") || "none yet";
+        const userMsg = [
+            `Dashboard title: "${draft.title || "(untitled)"}".`,
+            draft.description ? `Description: ${draft.description}.` : "",
+            isCanvas ? "" : `Widgets present: ${widgetList}.`,
+            (draft.systemPrompt ?? "").trim() ? `Existing notes / draft to build on:\n${(draft.systemPrompt ?? "").trim()}` : "No draft yet — infer the dashboard's purpose from the title.",
+        ]
+            .filter(Boolean)
+            .join("\n");
+        const sys =
+            "You write the SYSTEM PROMPT (assistant context) for an AI assistant that helps build and edit a specific live widget dashboard. " +
+            "Using the dashboard's title, description, widgets, and any draft notes, produce a concise, high-signal context that tells the assistant the dashboard's purpose, audience, the kind of data/widgets to favour, tone, and any constraints. " +
+            "Write in the second person addressed to the assistant (e.g. \"You help…\"). 3–6 sentences, plain text only — no markdown headings, no preamble, no quotes around the result. Output ONLY the prompt text.";
+        const res = await chat({
+            provider: conn.aiProvider ?? "openai",
+            baseUrl: conn.baseUrl ?? "",
+            apiKey: conn.auth?.token ?? conn.auth?.keyValue,
+            model: agent.model ?? assistant.model ?? conn.aiModel ?? "gpt-4o-mini",
+            messages: [{ role: "user", content: userMsg }],
+            system: sys,
+        });
+        setGeneratingPrompt(false);
+        if (res.ok && res.content?.trim()) setDraftField("systemPrompt", res.content.trim());
+        else setPromptError(typeof res.error === "string" ? res.error : "Couldn't generate a prompt. Check the model connection.");
+    };
+
     const isCanvas = draft.kind === "canvas";
     const surfaceSkills = skills.filter((s) => !s.surfaces || s.surfaces.includes(isCanvas ? "canvas" : "dashboard"));
     // A skill is active when: built-in & not disabled, or custom & enabled.
@@ -283,14 +324,29 @@ export function DashboardSettingsModal({ open, onClose }: { open: boolean; onClo
                                             />
                                         </div>
 
-                                        <TextArea
-                                            label="AI assistant context (system prompt)"
-                                            hint="Injected at the top of this dashboard's agent prompt. Leave blank to use the default shown below."
-                                            value={draft.systemPrompt ?? ""}
-                                            onChange={(v) => setDraftField("systemPrompt", v)}
-                                            rows={5}
-                                            placeholder={DEFAULT_PAGE_CONTEXT}
-                                        />
+                                        <div className="relative">
+                                            <TextArea
+                                                label="AI assistant context (system prompt)"
+                                                hint={promptError ?? "Injected at the top of this dashboard's agent prompt. Leave blank to use the default shown below."}
+                                                isInvalid={!!promptError}
+                                                value={draft.systemPrompt ?? ""}
+                                                onChange={(v) => { setDraftField("systemPrompt", v); setPromptError(null); }}
+                                                rows={5}
+                                                placeholder={DEFAULT_PAGE_CONTEXT}
+                                                textAreaClassName="pr-10"
+                                            />
+                                            {/* Generate a polished system prompt from the title + current draft. */}
+                                            <ButtonUtility
+                                                type="button"
+                                                color="tertiary"
+                                                size="xs"
+                                                icon={Stars01}
+                                                isDisabled={generatingPrompt}
+                                                onClick={generateSystemPrompt}
+                                                tooltip={generatingPrompt ? "Writing…" : "Write this for me with AI"}
+                                                className={cx("absolute right-2 top-8", generatingPrompt && "animate-pulse")}
+                                            />
+                                        </div>
 
                                         <div className="flex flex-col gap-2">
                                             <span className="text-xs font-semibold uppercase tracking-wide text-quaternary">Skills</span>
