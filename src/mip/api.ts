@@ -143,6 +143,7 @@ export type DbCollection =
     | "settings"
     | "tokens"
     | "components"
+    | "widget_types"
     | "apps"
     | "conversations"
     | "themes"

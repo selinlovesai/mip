@@ -38,6 +38,7 @@ COLLECTIONS = {
     "settings",
     "tokens",
     "components",
+    "widget_types",
     "apps",
     "conversations",
     "themes",

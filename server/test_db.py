@@ -88,6 +88,22 @@ async def test_seed_seeds_empty_then_is_noop(fresh_db):
     assert edited is not None and edited["data"]["title"] == "My Overview"
 
 
+async def test_widget_types_catalog_seeds(fresh_db):
+    # The widget-type registry catalog seeds one row per type (id = the type),
+    # each carrying display + data-binding metadata the picker/AI read.
+    result = await seed.seed_if_empty(fresh_db)
+    assert result.get("widget_types") == 33
+    rows = await db.list_records("widget_types")
+    by_id = {r["id"]: r["data"] for r in rows}
+    assert {"kpi", "lineChart", "table", "hero", "markdown"} <= set(by_id)
+    kpi = by_id["kpi"]
+    assert kpi["label"] == "KPI" and kpi["group"] == "Data" and kpi["refreshable"] is True
+    assert kpi["dataMap"] == {"key": "value", "shape": "scalar"}
+    # Charts map their array under `series` (mip-tailwind renderers), not `slices`.
+    assert by_id["pieChart"]["dataMap"]["key"] == "series" and by_id["pieChart"]["isChart"] is True
+    assert by_id["hero"]["isDesignBlock"] is True
+
+
 def test_emit_json_and_css_are_pure():
     rows = [
         {"name": "--color-brand-600", "mode": "light", "value": "rgb(127 86 217)", "kind": "color", "group": "Brand"},
