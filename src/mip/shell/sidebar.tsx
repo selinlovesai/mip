@@ -70,19 +70,22 @@ export function Sidebar({ onToggle, onOpenSettings, onNavigate, onSignOut }: { o
     const canDelete = state.pages.length > 1;
 
     return (
-        <aside className="flex h-full w-64 shrink-0 flex-col border-r border-secondary bg-primary">
-            <div className="flex items-center justify-between gap-2 px-4 py-4">
+        <aside className="flex h-full w-60 shrink-0 flex-col border-r border-secondary bg-primary">
+            <div className="flex items-center justify-between gap-2 px-4 py-3.5">
                 <div className="flex items-center gap-2.5">
-                    <Avatar size="md" rounded={false} initials="M" className="bg-brand-solid text-white" />
+                    <Avatar size="sm" rounded={false} initials="M" className="bg-brand-solid text-white" />
                     <span className="flex flex-col leading-tight">
-                        <span className="text-sm font-semibold text-primary">Protocol Foundation</span>
-                        <span className="text-xs text-tertiary">MIP runtime</span>
+                        <span className="text-[13px] font-semibold leading-tight text-primary">Protocol Foundation</span>
+                        <span className="text-[11px] leading-tight text-tertiary">MIP runtime</span>
                     </span>
                 </div>
                 <ButtonUtility color="tertiary" size="xs" icon={ChevronLeft} tooltip="Collapse sidebar" onClick={onToggle} />
             </div>
 
-            <nav className="flex-1 overflow-y-auto px-3 py-2">
+            {/* Slightly smaller nav items: shrink the NavItemBase icon (size-5→4),
+                label (text-sm→13px), and vertical padding/line-height. Scoped to
+                links so the header/dropdown ButtonUtilities are unaffected. */}
+            <nav className="flex-1 overflow-y-auto px-3 py-2 [&_a>span]:!text-[13px] [&_a>span]:!leading-tight [&_a>svg]:!size-4 [&_a]:!py-1.5">
                 <div className="flex items-center justify-between px-2 py-1.5">
                     <span className="text-xs font-semibold uppercase tracking-wide text-quaternary">Workspace</span>
                     <div className="flex items-center gap-0.5">
@@ -160,12 +163,12 @@ export function Sidebar({ onToggle, onOpenSettings, onNavigate, onSignOut }: { o
                         aria-label="Open account menu"
                         className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left outline-focus-ring hover:bg-secondary"
                     >
-                        <Avatar size="md" initials={initialsOf(profile.name)} />
+                        <Avatar size="sm" initials={initialsOf(profile.name)} />
                         <span className="flex min-w-0 flex-1 flex-col leading-tight">
-                            <span className="truncate text-sm font-semibold text-primary">{profile.name}</span>
-                            <span className="truncate text-xs text-tertiary">{profile.email}</span>
+                            <span className="truncate text-[13px] font-semibold leading-tight text-primary">{profile.name}</span>
+                            <span className="truncate text-[11px] leading-tight text-tertiary">{profile.email}</span>
                         </span>
-                        <ChevronRight className="size-4 shrink-0 text-tertiary" />
+                        <ChevronRight className="size-3.5 shrink-0 text-tertiary" />
                     </AriaButton>
                     <Dropdown.Popover placement="top end">
                         <Dropdown.Menu>

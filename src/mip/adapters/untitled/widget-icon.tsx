@@ -27,17 +27,29 @@ const NAMED: Record<string, IconComp> = {
     target01: Target01, trendup: TrendUp01, trendup01: TrendUp01, users: Users01, users01: Users01, zap: Zap, bolt: Zap,
 };
 
+/** Map common emojis to a curated Untitled icon, so legacy/AI data that used
+ *  raw emojis renders as a crisp icon-font glyph instead of a coloured emoji. */
+const EMOJI: Record<string, IconComp> = {
+    "⚡": Zap, "🔌": Zap, "🔒": Lock01, "🔐": Lock01, "🛡️": Shield01, "🛡": Shield01, "🌐": Globe01, "🌍": Globe01, "🌎": Globe01, "🌏": Globe01,
+    "🚀": Rocket01, "⭐": Star01, "🌟": Star01, "❤️": Heart, "♥️": Heart, "📊": BarChartSquare01, "📈": TrendUp01, "📅": Calendar, "🕐": Clock, "⏰": Clock,
+    "🔔": BellRinging01, "✉️": Mail01, "📧": Mail01, "💬": MessageChatCircle, "👥": Users01, "🎯": Target01, "🏆": Award01, "🚩": Flag01,
+    "💡": Lightbulb01, "⚙️": Settings01, "🖼️": Image01, "🗄️": Database01, "📦": Cube01, "✅": CheckCircle, "✔️": CheckCircle, "🏁": Flag01,
+};
+
 /** Heuristic: does this look like an icon-font class rather than a name/emoji? */
 const looksLikeClass = (s: string) => /\s/.test(s) || /^(fa[srlbd]?-|fa-|bi-|bi |ti-|ti |ph-|ph |material-icons|mdi-|lucide|icon-)/i.test(s.trim());
 
 export function WidgetIcon({ icon, className }: { icon?: unknown; className?: string }) {
     if (typeof icon !== "string" || !icon.trim()) return null;
-    const Comp = NAMED[icon.trim().toLowerCase()];
+    const raw = icon.trim();
+    const Comp = NAMED[raw.toLowerCase()] ?? EMOJI[raw] ?? EMOJI[raw.replace(/️/g, "")];
     if (Comp) return <Comp className={className} aria-hidden />;
-    if (looksLikeClass(icon)) return <i className={cx(icon, className)} aria-hidden />;
+    if (looksLikeClass(raw)) return <i className={cx(raw, className)} aria-hidden />;
+    // Unknown emoji/text → a neutral icon so the grid stays consistent (no emoji).
+    if (/\p{Extended_Pictographic}/u.test(raw)) return <Star01 className={className} aria-hidden />;
     return (
         <span className={className} aria-hidden>
-            {icon}
+            {raw}
         </span>
     );
 }
