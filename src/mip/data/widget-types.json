@@ -1,0 +1,547 @@
+{
+  "_comment": "Canonical widget-type registry catalog. Source of truth for the frontend (imported by src/mip/widget-types.ts) AND the DB seed (server/seed.py seed_widget_types). Edit here.",
+  "types": [
+    {
+      "type": "kpi",
+      "label": "KPI",
+      "group": "Data",
+      "order": 0,
+      "description": "Single metric summary",
+      "layout": {
+        "w": 4,
+        "h": 1
+      },
+      "refreshable": true,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": false,
+      "dataMap": {
+        "key": "value",
+        "shape": "scalar"
+      }
+    },
+    {
+      "type": "progress",
+      "label": "Progress",
+      "group": "Data",
+      "order": 1,
+      "description": "Goal and progress bar",
+      "layout": {
+        "w": 4,
+        "h": 1
+      },
+      "refreshable": true,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": false,
+      "dataMap": {
+        "key": "value",
+        "shape": "scalar"
+      },
+      "accent": "success"
+    },
+    {
+      "type": "lineChart",
+      "label": "Line chart",
+      "group": "Charts",
+      "order": 2,
+      "description": "Trend over time",
+      "layout": {
+        "w": 6,
+        "h": 2
+      },
+      "refreshable": true,
+      "isChart": true,
+      "isDiagram": false,
+      "isDesignBlock": false,
+      "dataMap": {
+        "key": "series",
+        "shape": "array"
+      }
+    },
+    {
+      "type": "barChart",
+      "label": "Bar chart",
+      "group": "Charts",
+      "order": 3,
+      "description": "Category bars",
+      "layout": {
+        "w": 6,
+        "h": 2
+      },
+      "refreshable": true,
+      "isChart": true,
+      "isDiagram": false,
+      "isDesignBlock": false,
+      "dataMap": {
+        "key": "series",
+        "shape": "array"
+      },
+      "accent": "info"
+    },
+    {
+      "type": "areaChart",
+      "label": "Area chart",
+      "group": "Charts",
+      "order": 4,
+      "description": "Filled trend chart",
+      "layout": {
+        "w": 6,
+        "h": 2
+      },
+      "refreshable": true,
+      "isChart": true,
+      "isDiagram": false,
+      "isDesignBlock": false,
+      "dataMap": {
+        "key": "series",
+        "shape": "array"
+      }
+    },
+    {
+      "type": "pieChart",
+      "label": "Pie chart",
+      "group": "Charts",
+      "order": 5,
+      "description": "Share breakdown",
+      "layout": {
+        "w": 4,
+        "h": 2
+      },
+      "refreshable": true,
+      "isChart": true,
+      "isDiagram": false,
+      "isDesignBlock": false,
+      "dataMap": {
+        "key": "series",
+        "shape": "array"
+      },
+      "accent": "warning"
+    },
+    {
+      "type": "donutChart",
+      "label": "Donut chart",
+      "group": "Charts",
+      "order": 6,
+      "description": "Share breakdown ring",
+      "layout": {
+        "w": 4,
+        "h": 2
+      },
+      "refreshable": true,
+      "isChart": true,
+      "isDiagram": false,
+      "isDesignBlock": false,
+      "dataMap": {
+        "key": "series",
+        "shape": "array"
+      },
+      "accent": "warning"
+    },
+    {
+      "type": "table",
+      "label": "Table",
+      "group": "Data",
+      "order": 7,
+      "description": "Structured rows",
+      "layout": {
+        "w": 6,
+        "h": 2
+      },
+      "refreshable": true,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": false,
+      "dataMap": {
+        "key": "rows",
+        "shape": "array"
+      }
+    },
+    {
+      "type": "list",
+      "label": "List",
+      "group": "Data",
+      "order": 8,
+      "description": "Bordered item list",
+      "layout": {
+        "w": 4,
+        "h": 2
+      },
+      "refreshable": true,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": false,
+      "dataMap": {
+        "key": "items",
+        "shape": "array"
+      },
+      "accent": "info"
+    },
+    {
+      "type": "detail",
+      "label": "Detail",
+      "group": "Data",
+      "order": 9,
+      "description": "Record fields",
+      "layout": {
+        "w": 4,
+        "h": 2
+      },
+      "refreshable": true,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": false,
+      "dataMap": {
+        "key": "record",
+        "shape": "object"
+      },
+      "accent": "info"
+    },
+    {
+      "type": "markdown",
+      "label": "Markdown",
+      "group": "Content",
+      "order": 10,
+      "description": "Formatted text",
+      "layout": {
+        "w": 4,
+        "h": 2
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": false
+    },
+    {
+      "type": "image",
+      "label": "Image",
+      "group": "Content",
+      "order": 11,
+      "description": "Image from a URL",
+      "layout": {
+        "w": 4,
+        "h": 2
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": false
+    },
+    {
+      "type": "flowchart",
+      "label": "Flowchart",
+      "group": "Diagrams",
+      "order": 12,
+      "description": "Boxes-and-arrows process diagram",
+      "layout": {
+        "w": 6,
+        "h": 3
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": true,
+      "isDesignBlock": false
+    },
+    {
+      "type": "sequenceDiagram",
+      "label": "Sequence",
+      "group": "Diagrams",
+      "order": 13,
+      "description": "Actor interactions over time",
+      "layout": {
+        "w": 6,
+        "h": 3
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": true,
+      "isDesignBlock": false
+    },
+    {
+      "type": "mindmap",
+      "label": "Mindmap",
+      "group": "Diagrams",
+      "order": 14,
+      "description": "Branching idea map",
+      "layout": {
+        "w": 6,
+        "h": 6
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": true,
+      "isDesignBlock": false
+    },
+    {
+      "type": "timeline",
+      "label": "Timeline",
+      "group": "Diagrams",
+      "order": 15,
+      "description": "Chronological events",
+      "layout": {
+        "w": 6,
+        "h": 6
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": true,
+      "isDesignBlock": false
+    },
+    {
+      "type": "ganttChart",
+      "label": "Gantt",
+      "group": "Diagrams",
+      "order": 16,
+      "description": "Project schedule bars",
+      "layout": {
+        "w": 8,
+        "h": 2
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": true,
+      "isDesignBlock": false
+    },
+    {
+      "type": "form",
+      "label": "Form",
+      "group": "Content",
+      "order": 17,
+      "description": "Data collection",
+      "layout": {
+        "w": 4,
+        "h": 2
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": false,
+      "accent": "success"
+    },
+    {
+      "type": "button",
+      "label": "Button",
+      "group": "Content",
+      "order": 18,
+      "description": "Action trigger",
+      "layout": {
+        "w": 2,
+        "h": 1
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": false
+    },
+    {
+      "type": "pageHeader",
+      "label": "Page header",
+      "group": "Content",
+      "order": 19,
+      "description": "Section header",
+      "layout": {
+        "w": 12,
+        "h": 2
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": false
+    },
+    {
+      "type": "card",
+      "label": "Card",
+      "group": "Content",
+      "order": 20,
+      "description": "Content container",
+      "layout": {
+        "w": 4,
+        "h": 1
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": false
+    },
+    {
+      "type": "tabs",
+      "label": "Tabs",
+      "group": "Content",
+      "order": 21,
+      "description": "Tabbed surface",
+      "layout": {
+        "w": 6,
+        "h": 2
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": false
+    },
+    {
+      "type": "modal",
+      "label": "Modal",
+      "group": "Content",
+      "order": 22,
+      "description": "Overlay placeholder",
+      "layout": {
+        "w": 3,
+        "h": 2
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": false
+    },
+    {
+      "type": "drawer",
+      "label": "Drawer",
+      "group": "Content",
+      "order": 23,
+      "description": "Side panel placeholder",
+      "layout": {
+        "w": 3,
+        "h": 2
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": false
+    },
+    {
+      "type": "googleMap",
+      "label": "Map",
+      "group": "Integrations",
+      "order": 24,
+      "description": "Interactive map with markers and layers",
+      "layout": {
+        "w": 6,
+        "h": 2
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": false
+    },
+    {
+      "type": "contentSection",
+      "label": "Content section",
+      "group": "Marketing",
+      "order": 25,
+      "description": "Rich content block with heading and body",
+      "layout": {
+        "w": 12,
+        "h": 6
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": true
+    },
+    {
+      "type": "cta",
+      "label": "CTA",
+      "group": "Marketing",
+      "order": 26,
+      "description": "Conversion call-to-action banner",
+      "layout": {
+        "w": 12,
+        "h": 2
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": true
+    },
+    {
+      "type": "faq",
+      "label": "FAQ",
+      "group": "Marketing",
+      "order": 27,
+      "description": "Expandable Q&A accordion",
+      "layout": {
+        "w": 8,
+        "h": 2
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": true
+    },
+    {
+      "type": "featureGrid",
+      "label": "Feature grid",
+      "group": "Marketing",
+      "order": 28,
+      "description": "Icon + text feature showcase",
+      "layout": {
+        "w": 8,
+        "h": 2
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": true
+    },
+    {
+      "type": "hero",
+      "label": "Hero",
+      "group": "Marketing",
+      "order": 29,
+      "description": "Large hero banner with heading and CTA",
+      "layout": {
+        "w": 12,
+        "h": 3
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": true
+    },
+    {
+      "type": "pricing",
+      "label": "Pricing",
+      "group": "Marketing",
+      "order": 30,
+      "description": "Multi-tier pricing comparison",
+      "layout": {
+        "w": 12,
+        "h": 3
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": true
+    },
+    {
+      "type": "statsGrid",
+      "label": "Stats grid",
+      "group": "Marketing",
+      "order": 31,
+      "description": "KPI metrics in a card grid",
+      "layout": {
+        "w": 8,
+        "h": 1
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": true
+    },
+    {
+      "type": "testimonial",
+      "label": "Testimonial",
+      "group": "Marketing",
+      "order": 32,
+      "description": "Customer quote with attribution",
+      "layout": {
+        "w": 4,
+        "h": 2
+      },
+      "refreshable": false,
+      "isChart": false,
+      "isDiagram": false,
+      "isDesignBlock": true
+    }
+  ]
+}

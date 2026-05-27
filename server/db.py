@@ -107,6 +107,7 @@ async def init_db() -> bool:
         try:
             await seed.seed_if_empty(engine)
             await seed.seed_tokens(engine)
+            await seed.seed_widget_types(engine)
         except Exception as exc:  # noqa: BLE001 - seeding is best-effort
             print(f"[db] seed skipped ({exc.__class__.__name__}: {exc})")
         return True

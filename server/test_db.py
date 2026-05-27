@@ -89,10 +89,11 @@ async def test_seed_seeds_empty_then_is_noop(fresh_db):
 
 
 async def test_widget_types_catalog_seeds(fresh_db):
-    # The widget-type registry catalog seeds one row per type (id = the type),
-    # each carrying display + data-binding metadata the picker/AI read.
-    result = await seed.seed_if_empty(fresh_db)
-    assert result.get("widget_types") == 33
+    # The widget-type registry catalog seeds one row per type (id = the type)
+    # from the canonical frontend JSON — display + data-binding metadata the
+    # picker/AI read. Seed-if-empty: re-running is a no-op.
+    assert await seed.seed_widget_types(fresh_db) == 33
+    assert await seed.seed_widget_types(fresh_db) == 0
     rows = await db.list_records("widget_types")
     by_id = {r["id"]: r["data"] for r in rows}
     assert {"kpi", "lineChart", "table", "hero", "markdown"} <= set(by_id)
