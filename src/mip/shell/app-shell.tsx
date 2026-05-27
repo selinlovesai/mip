@@ -29,7 +29,7 @@ function PageBody() {
     const { activePage } = useDashboard();
     if (activePage.kind === "canvas") return <CanvasSurface key={activePage.id} pageId={activePage.id} html={activePage.html ?? ""} />;
     return (
-        <div className="h-full overflow-y-auto p-6">
+        <div className="h-full overflow-x-hidden overflow-y-auto p-6">
             <DashboardGrid />
         </div>
     );

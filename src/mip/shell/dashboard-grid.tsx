@@ -59,7 +59,7 @@ export function DashboardGrid() {
     }
 
     return (
-        <div ref={containerRef}>
+        <div ref={containerRef} className="w-full min-w-0 overflow-hidden">
             {mounted ? (
                 <GridLayout
                     width={width}
@@ -76,7 +76,7 @@ export function DashboardGrid() {
                     onLayoutChange={(next) => applyLayout(next)}
                 >
                     {activePage.widgets.map((widget) => (
-                        <div key={widget.id} data-mip-widget-id={widget.id}>
+                        <div key={widget.id} data-mip-widget-id={widget.id} className="min-w-0 overflow-hidden">
                             <WidgetChrome widget={widget} editMode={editMode} onDelete={removeWidget} />
                         </div>
                     ))}
